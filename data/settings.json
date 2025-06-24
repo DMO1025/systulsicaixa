@@ -54,11 +54,5 @@
     "eventosDireto": true,
     "eventosHotel": true
   },
-  "mysqlConnectionConfig": {
-    "host": "",
-    "port": ,
-    "user": "",
-    "password": "",
-    "database": ""
-  }
+  "mysqlConnectionConfig": {}
 }

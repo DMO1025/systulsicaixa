@@ -64,17 +64,17 @@ export default function MigrationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Migrar Lançamentos do JSON para MySQL</CardTitle>
+          <CardTitle>Migrar Dados do JSON para MySQL</CardTitle>
           <CardDescription>
-            Use esta função para transferir todos os lançamentos diários que foram salvos localmente (em formato JSON) para o banco de dados MySQL configurado. 
-            Certifique-se de que a conexão com o MySQL está ativa e a tabela 'daily_entries' foi criada antes de iniciar a migração. 
-            Registros com o mesmo ID (data) no banco de dados serão atualizados.
+            Use esta função para transferir todos os dados (lançamentos, usuários, configurações) salvos localmente (em formato JSON) para o banco de dados MySQL configurado. 
+            Certifique-se de que a conexão com o MySQL está ativa e as tabelas foram criadas antes de iniciar a migração. 
+            Registros existentes no banco de dados serão atualizados.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Button onClick={handleMigrateData} disabled={isMigratingData} className="w-full sm:w-auto">
             {isMigratingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
-            Iniciar Migração de Lançamentos
+            Iniciar Migração Completa
           </Button>
         </CardContent>
       </Card>

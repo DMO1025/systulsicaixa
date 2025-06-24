@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   FileText,
   CalendarPlus,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -32,6 +33,7 @@ const baseNavItems = [
   { id: 'dashboard', href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'entry', href: '/entry', label: 'Lançamento Diário', icon: CalendarPlus },
   { id: 'reports', href: '/reports', label: 'Relatórios', icon: FileText },
+  { id: 'help', href: '/help', label: 'Ajuda', icon: HelpCircle },
 ];
 
 export default function Header() {
@@ -40,6 +42,8 @@ export default function Header() {
   const router = useRouter();
 
   const navItems = baseNavItems.filter(item => {
+    if (item.id === 'help') return true; // Help is always visible
+
     if (userRole === 'administrator') {
       return true;
     }
@@ -48,6 +52,22 @@ export default function Header() {
     }
     return false;
   });
+
+  const getLinkClassName = (href: string) => {
+    // Exact match for homepage, startsWith for others
+    if (href === '/') {
+        return pathname === href ? "bg-muted text-primary font-semibold" : "font-medium";
+    }
+    return pathname.startsWith(href) ? "bg-muted text-primary font-semibold" : "font-medium";
+  };
+
+  const getButtonVariant = (href: string) => {
+    if (href === '/') {
+      return pathname === href ? 'secondary' : 'ghost';
+    }
+    return pathname.startsWith(href) ? 'secondary' : 'ghost';
+  };
+
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 shadow-sm">
@@ -75,7 +95,7 @@ export default function Header() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:bg-primary/10",
-                    pathname.startsWith(item.href) && item.href !== '/' ? "bg-muted text-primary" : pathname ==='/' && item.href ==='/'? "bg-muted text-primary":""
+                    getLinkClassName(item.href)
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -99,7 +119,7 @@ export default function Header() {
             <Button
               key={item.label}
               asChild
-              variant={pathname.startsWith(item.href) && item.href !== '/' ? 'secondary' : pathname === '/' && item.href ==='/' ? 'secondary' : 'ghost'}
+              variant={getButtonVariant(item.href)}
               className="text-sm font-medium"
             >
               <Link href={item.href} className="flex items-center gap-2 px-3 py-2">

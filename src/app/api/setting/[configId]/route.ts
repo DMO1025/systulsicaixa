@@ -2,8 +2,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSettingFromFile, saveSettingToFile } from '@/lib/fileDb';
+import { getDbPool, isMysqlConnected, SETTINGS_TABLE_NAME, safeStringify } from '@/lib/mysql';
 import type { Settings } from '@/lib/types';
-import { unstable_cache as cache, revalidateTag } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import type mysql from 'mysql2/promise';
 
 const validConfigIds = z.enum([
   'cardVisibilityConfig', 
@@ -14,20 +16,6 @@ const validConfigIds = z.enum([
 ]);
 type ValidConfigId = z.infer<typeof validConfigIds>;
 
-const getSetting = (configId: ValidConfigId) => cache(
-  async (id: ValidConfigId) => {
-    try {
-      const configValue = await getSettingFromFile(id);
-      return configValue;
-    } catch (error: any) {
-      console.error(`API GET Setting Erro para ${id}:`, error);
-      throw new Error(`Erro ao ler configuração ${id}.`);
-    }
-  },
-  ['setting', configId],
-  { tags: ['settings', `setting-${configId}`], revalidate: 60 }
-)(configId);
-
 export async function GET(request: NextRequest, { params }: { params: { configId: string } }) {
   const parsedConfigId = validConfigIds.safeParse(params.configId);
 
@@ -37,15 +25,32 @@ export async function GET(request: NextRequest, { params }: { params: { configId
   const configId = parsedConfigId.data as ValidConfigId;
 
   try {
-    const configValue = await getSetting(configId);
+    const pool = await getDbPool();
+    let configValue = null;
+
+    if (await isMysqlConnected(pool)) {
+      const [rows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT value FROM \`${SETTINGS_TABLE_NAME}\` WHERE id = ?`, [configId]);
+      if (rows.length > 0 && rows[0].value) {
+        configValue = rows[0].value;
+      }
+    }
+    
+    // If not in DB or DB not connected, fall back to file
+    if (configValue === null) {
+        configValue = await getSettingFromFile(configId);
+    }
+
     if (configValue === null || configValue === undefined) {
-      return NextResponse.json({ message: `Configuração ${configId} não encontrada.` }, { status: 404 });
+      // It's ok if it doesn't exist, return an empty object for the config
+      return NextResponse.json({ config: {} });
     }
     return NextResponse.json({ config: configValue });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message, details: error.toString() }, { status: 500 });
+    console.error(`API GET Setting Erro para ${configId}:`, error);
+    return NextResponse.json({ message: `Erro ao ler configuração ${configId}.`, details: error.toString() }, { status: 500 });
   }
 }
+
 
 export async function POST(request: NextRequest, { params }: { params: { configId: string } }) {
   const parsedConfigId = validConfigIds.safeParse(params.configId);
@@ -62,30 +67,26 @@ export async function POST(request: NextRequest, { params }: { params: { configI
     return NextResponse.json({ message: 'Payload JSON inválido.' }, { status: 400 });
   }
 
-  if (!requestBody || typeof requestBody.config === 'undefined') {
+  if (typeof requestBody.config === 'undefined') {
     return NextResponse.json({ message: 'Payload deve conter a propriedade "config".' }, { status: 400 });
   }
 
   const configValue = requestBody.config as Settings[ValidConfigId];
 
   try {
-    if (configId === 'cardVisibilityConfig' && typeof configValue !== 'object') {
-        return NextResponse.json({ message: 'cardVisibilityConfig deve ser um objeto.' }, { status: 400 });
+    const pool = await getDbPool();
+    if (await isMysqlConnected(pool)) {
+      const jsonValue = safeStringify(configValue);
+      if (jsonValue) {
+          const sql = `INSERT INTO \`${SETTINGS_TABLE_NAME}\` (id, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value);`;
+          await pool!.query(sql, [configId, jsonValue]);
+      } else {
+          // If value is null/empty, delete from DB
+          await pool!.query(`DELETE FROM \`${SETTINGS_TABLE_NAME}\` WHERE id = ?`, [configId]);
+      }
+    } else {
+      await saveSettingToFile(configId, configValue);
     }
-    if (configId === 'dashboardItemVisibilityConfig' && typeof configValue !== 'object') {
-        return NextResponse.json({ message: 'dashboardItemVisibilityConfig deve ser um objeto.' }, { status: 400 });
-    }
-    if (configId === 'channelUnitPricesConfig' && typeof configValue !== 'object') {
-        return NextResponse.json({ message: 'channelUnitPricesConfig deve ser um objeto.' }, { status: 400 });
-    }
-     if (configId === 'mysqlConnectionConfig' && typeof configValue !== 'object') {
-        return NextResponse.json({ message: 'mysqlConnectionConfig deve ser um objeto.' }, { status: 400 });
-    }
-    if (configId === 'summaryCardItemsConfig' && typeof configValue !== 'object') {
-        return NextResponse.json({ message: 'summaryCardItemsConfig deve ser um objeto.' }, { status: 400 });
-    }
-
-    await saveSettingToFile(configId, configValue);
     
     revalidateTag('settings');
     revalidateTag(`setting-${configId}`);

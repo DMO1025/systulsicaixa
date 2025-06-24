@@ -17,10 +17,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PATH_TO_PAGE_ID: Record<string, PageId> = {
+const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
   '/': 'dashboard',
   '/entry': 'entry',
-  '/reports': 'reports'
+  '/reports': 'reports',
+  '/help': 'help',
+  '/admin': 'admin',
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -70,21 +72,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (userRole === 'operator' && allowedPages) {
-        // Sort paths by length (desc) to find the most specific match first.
-        // e.g., for '/entry/madrugada', it will match '/entry' before '/'.
         const sortedPaths = Object.keys(PATH_TO_PAGE_ID).sort((a, b) => b.length - a.length);
         const currentPagePath = sortedPaths.find(p => pathname.startsWith(p));
         
         let isAllowed = false;
-
-        // Explicitly block admin pages
-        if (pathname.startsWith('/admin')) {
-            isAllowed = false;
-        } else if (currentPagePath) {
-            const pageId = PATH_TO_PAGE_ID[currentPagePath];
-            isAllowed = allowedPages.includes(pageId);
+        
+        if (currentPagePath) {
+          const pageId = PATH_TO_PAGE_ID[currentPagePath];
+          if (pageId === 'admin') {
+            isAllowed = false; // Operators are never allowed in admin
+          } else if (pageId === 'help') {
+            isAllowed = true; // All authenticated users can see help
+          } else {
+            isAllowed = allowedPages.includes(pageId as PageId);
+          }
         } else {
-            // Path is not a known page, consider it not allowed for operators
             isAllowed = false;
         }
 

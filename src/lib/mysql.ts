@@ -8,6 +8,9 @@ import { PERIOD_DEFINITIONS } from './constants';
 let pool: Pool | null = null;
 
 export const TABLE_NAME = 'daily_entries';
+export const SETTINGS_TABLE_NAME = 'app_settings';
+export const USERS_TABLE_NAME = 'users';
+
 
 const generateTableSchema = (): string => {
   const periodColumns = PERIOD_DEFINITIONS.map(p => `\`${p.id}\` JSON`).join(',\n  ');
@@ -25,6 +28,26 @@ CREATE TABLE IF NOT EXISTS \`${TABLE_NAME}\` (
 };
 
 export const DAILY_ENTRIES_TABLE_SCHEMA = generateTableSchema();
+
+export const APP_SETTINGS_TABLE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS \`${SETTINGS_TABLE_NAME}\` (
+  id VARCHAR(255) PRIMARY KEY,
+  value JSON NOT NULL,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);`;
+
+export const USERS_TABLE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS \`${USERS_TABLE_NAME}\` (
+  id VARCHAR(255) PRIMARY KEY,
+  username VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL,
+  shifts JSON,
+  allowedPages JSON,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);`;
 
 
 export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {

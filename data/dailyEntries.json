@@ -3,7 +3,7 @@
     "date": "2025-06-24",
     "generalObservations": "",
     "madrugada": "{\"periodObservations\":\"\",\"channels\":{\"madrugadaRoomServiceQtdPedidos\":{},\"madrugadaRoomServiceQtdPratos\":{},\"madrugadaRoomServicePagDireto\":{},\"madrugadaRoomServiceValorServico\":{}}}",
-    "cafeDaManha": "{\"periodObservations\":\"\",\"channels\":{\"cdmListaHospedes\":{\"qtd\":10,\"vtotal\":150},\"cdmNoShow\":{\"qtd\":10,\"vtotal\":150},\"cdmSemCheckIn\":{\"qtd\":10,\"vtotal\":150},\"cdmCafeAssinado\":{\"qtd\":10,\"vtotal\":10},\"cdmDiretoCartao\":{\"qtd\":10,\"vtotal\":10}}}",
+    "cafeDaManha": "{\"periodObservations\":\"\",\"channels\":{\"cdmListaHospedes\":{},\"cdmNoShow\":{},\"cdmSemCheckIn\":{},\"cdmCafeAssinado\":{},\"cdmDiretoCartao\":{}}}",
     "breakfast": "{\"periodObservations\":\"\",\"channels\":{\"breakfastEntry\":{}}}",
     "almocoPrimeiroTurno": "{\"periodObservations\":\"\",\"subTabs\":{\"roomService\":{\"channels\":{\"aptRoomServiceQtdPedidos\":{},\"aptRoomServicePagDireto\":{},\"aptRoomServiceValorServico\":{}}},\"hospedes\":{\"channels\":{\"aptHospedesQtdHospedes\":{},\"aptHospedesPagamentoHospedes\":{}}},\"clienteMesa\":{\"channels\":{\"aptClienteMesaTotaisQtd\":{},\"aptClienteMesaDinheiro\":{},\"aptClienteMesaCredito\":{},\"aptClienteMesaDebito\":{},\"aptClienteMesaPix\":{},\"aptClienteMesaTicketRefeicao\":{},\"aptClienteMesaRetiradaQtd\":{},\"aptClienteMesaRetiradaValor\":{}}},\"delivery\":{\"channels\":{\"aptDeliveryIfoodQtd\":{},\"aptDeliveryIfoodValor\":{},\"aptDeliveryRappiQtd\":{},\"aptDeliveryRappiValor\":{}}},\"ciEFaturados\":{\"channels\":{\"aptCiEFaturadosFaturadosQtd\":{},\"aptCiEFaturadosValorHotel\":{},\"aptCiEFaturadosValorFuncionario\":{},\"aptCiEFaturadosTotalFaturado\":{},\"aptCiEFaturadosConsumoInternoQtd\":{},\"aptCiEFaturadosReajusteCI\":{},\"aptCiEFaturadosTotalCI\":{}}}}}",
     "almocoSegundoTurno": "{\"periodObservations\":\"\",\"subTabs\":{\"roomService\":{\"channels\":{\"astRoomServiceQtdPedidos\":{},\"astRoomServicePagDireto\":{},\"astRoomServiceValorServico\":{}}},\"hospedes\":{\"channels\":{\"astHospedesQtdHospedes\":{},\"astHospedesPagamentoHospedes\":{}}},\"clienteMesa\":{\"channels\":{\"astClienteMesaTotaisQtd\":{},\"astClienteMesaDinheiro\":{},\"astClienteMesaCredito\":{},\"astClienteMesaDebito\":{},\"astClienteMesaPix\":{},\"astClienteMesaTicketRefeicao\":{},\"astClienteMesaRetiradaQtd\":{},\"astClienteMesaRetiradaValor\":{}}},\"delivery\":{\"channels\":{\"astDeliveryIfoodQtd\":{},\"astDeliveryIfoodValor\":{},\"astDeliveryRappiQtd\":{},\"astDeliveryRappiValor\":{}}},\"ciEFaturados\":{\"channels\":{\"astCiEFaturadosFaturadosQtd\":{},\"astCiEFaturadosValorHotel\":{},\"astCiEFaturadosValorFuncionario\":{},\"astCiEFaturadosTotalFaturado\":{},\"astCiEFaturadosConsumoInternoQtd\":{},\"astCiEFaturadosReajusteCI\":{},\"astCiEFaturadosTotalCI\":{}}}}}",
@@ -18,7 +18,7 @@
     "frigobar": "{\"periodObservations\":\"\",\"subTabs\":{\"primeiroTurno\":{\"channels\":{\"frgPTTotalQuartos\":{},\"frgPTPagRestaurante\":{},\"frgPTPagHotel\":{}}},\"segundoTurno\":{\"channels\":{\"frgSTTotalQuartos\":{},\"frgSTPagRestaurante\":{},\"frgSTPagHotel\":{}}}}}",
     "id": "2025-06-24",
     "createdAt": "2025-06-24T04:27:53.888Z",
-    "lastModifiedAt": "2025-06-24T16:05:58.887Z"
+    "lastModifiedAt": "2025-06-24T04:28:16.226Z"
   },
   {
     "date": "2025-06-20",
