@@ -1,6 +1,6 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getDbPool, isMysqlConnected, TABLE_NAME, safeParse } from '@/lib/mysql';
+import { getDbPool, isMysqlConnected, DAILY_ENTRIES_TABLE_NAME, safeParse } from '@/lib/mysql';
 import { getAllEntriesFromFile } from '@/lib/fileDb';
 import type { DailyLogEntry, PeriodData, EventosPeriodData } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
@@ -63,7 +63,7 @@ async function getEntries(startDateStr?: string, endDateStr?: string): Promise<D
   const pool = await getDbPool();
   if (await isMysqlConnected(pool)) {
     try {
-      let query = `SELECT * FROM ${TABLE_NAME}`;
+      let query = `SELECT * FROM ${DAILY_ENTRIES_TABLE_NAME}`;
       const params: string[] = [];
       if (startDateStr && endDateStr) {
         query += ' WHERE date BETWEEN ? AND ?';
@@ -107,4 +107,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: error.message, details: error.toString() }, { status: 500 });
   }
 }
-    

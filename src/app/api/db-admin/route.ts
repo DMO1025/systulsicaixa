@@ -1,18 +1,14 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getDbPool, DAILY_ENTRIES_TABLE_SCHEMA, isMysqlConnected, safeParse, safeStringify, TABLE_NAME } from '@/lib/mysql';
-import { getAllEntriesFromFile } from '@/lib/fileDb';
-import type { MysqlConnectionConfig, DailyLogEntry } from '@/lib/types';
+import { getDbPool, DATABASE_INIT_SCHEMA, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME } from '@/lib/mysql';
+import { getAllEntriesFromFile, getUsersFromFile, readSettingsFile } from '@/lib/fileDb';
+import type { MysqlConnectionConfig, DailyLogEntry, Settings, User } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
 import mysql, { type PoolOptions } from 'mysql2/promise';
 import { format, isValid, parseISO } from 'date-fns';
 import { revalidateTag } from 'next/cache';
 
-export async function POST(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const action = searchParams.get('action');
-  
-  if (action === 'test-connection') {
+async function testConnection(request: NextRequest): Promise<NextResponse> {
     let mysqlConfigFromRequest: MysqlConnectionConfig | undefined;
     try {
       if (request.headers.get('content-type')?.includes('application/json')) {
@@ -22,18 +18,14 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (e) {
-      // Sem corpo ou JSON inválido
+      // No body or invalid JSON, which is fine.
     }
 
     try {
       if (mysqlConfigFromRequest && mysqlConfigFromRequest.host) {
         const testOptions: PoolOptions = {
-          host: mysqlConfigFromRequest.host,
-          port: mysqlConfigFromRequest.port || 3306,
-          user: mysqlConfigFromRequest.user,
-          password: mysqlConfigFromRequest.password,
-          database: mysqlConfigFromRequest.database,
-          connectTimeout: 5000,
+          host: mysqlConfigFromRequest.host, port: mysqlConfigFromRequest.port || 3306, user: mysqlConfigFromRequest.user,
+          password: mysqlConfigFromRequest.password, database: mysqlConfigFromRequest.database, connectTimeout: 5000,
         };
         const testPool = mysql.createPool(testOptions);
         const conn = await testPool.getConnection();
@@ -52,113 +44,143 @@ export async function POST(request: NextRequest) {
       console.error('API db-admin/test-connection erro:', error);
       return NextResponse.json({ message: `Falha na conexão com MySQL: ${error.message}` }, { status: 500 });
     }
-  }
+}
 
-  if (action === 'ensure-table') {
+async function ensureTables(): Promise<NextResponse> {
     try {
       const pool = await getDbPool();
       if (!pool || !(await isMysqlConnected(pool))) {
         return NextResponse.json({ message: 'Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.' }, { status: 500 });
       }
-      await pool.query(DAILY_ENTRIES_TABLE_SCHEMA);
-      return NextResponse.json({ message: 'Tabela de lançamentos diários verificada/criada com sucesso!' });
+      // Split schema into individual statements and execute them. Some DB versions have issues with multi-statement queries.
+      const statements = DATABASE_INIT_SCHEMA.split(';').filter(s => s.trim().length > 0);
+      for (const statement of statements) {
+          await pool.query(statement);
+      }
+      return NextResponse.json({ message: 'Tabelas do banco de dados (lançamentos, usuários, configurações) verificadas/criadas com sucesso!' });
     } catch (error: any) {
       console.error('API db-admin/ensure-table erro:', error);
-      return NextResponse.json({ message: `Erro ao verificar/criar tabela: ${error.message}` }, { status: 500 });
+      return NextResponse.json({ message: `Erro ao verificar/criar tabelas: ${error.message}` }, { status: 500 });
     }
-  }
-  
-  if (action === 'migrate-json-to-mysql') {
+}
+
+async function migrateDataToMysql(): Promise<NextResponse> {
     const pool = await getDbPool();
     if (!pool || !(await isMysqlConnected(pool))) {
       return NextResponse.json({ message: 'MySQL não está conectado. Configure e salve as credenciais do MySQL primeiro.' }, { status: 400 });
     }
 
+    const results = {
+        settings: { migrated: 0, errors: 0, errorDetails: [] as string[] },
+        users: { migrated: 0, errors: 0, errorDetails: [] as string[] },
+        entries: { migrated: 0, errors: 0, errorDetails: [] as string[] },
+    };
+
+    // Migrate Settings
     try {
-      const jsonEntries = await getAllEntriesFromFile();
-      if (!jsonEntries || jsonEntries.length === 0) {
-        return NextResponse.json({ message: 'Nenhum lançamento encontrado no arquivo JSON para migrar.' });
-      }
-
-      let migratedCount = 0;
-      let errorCount = 0;
-      const errors = [];
-
-      for (const entry of jsonEntries) {
-        try {
-          const entryId = entry.id;
-          let entryDateStr: string;
-
-          if (entry.date instanceof Date && isValid(entry.date)) {
-            entryDateStr = format(entry.date, 'yyyy-MM-dd');
-          } else if (typeof entry.date === 'string') {
-            const parsedDate = parseISO(entry.date);
-            if (isValid(parsedDate)) {
-              entryDateStr = format(parsedDate, 'yyyy-MM-dd');
-            } else {
-              throw new Error(`Formato de data inválido para o ID ${entryId}`);
-            }
-          } else {
-            throw new Error(`Data ausente ou inválida para o ID ${entryId}`);
-          }
-
-          const columns: string[] = ['id', 'date', 'generalObservations'];
-          const values: (string | null)[] = [entryId, entryDateStr, entry.generalObservations || null];
-          const updatePlaceholders: string[] = ['date = VALUES(date)', 'generalObservations = VALUES(generalObservations)'];
-
-          PERIOD_DEFINITIONS.forEach(pDef => {
-            columns.push(`\`${pDef.id}\``);
-            const periodValue = entry[pDef.id as keyof DailyLogEntry];
-            values.push(safeStringify(periodValue));
-            updatePlaceholders.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
-          });
-          
-          const [existingRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT id FROM ${TABLE_NAME} WHERE id = ?`, [entryId]);
-          if (existingRows.length === 0) {
-              columns.push('createdAt');
-              let createdAtDate = new Date();
-              if (entry.createdAt) {
-                  const parsedCreatedAt = entry.createdAt instanceof Date ? entry.createdAt : parseISO(String(entry.createdAt));
-                  if (isValid(parsedCreatedAt)) {
-                      createdAtDate = parsedCreatedAt;
-                  }
-              }
-              values.push(format(createdAtDate, 'yyyy-MM-dd HH:mm:ss'));
-          }
-          
-          const sql = `
-            INSERT INTO ${TABLE_NAME} (${columns.join(', ')}) 
-            VALUES (${values.map(() => '?').join(', ')})
-            ON DUPLICATE KEY UPDATE ${updatePlaceholders.join(', ')}, lastModifiedAt = VALUES(lastModifiedAt)
-          `;
-
-          await pool.query(sql, values);
-          migratedCount++;
-        } catch (migrationError: any) {
-          errorCount++;
-          errors.push(`ID do Lançamento ${entry.id || 'desconhecido'}: ${migrationError.message}`);
-          console.error(`Erro ao migrar lançamento ${entry.id || 'desconhecido'}:`, migrationError);
+        const settings = await readSettingsFile();
+        for (const [key, value] of Object.entries(settings)) {
+            const sql = `INSERT INTO ${SETTINGS_TABLE_NAME} (configId, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`;
+            await pool.query(sql, [key, JSON.stringify(value)]);
+            results.settings.migrated++;
         }
-      }
-
-      if (migratedCount > 0) {
-        revalidateTag('entries');
-      }
-
-      if (errorCount > 0) {
-        return NextResponse.json({ 
-          message: `Migração concluída com ${errorCount} erro(s). ${migratedCount} lançamentos migrados.`,
-          errors 
-        }, { status: 207 }); // Multi-Status
-      }
-      return NextResponse.json({ message: `Migração concluída com sucesso! ${migratedCount} lançamentos migrados.` });
-
     } catch (error: any) {
-      console.error('API db-admin/migrate-json-to-mysql erro:', error);
-      return NextResponse.json({ message: `Erro durante a migração: ${error.message}` }, { status: 500 });
+        results.settings.errors++;
+        results.settings.errorDetails.push(`Erro ao migrar configurações: ${error.message}`);
     }
+
+    // Migrate Users
+    try {
+        const users = await getUsersFromFile();
+        for (const user of users) {
+            const sql = `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), role=VALUES(role), shifts=VALUES(shifts), allowedPages=VALUES(allowedPages)`;
+            await pool.query(sql, [user.id, user.username, user.password, user.role, JSON.stringify(user.shifts || []), JSON.stringify(user.allowedPages || []), user.createdAt || new Date()]);
+            results.users.migrated++;
+        }
+    } catch (error: any) {
+        results.users.errors++;
+        results.users.errorDetails.push(`Erro ao migrar usuários: ${error.message}`);
+    }
+
+    // Migrate Daily Entries
+    try {
+        const jsonEntries = await getAllEntriesFromFile();
+        for (const entry of jsonEntries) {
+            try {
+                const entryId = entry.id;
+                let entryDateStr: string;
+
+                if (entry.date instanceof Date && isValid(entry.date)) {
+                    entryDateStr = format(entry.date, 'yyyy-MM-dd');
+                } else if (typeof entry.date === 'string') {
+                    const parsedDate = parseISO(entry.date);
+                    if (isValid(parsedDate)) {
+                        entryDateStr = format(parsedDate, 'yyyy-MM-dd');
+                    } else { throw new Error(`Formato de data inválido para o ID ${entryId}`); }
+                } else { throw new Error(`Data ausente ou inválida para o ID ${entryId}`); }
+
+                const columns: string[] = ['id', 'date', 'generalObservations'];
+                const values: (string | null)[] = [entryId, entryDateStr, entry.generalObservations || null];
+                const updatePlaceholders: string[] = ['date = VALUES(date)', 'generalObservations = VALUES(generalObservations)'];
+
+                PERIOD_DEFINITIONS.forEach(pDef => {
+                    columns.push(`\`${pDef.id}\``);
+                    const periodValue = entry[pDef.id as keyof DailyLogEntry];
+                    values.push(safeStringify(periodValue));
+                    updatePlaceholders.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
+                });
+
+                const [existingRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT id FROM ${DAILY_ENTRIES_TABLE_NAME} WHERE id = ?`, [entryId]);
+                if (existingRows.length === 0) {
+                    columns.push('createdAt');
+                    let createdAtDate = new Date();
+                    if (entry.createdAt) {
+                        const parsedCreatedAt = entry.createdAt instanceof Date ? entry.createdAt : parseISO(String(entry.createdAt));
+                        if (isValid(parsedCreatedAt)) createdAtDate = parsedCreatedAt;
+                    }
+                    values.push(format(createdAtDate, 'yyyy-MM-dd HH:mm:ss'));
+                }
+                
+                const sql = `INSERT INTO ${DAILY_ENTRIES_TABLE_NAME} (${columns.join(', ')}) VALUES (${values.map(() => '?').join(', ')}) ON DUPLICATE KEY UPDATE ${updatePlaceholders.join(', ')}, lastModifiedAt = VALUES(lastModifiedAt)`;
+                await pool.query(sql, values);
+                results.entries.migrated++;
+            } catch (migrationError: any) {
+                results.entries.errors++;
+                results.entries.errorDetails.push(`ID do Lançamento ${entry.id || 'desconhecido'}: ${migrationError.message}`);
+                console.error(`Erro ao migrar lançamento ${entry.id || 'desconhecido'}:`, migrationError);
+            }
+        }
+    } catch (error: any) {
+        results.entries.errors++;
+        results.entries.errorDetails.push(`Erro geral ao migrar lançamentos: ${error.message}`);
+    }
+
+    const totalErrors = results.settings.errors + results.users.errors + results.entries.errors;
+    if (totalErrors > 0) {
+        revalidateTag('settings'); revalidateTag('users'); revalidateTag('entries');
+        return NextResponse.json({
+            message: `Migração concluída com ${totalErrors} erro(s). Settings: ${results.settings.migrated}, Users: ${results.users.migrated}, Entries: ${results.entries.migrated}.`,
+            errors: { ...results }
+        }, { status: 207 });
+    }
+
+    revalidateTag('settings'); revalidateTag('users'); revalidateTag('entries');
+    return NextResponse.json({ message: `Migração completa bem-sucedida! Settings: ${results.settings.migrated}, Users: ${results.users.migrated}, Entries: ${results.entries.migrated}.` });
+}
+
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+  
+  switch(action) {
+    case 'test-connection':
+        return await testConnection(request);
+    case 'ensure-table':
+    case 'ensure-tables': // Allow both for compatibility
+        return await ensureTables();
+    case 'migrate-json-to-mysql':
+        return await migrateDataToMysql();
+    default:
+        return NextResponse.json({ message: `Ação '${action}' desconhecida ou não implementada.` }, { status: 400 });
   }
-
-
-  return NextResponse.json({ message: `Ação '${action}' desconhecida ou não implementada.` }, { status: 400 });
 }

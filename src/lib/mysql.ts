@@ -7,47 +7,49 @@ import { PERIOD_DEFINITIONS } from './constants';
 
 let pool: Pool | null = null;
 
-export const TABLE_NAME = 'daily_entries';
-export const SETTINGS_TABLE_NAME = 'app_settings';
+// Rename for clarity and export all table names
+export const DAILY_ENTRIES_TABLE_NAME = 'daily_entries';
+export const SETTINGS_TABLE_NAME = 'settings';
 export const USERS_TABLE_NAME = 'users';
 
+const generateSchema = (): string => {
+  const dailyEntriesPeriodColumns = PERIOD_DEFINITIONS.map(p => `\`${p.id}\` JSON`).join(',\n  ');
 
-const generateTableSchema = (): string => {
-  const periodColumns = PERIOD_DEFINITIONS.map(p => `\`${p.id}\` JSON`).join(',\n  ');
-  
-  return `
-CREATE TABLE IF NOT EXISTS \`${TABLE_NAME}\` (
-  id VARCHAR(10) PRIMARY KEY, -- YYYY-MM-DD
-  date DATE NOT NULL,
-  generalObservations TEXT,
-  ${periodColumns},
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE INDEX date_idx (date)
-);`;
+  const dailyEntriesSchema = `
+  CREATE TABLE IF NOT EXISTS \`${DAILY_ENTRIES_TABLE_NAME}\` (
+    id VARCHAR(10) PRIMARY KEY, -- YYYY-MM-DD
+    date DATE NOT NULL,
+    generalObservations TEXT,
+    ${dailyEntriesPeriodColumns},
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE INDEX date_idx (date)
+  );`;
+
+  const settingsSchema = `
+  CREATE TABLE IF NOT EXISTS \`${SETTINGS_TABLE_NAME}\` (
+    configId VARCHAR(255) PRIMARY KEY,
+    value JSON,
+    lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  );`;
+
+  const usersSchema = `
+  CREATE TABLE IF NOT EXISTS \`${USERS_TABLE_NAME}\` (
+    id VARCHAR(36) PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    shifts JSON,
+    allowedPages JSON,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  );`;
+
+  return `${dailyEntriesSchema}\n\n${settingsSchema}\n\n${usersSchema}`;
 };
 
-export const DAILY_ENTRIES_TABLE_SCHEMA = generateTableSchema();
-
-export const APP_SETTINGS_TABLE_SCHEMA = `
-CREATE TABLE IF NOT EXISTS \`${SETTINGS_TABLE_NAME}\` (
-  id VARCHAR(255) PRIMARY KEY,
-  value JSON NOT NULL,
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);`;
-
-export const USERS_TABLE_SCHEMA = `
-CREATE TABLE IF NOT EXISTS \`${USERS_TABLE_NAME}\` (
-  id VARCHAR(255) PRIMARY KEY,
-  username VARCHAR(255) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  role VARCHAR(50) NOT NULL,
-  shifts JSON,
-  allowedPages JSON,
-  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);`;
+// Renamed from DAILY_ENTRIES_TABLE_SCHEMA
+export const DATABASE_INIT_SCHEMA = generateSchema();
 
 
 export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
@@ -104,12 +106,11 @@ export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
 }
 
 export async function isMysqlConnected(currentPool?: Pool | null): Promise<boolean> {
-    const poolToTest = currentPool ?? await getDbPool().catch(() => null); // Catch error from getDbPool
-    if (!poolToTest) {
+    if (!currentPool) {
         return false;
     }
     try {
-        const connection = await poolToTest.getConnection();
+        const connection = await currentPool.getConnection();
         await connection.ping();
         connection.release();
         return true;

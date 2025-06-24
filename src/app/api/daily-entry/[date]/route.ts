@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getDbPool, isMysqlConnected, TABLE_NAME, safeStringify, safeParse } from '@/lib/mysql';
+import { getDbPool, isMysqlConnected, DAILY_ENTRIES_TABLE_NAME, safeStringify, safeParse } from '@/lib/mysql';
 import { getDailyEntryFromFile, saveDailyEntryToFile } from '@/lib/fileDb';
 import type { DailyLogEntry, PeriodData, EventosPeriodData } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
@@ -42,7 +42,7 @@ const getEntry = (date: string) => cache(
     const pool = await getDbPool();
     if (await isMysqlConnected(pool)) {
       try {
-        const [rows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT * FROM \`${TABLE_NAME}\` WHERE id = ?`, [entryId]);
+        const [rows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT * FROM \`${DAILY_ENTRIES_TABLE_NAME}\` WHERE id = ?`, [entryId]);
         if (rows.length === 0) {
           return null;
         }
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest, { params }: { params: { date: s
         onUpdateFragments.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
       });
       
-      const [existingRows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT id, createdAt FROM \`${TABLE_NAME}\` WHERE id = ?`, [entryIdFromUrl]);
+      const [existingRows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT id, createdAt FROM \`${DAILY_ENTRIES_TABLE_NAME}\` WHERE id = ?`, [entryIdFromUrl]);
       let finalCreatedAt: Date | string = new Date();
 
       if (existingRows.length > 0 && existingRows[0].createdAt) {
@@ -174,14 +174,14 @@ export async function POST(request: NextRequest, { params }: { params: { date: s
       const onUpdateSqlString = onUpdateFragments.join(', ');
 
       const sql = `
-        INSERT INTO \`${TABLE_NAME}\` (${columnsSqlString}) 
+        INSERT INTO \`${DAILY_ENTRIES_TABLE_NAME}\` (${columnsSqlString}) 
         VALUES (${valuePlaceholdersSqlString})
         ON DUPLICATE KEY UPDATE ${onUpdateSqlString}
       `;
       
       await pool!.query(sql, finalSqlValues);
       
-      const [updatedRows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT * FROM \`${TABLE_NAME}\` WHERE id = ?`, [entryIdFromUrl]);
+      const [updatedRows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT * FROM \`${DAILY_ENTRIES_TABLE_NAME}\` WHERE id = ?`, [entryIdFromUrl]);
       savedEntry = parsePeriodDataFromDbRow(updatedRows[0]);
       if (savedEntry.date && typeof savedEntry.date === 'string') {
         const parsedDate = parseISO(savedEntry.date);
@@ -218,4 +218,3 @@ export async function POST(request: NextRequest, { params }: { params: { date: s
 
   return NextResponse.json({ message, data: savedEntry }, { status: 200 });
 }
-    

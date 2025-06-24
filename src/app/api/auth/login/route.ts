@@ -2,6 +2,22 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getUsersFromFile } from '@/lib/fileDb';
 import type { User, OperatorShift, PageId } from '@/lib/types';
+import { getDbPool, isMysqlConnected, USERS_TABLE_NAME } from '@/lib/mysql';
+import type mysql from 'mysql2/promise';
+
+async function findUser(username: string): Promise<User | null> {
+    const pool = await getDbPool();
+    if (await isMysqlConnected(pool)) {
+        const [rows] = await pool!.query<mysql.RowDataPacket[]> (`SELECT * FROM ${USERS_TABLE_NAME} WHERE username = ?`, [username]);
+        if (rows.length === 0) return null;
+        // mysql2 driver automatically parses JSON fields
+        return rows[0] as User;
+    } else {
+        const allUsers = await getUsersFromFile();
+        return allUsers.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+    }
+}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,9 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Usuário e senha são obrigatórios.' }, { status: 400 });
     }
 
-    const allUsers = await getUsersFromFile();
-    const user = allUsers.find(u => u.username === username);
-
+    const user = await findUser(username);
+    
     if (!user || user.password !== password) {
       return NextResponse.json({ message: 'Usuário ou senha inválidos.' }, { status: 401 });
     }
