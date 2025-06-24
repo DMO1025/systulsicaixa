@@ -1,0 +1,27 @@
+
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "password": "admin",
+    "role": "administrator",
+    "shifts": [],
+    "allowedPages": [
+      "dashboard",
+      "entry",
+      "reports"
+    ]
+  },
+  {
+    "id": "4ddf5354-e23b-47cc-a781-d5fc1629b011",
+    "username": "dmt",
+    "password": "123456",
+    "role": "operator",
+    "shifts": [
+      "first"
+    ],
+    "allowedPages": [
+      "entry"
+    ]
+  }
+]

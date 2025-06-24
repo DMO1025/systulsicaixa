@@ -1,0 +1,313 @@
+
+import { getSafeNumericValue } from '@/lib/utils';
+import type { DailyLogEntry, PeriodId, PeriodData, EventosPeriodData, ReportData, GeneralReportViewData, PeriodReportViewData, GeneralReportDailyItem, GeneralReportSummary, DailyCategoryDataItem } from '@/lib/types';
+import { PERIOD_DEFINITIONS } from '@/lib/constants';
+
+const getReportTitleLabel = (periodId: PeriodId | "all"): string => {
+  if (periodId === "all") return "GERAL (MÊS)";
+  const periodDef = PERIOD_DEFINITIONS.find(p => p.id === periodId);
+  return periodDef ? periodDef.label.toUpperCase() : "DESCONHECIDO";
+};
+
+const calculatePeriodGrandTotal = (periodEntryData: PeriodData | EventosPeriodData | undefined | string): { qtd: number; valor: number } => {
+  if (!periodEntryData || typeof periodEntryData === 'string') return { qtd: 0, valor: 0 };
+
+  let totalQtd = 0;
+  let totalValor = 0;
+
+  if ('items' in periodEntryData) { // EventosPeriodData
+    const evData = periodEntryData as EventosPeriodData;
+    (evData.items || []).forEach(item => {
+      (item.subEvents || []).forEach(subEvent => {
+        totalQtd += subEvent.quantity || 0;
+        totalValor += subEvent.totalValue || 0;
+      });
+    });
+  } else { // PeriodData
+    const pData = periodEntryData as PeriodData;
+    if (pData.channels) {
+      Object.values(pData.channels).forEach(channel => {
+        totalQtd += getSafeNumericValue(channel, 'qtd');
+        totalValor += getSafeNumericValue(channel, 'vtotal');
+      });
+    }
+    if (pData.subTabs) {
+      Object.values(pData.subTabs).forEach(subTab => {
+        if (subTab?.channels) {
+          Object.values(subTab.channels).forEach(channel => {
+            totalQtd += getSafeNumericValue(channel, 'qtd');
+            totalValor += getSafeNumericValue(channel, 'vtotal');
+          });
+        }
+      });
+    }
+  }
+  return { qtd: totalQtd, valor: totalValor };
+};
+
+const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: PeriodId): Record<string, number> => {
+  const data: Record<string, number> = {
+    faturadosQtd: 0, faturadosHotelValor: 0, faturadosFuncionarioValor: 0, faturadosTotalValor: 0,
+    ifoodQtd: 0, ifoodValor: 0,
+    rappiQtd: 0, rappiValor: 0,
+    mesaQtd: 0, mesaDinheiroValor: 0, mesaCreditoValor: 0, mesaDebitoValor: 0, mesaPixValor: 0, mesaTicketValor: 0, mesaTotalValor: 0,
+    hospedesQtd: 0, hospedesValor: 0,
+    retiradaQtd: 0, retiradaValor: 0,
+    ciQtd: 0, ciReajusteValor: 0, ciTotalValor: 0,
+    roomServiceQtd: 0, roomServiceValor: 0,
+    genericPeriodQtd: 0, genericPeriodValor: 0,
+    cdmListaHospedesQtd: 0, cdmListaHospedesValor: 0,
+    cdmNoShowQtd: 0, cdmNoShowValor: 0,
+    cdmSemCheckInQtd: 0, cdmSemCheckInValor: 0,
+    cdmCafeAssinadoQtd: 0, cdmCafeAssinadoValor: 0,
+    cdmDiretoCartaoQtd: 0, cdmDiretoCartaoValor: 0,
+  };
+
+  const periodEntryData = entry[periodId] as PeriodData | EventosPeriodData | undefined;
+  if (!periodEntryData || typeof periodEntryData === 'string') return data;
+
+  const prefixes: ('apt' | 'ast' | 'jnt')[] = [];
+  if (periodId === 'almocoPrimeiroTurno') prefixes.push('apt');
+  else if (periodId === 'almocoSegundoTurno') prefixes.push('ast');
+  else if (periodId === 'jantar') prefixes.push('jnt');
+
+  if (prefixes.length > 0) {
+    prefixes.forEach(prefix => {
+      const pData = periodEntryData as PeriodData;
+      const cifKey = `${prefix}CiEFaturados`;
+      data.faturadosQtd += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}FaturadosQtd.qtd`);
+      data.faturadosHotelValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorHotel.vtotal`);
+      data.faturadosFuncionarioValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorFuncionario.vtotal`);
+      data.faturadosTotalValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}TotalFaturado.vtotal`);
+
+      data.ifoodQtd += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryIfoodQtd.qtd`);
+      data.ifoodValor += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryIfoodValor.vtotal`);
+      data.rappiQtd += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryRappiQtd.qtd`);
+      data.rappiValor += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryRappiValor.vtotal`);
+      
+      const mesaDinheiro = getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaDinheiro.vtotal`);
+      const mesaCredito = getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaCredito.vtotal`);
+      const mesaDebito = getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaDebito.vtotal`);
+      const mesaPix = getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaPix.vtotal`);
+      const mesaTicket = getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaTicketRefeicao.vtotal`);
+      data.mesaQtd += getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaTotaisQtd.qtd`);
+      data.mesaDinheiroValor += mesaDinheiro;
+      data.mesaCreditoValor += mesaCredito;
+      data.mesaDebitoValor += mesaDebito;
+      data.mesaPixValor += mesaPix;
+      data.mesaTicketValor += mesaTicket;
+      data.mesaTotalValor += mesaDinheiro + mesaCredito + mesaDebito + mesaPix + mesaTicket;
+
+      data.hospedesQtd += getSafeNumericValue(pData, `subTabs.hospedes.channels.${prefix}HospedesQtdHospedes.qtd`);
+      data.hospedesValor += getSafeNumericValue(pData, `subTabs.hospedes.channels.${prefix}HospedesPagamentoHospedes.vtotal`);
+
+      data.retiradaQtd += getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaQtd.qtd`);
+      data.retiradaValor += getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaValor.vtotal`);
+
+      data.ciQtd += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ConsumoInternoQtd.qtd`);
+      data.ciReajusteValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ReajusteCI.vtotal`);
+      data.ciTotalValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}TotalCI.vtotal`);
+
+      data.roomServiceQtd += getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServiceQtdPedidos.qtd`);
+      data.roomServiceValor += getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServicePagDireto.vtotal`) + getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServiceValorServico.vtotal`);
+    });
+  } else if (periodId === 'madrugada') {
+    const pData = periodEntryData as PeriodData;
+    data.roomServiceQtd += getSafeNumericValue(pData, 'channels.madrugadaRoomServiceQtdPedidos.qtd');
+    data.roomServiceValor += getSafeNumericValue(pData, 'channels.madrugadaRoomServicePagDireto.vtotal') + getSafeNumericValue(pData, 'channels.madrugadaRoomServiceValorServico.vtotal');
+  } else if (periodId === 'cafeDaManha') {
+    const pData = periodEntryData as PeriodData;
+    data.cdmListaHospedesQtd += getSafeNumericValue(pData, 'channels.cdmListaHospedes.qtd');
+    data.cdmListaHospedesValor += getSafeNumericValue(pData, 'channels.cdmListaHospedes.vtotal');
+    data.cdmNoShowQtd += getSafeNumericValue(pData, 'channels.cdmNoShow.qtd');
+    data.cdmNoShowValor += getSafeNumericValue(pData, 'channels.cdmNoShow.vtotal');
+    data.cdmSemCheckInQtd += getSafeNumericValue(pData, 'channels.cdmSemCheckIn.qtd');
+    data.cdmSemCheckInValor += getSafeNumericValue(pData, 'channels.cdmSemCheckIn.vtotal');
+    data.cdmCafeAssinadoQtd += getSafeNumericValue(pData, 'channels.cdmCafeAssinado.qtd');
+    data.cdmCafeAssinadoValor += getSafeNumericValue(pData, 'channels.cdmCafeAssinado.vtotal');
+    data.cdmDiretoCartaoQtd += getSafeNumericValue(pData, 'channels.cdmDiretoCartao.qtd');
+    data.cdmDiretoCartaoValor += getSafeNumericValue(pData, 'channels.cdmDiretoCartao.vtotal');
+  } else if (periodId === 'frigobar') {
+    const pData = periodEntryData as PeriodData;
+    data.genericPeriodQtd += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTTotalQuartos.qtd') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTTotalQuartos.qtd');
+    data.genericPeriodValor += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
+  } else if (periodId === 'eventos') {
+    const evData = periodEntryData as EventosPeriodData;
+    (evData.items || []).forEach(item => {
+      (item.subEvents || []).forEach(subEvent => {
+        data.genericPeriodQtd += subEvent.quantity || 0;
+        data.genericPeriodValor += subEvent.totalValue || 0;
+      });
+    });
+  } else if (['baliAlmoco', 'baliHappy', 'deliverysEventos', 'extras', 'cafeJasmin', 'italianoAlmoco', 'italianoJantar', 'indianoAlmoco', 'indianoJantar', 'breakfast'].includes(periodId)) {
+    const pData = periodEntryData as PeriodData;
+    if (pData.channels) {
+      if (periodId === 'breakfast' && pData.channels['breakfastEntry']) {
+        data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.breakfastEntry.qtd');
+        data.genericPeriodValor += getSafeNumericValue(pData, 'channels.breakfastEntry.vtotal');
+      } else if (periodId === 'italianoAlmoco' && pData.channels['rwItalianoAlmocoEntry']) {
+          data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.rwItalianoAlmocoEntry.qtd');
+          data.genericPeriodValor += getSafeNumericValue(pData, 'channels.rwItalianoAlmocoEntry.vtotal');
+      } else if (periodId === 'italianoJantar' && pData.channels['rwItalianoJantarEntry']) {
+          data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.rwItalianoJantarEntry.qtd');
+          data.genericPeriodValor += getSafeNumericValue(pData, 'channels.rwItalianoJantarEntry.vtotal');
+      } else if (periodId === 'indianoAlmoco' && pData.channels['rwIndianoAlmocoEntry']) {
+          data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.rwIndianoAlmocoEntry.qtd');
+          data.genericPeriodValor += getSafeNumericValue(pData, 'channels.rwIndianoAlmocoEntry.vtotal');
+      } else if (periodId === 'indianoJantar' && pData.channels['rwIndianoJantarEntry']) {
+          data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.rwIndianoJantarEntry.qtd');
+          data.genericPeriodValor += getSafeNumericValue(pData, 'channels.rwIndianoJantarEntry.vtotal');
+      } else {
+        data.genericPeriodQtd += getSafeNumericValue(pData, 'channels.genericQtdItems.qtd');
+        data.genericPeriodValor += getSafeNumericValue(pData, 'channels.genericTotalValue.vtotal');
+      }
+    }
+  }
+  return data;
+};
+
+export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPeriod: PeriodId | 'all'): ReportData | null => {
+    if (filteredEntries.length === 0) return null;
+
+    if (selectedPeriod === 'all') {
+      const dailyBreakdowns: GeneralReportDailyItem[] = [];
+      const summary: GeneralReportSummary = {
+          periodTotals: {},
+          grandTotalComCI: 0,
+          grandTotalSemCI: 0,
+          grandTotalReajusteCI: 0,
+          grandTotalQtd: 0,
+      };
+
+      PERIOD_DEFINITIONS.forEach(pDef => {
+          summary.periodTotals[pDef.id] = { qtd: 0, valor: 0 };
+      });
+
+      filteredEntries.forEach(entry => {
+          const entryDateStr = entry.id ? `${entry.id.substring(8, 10)}/${entry.id.substring(5, 7)}/${entry.id.substring(0, 4)}` : "Inválida";
+          
+          let dayTotalComCI = 0;
+          let dayTotalQtd = 0;
+          const periodTotals: Partial<Record<PeriodId, { qtd: number; valor: number }>> = {};
+
+          PERIOD_DEFINITIONS.forEach(pDef => {
+              const periodId = pDef.id;
+              const { qtd, valor } = calculatePeriodGrandTotal(entry[periodId]);
+              periodTotals[periodId] = { qtd, valor };
+              dayTotalQtd += qtd;
+              dayTotalComCI += valor;
+
+              if (summary.periodTotals[periodId]) {
+                  summary.periodTotals[periodId]!.qtd += qtd;
+                  summary.periodTotals[periodId]!.valor += valor;
+              }
+          });
+
+          // CI and Reajuste calculations for the day
+          const entryCIAlmocoValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
+          const entryCIJantarValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
+          const entryReajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
+          const entryReajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
+          
+          const dayValorCI = entryCIAlmocoValor + entryCIJantarValor;
+          const dayTotalReajusteCI = entryReajusteCIAlmoco + entryReajusteCIJantar;
+          const dayTotalSemCI = dayTotalComCI - dayValorCI - dayTotalReajusteCI;
+          
+          const dailyItem: GeneralReportDailyItem = {
+              date: entryDateStr,
+              periodTotals: periodTotals,
+              totalComCI: dayTotalComCI,
+              totalSemCI: dayTotalSemCI,
+              totalReajusteCI: dayTotalReajusteCI,
+              totalQtd: dayTotalQtd,
+          };
+          
+          dailyBreakdowns.push(dailyItem);
+          
+          // Accumulate totals for summary
+          summary.grandTotalQtd += dayTotalQtd;
+          summary.grandTotalComCI += dayTotalComCI;
+          summary.grandTotalSemCI += dayTotalSemCI;
+          summary.grandTotalReajusteCI += dayTotalReajusteCI;
+      });
+
+      const data: GeneralReportViewData = {
+          dailyBreakdowns,
+          summary,
+          reportTitle: getReportTitleLabel('all')
+      };
+      return { type: 'general', data };
+
+    } else {
+      const reportTitle = `TOTAL ${getReportTitleLabel(selectedPeriod)}`;
+      
+      const dailyResults: Record<string, DailyCategoryDataItem[]> = {
+        faturados: [], ifood: [], rappi: [], mesa: [], hospedes: [], retirada: [], ci: [], roomService: [], generic: [],
+        cafeDaManhaDetails: [],
+      };
+      const summaryAcc: Record<string, { qtd: number; total: number; reajuste?: number }> = {
+        faturados: { qtd: 0, total: 0 }, ifood: { qtd: 0, total: 0 }, rappi: { qtd: 0, total: 0 },
+        mesa: { qtd: 0, total: 0 }, hospedes: { qtd: 0, total: 0 }, retirada: { qtd: 0, total: 0 },
+        consumoInterno: { qtd: 0, total: 0, reajuste: 0 }, roomService: { qtd: 0, total: 0 }, generic: {qtd: 0, total: 0},
+        cdmListaHospedes: { qtd: 0, total: 0 }, cdmNoShow: { qtd: 0, total: 0 }, cdmSemCheckIn: { qtd: 0, total: 0 },
+        cdmCafeAssinado: { qtd: 0, total: 0 }, cdmDiretoCartao: { qtd: 0, total: 0 },
+      };
+
+      filteredEntries.forEach(entry => {
+        const entryDateStr = entry.id ? `${entry.id.substring(8, 10)}/${entry.id.substring(5, 7)}/${entry.id.substring(0, 4)}` : "Inválida";
+        const dailyData = extractDetailedCategoryDataForPeriod(entry, selectedPeriod);
+        
+        if (selectedPeriod === 'cafeDaManha') {
+            dailyResults.cafeDaManhaDetails.push({
+                date: entryDateStr,
+                listaHospedesQtd: dailyData.cdmListaHospedesQtd, listaHospedesValor: dailyData.cdmListaHospedesValor,
+                noShowQtd: dailyData.cdmNoShowQtd, noShowValor: dailyData.cdmNoShowValor,
+                semCheckInQtd: dailyData.cdmSemCheckInQtd, semCheckInValor: dailyData.cdmSemCheckInValor,
+                cafeAssinadoQtd: dailyData.cdmCafeAssinadoQtd, cafeAssinadoValor: dailyData.cdmCafeAssinadoValor,
+                diretoCartaoQtd: dailyData.cdmDiretoCartaoQtd, diretoCartaoValor: dailyData.cdmDiretoCartaoValor,
+            });
+
+            summaryAcc.cdmListaHospedes.qtd += dailyData.cdmListaHospedesQtd; summaryAcc.cdmListaHospedes.total += dailyData.cdmListaHospedesValor;
+            summaryAcc.cdmNoShow.qtd += dailyData.cdmNoShowQtd; summaryAcc.cdmNoShow.total += dailyData.cdmNoShowValor;
+            summaryAcc.cdmSemCheckIn.qtd += dailyData.cdmSemCheckInQtd; summaryAcc.cdmSemCheckIn.total += dailyData.cdmSemCheckInValor;
+            summaryAcc.cdmCafeAssinado.qtd += dailyData.cdmCafeAssinadoQtd; summaryAcc.cdmCafeAssinado.total += dailyData.cdmCafeAssinadoValor;
+            summaryAcc.cdmDiretoCartao.qtd += dailyData.cdmDiretoCartaoQtd; summaryAcc.cdmDiretoCartao.total += dailyData.cdmDiretoCartaoValor;
+        } else {
+            if (dailyData.faturadosTotalValor > 0 || dailyData.faturadosQtd > 0) { dailyResults.faturados.push({ date: entryDateStr, qtd: dailyData.faturadosQtd, hotel: dailyData.faturadosHotelValor, funcionario: dailyData.faturadosFuncionarioValor, total: dailyData.faturadosTotalValor }); }
+            if (dailyData.ifoodValor > 0 || dailyData.ifoodQtd > 0) { dailyResults.ifood.push({ date: entryDateStr, qtd: dailyData.ifoodQtd, valor: dailyData.ifoodValor }); }
+            if (dailyData.rappiValor > 0 || dailyData.rappiQtd > 0) { dailyResults.rappi.push({ date: entryDateStr, qtd: dailyData.rappiQtd, valor: dailyData.rappiValor }); }
+            if (dailyData.mesaTotalValor > 0 || dailyData.mesaQtd > 0) { dailyResults.mesa.push({ date: entryDateStr, qtd: dailyData.mesaQtd, dinheiro: dailyData.mesaDinheiroValor, credito: dailyData.mesaCreditoValor, debito: dailyData.mesaDebitoValor, pix: dailyData.mesaPixValor, ticket: dailyData.mesaTicketValor, total: dailyData.mesaTotalValor }); }
+            if (dailyData.hospedesValor > 0 || dailyData.hospedesQtd > 0) { dailyResults.hospedes.push({ date: entryDateStr, qtd: dailyData.hospedesQtd, valor: dailyData.hospedesValor }); }
+            if (dailyData.retiradaValor > 0 || dailyData.retiradaQtd > 0) { dailyResults.retirada.push({ date: entryDateStr, qtd: dailyData.retiradaQtd, valor: dailyData.retiradaValor }); }
+            if (dailyData.ciTotalValor > 0 || dailyData.ciQtd > 0 || dailyData.ciReajusteValor !== 0) { dailyResults.ci.push({ date: entryDateStr, qtd: dailyData.ciQtd, reajuste: dailyData.ciReajusteValor, total: dailyData.ciTotalValor }); }
+            if (dailyData.roomServiceValor > 0 || dailyData.roomServiceQtd > 0) { dailyResults.roomService.push({ date: entryDateStr, qtd: dailyData.roomServiceQtd, valor: dailyData.roomServiceValor }); }
+            if (dailyData.genericPeriodValor > 0 || dailyData.genericPeriodQtd > 0) { dailyResults.generic.push({ date: entryDateStr, qtd: dailyData.genericPeriodQtd, valor: dailyData.genericPeriodValor }); }
+
+            summaryAcc.faturados.qtd += dailyData.faturadosQtd || 0; summaryAcc.faturados.total += dailyData.faturadosTotalValor || 0;
+            summaryAcc.ifood.qtd += dailyData.ifoodQtd || 0; summaryAcc.ifood.total += dailyData.ifoodValor || 0;
+            summaryAcc.rappi.qtd += dailyData.rappiQtd || 0; summaryAcc.rappi.total += dailyData.rappiValor || 0;
+            summaryAcc.mesa.qtd += dailyData.mesaQtd || 0; summaryAcc.mesa.total += dailyData.mesaTotalValor || 0;
+            summaryAcc.hospedes.qtd += dailyData.hospedesQtd || 0; summaryAcc.hospedes.total += dailyData.hospedesValor || 0;
+            summaryAcc.retirada.qtd += dailyData.retiradaQtd || 0; summaryAcc.retirada.total += dailyData.retiradaValor || 0;
+            summaryAcc.consumoInterno.qtd += dailyData.ciQtd || 0; summaryAcc.consumoInterno.total += dailyData.ciTotalValor || 0; (summaryAcc.consumoInterno.reajuste as number) += dailyData.ciReajusteValor || 0;
+            summaryAcc.roomService.qtd += dailyData.roomServiceQtd || 0; summaryAcc.roomService.total += dailyData.roomServiceValor || 0;
+            summaryAcc.generic.qtd += dailyData.genericPeriodQtd || 0; summaryAcc.generic.total += dailyData.genericPeriodValor || 0;
+        }
+      });
+      
+      const subtotalGeralComCI_TOTAL = Object.values(summaryAcc).reduce((sum, cat) => sum + cat.total, 0);
+      const subtotalGeralComCI_QTD = Object.values(summaryAcc).reduce((sum, cat) => sum + cat.qtd, 0);
+      
+      const subtotalGeralSemCI_TOTAL = subtotalGeralComCI_TOTAL - summaryAcc.consumoInterno.total - (summaryAcc.consumoInterno.reajuste || 0);
+      const subtotalGeralSemCI_QTD = subtotalGeralComCI_QTD - summaryAcc.consumoInterno.qtd;
+
+      const data: PeriodReportViewData = {
+        dailyBreakdowns: dailyResults,
+        summary: summaryAcc,
+        subtotalGeralComCI: { qtd: subtotalGeralComCI_QTD, total: subtotalGeralComCI_TOTAL },
+        subtotalGeralSemCI: { qtd: subtotalGeralSemCI_QTD, total: subtotalGeralSemCI_TOTAL },
+        reportTitle,
+      };
+      return { type: 'period', data };
+    }
+};

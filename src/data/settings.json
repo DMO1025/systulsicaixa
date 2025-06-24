@@ -1,0 +1,62 @@
+{
+  "channelUnitPricesConfig": {
+    "cdmListaHospedes": 15,
+    "cdmNoShow": 15,
+    "cdmSemCheckIn": 15
+  },
+  "dashboardItemVisibilityConfig": {
+    "ROOM SERVICE": true,
+    "CAFÉ DA MANHÃ": true,
+    "BREAKFAST": false,
+    "RW ITALIANO ALMOÇO": false,
+    "RW ITALIANO JANTAR": false,
+    "RW INDIANO ALMOÇO": false,
+    "RW INDIANO JANTAR": false,
+    "ALMOÇO": true,
+    "JANTAR": true,
+    "BALI ALMOÇO": false,
+    "BALI HAPPY HOUR": false,
+    "FRIGOBAR": true,
+    "EVENTOS DIRETO": true,
+    "EVENTOS HOTEL": true,
+    "OUTROS": false
+  },
+  "cardVisibilityConfig": {
+    "madrugada": true,
+    "cafeDaManha": true,
+    "almocoPrimeiroTurno": true,
+    "almocoSegundoTurno": true,
+    "jantar": true,
+    "baliAlmoco": false,
+    "baliHappy": false,
+    "deliverysEventos": false,
+    "eventos": true,
+    "frigobar": true,
+    "extras": false,
+    "cafeJasmin": false,
+    "breakfast": false,
+    "italianoAlmoco": false,
+    "italianoJantar": false,
+    "indianoAlmoco": false,
+    "indianoJantar": false
+  },
+  "summaryCardItemsConfig": {
+    "rsMadrugada": true,
+    "avulsoAssinado": true,
+    "buffetCafeDireto": true,
+    "breakfast": false,
+    "almoco": true,
+    "jantar": true,
+    "rwItalianoAlmoco": false,
+    "rwItalianoJantar": false,
+    "rwIndianoAlmoco": false,
+    "rwIndianoJantar": false,
+    "frigobar": true,
+    "cafeHospedes": true,
+    "almocoCI": false,
+    "jantarCI": true,
+    "eventosDireto": true,
+    "eventosHotel": true
+  },
+  "mysqlConnectionConfig": {}
+}
