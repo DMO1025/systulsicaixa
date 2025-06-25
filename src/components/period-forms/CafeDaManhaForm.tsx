@@ -82,7 +82,7 @@ const CafeDaManhaForm: React.FC<PeriodFormProps> = ({
               <FormItem className="mt-6">
                 <FormLabel>Observações do Período ({periodDefinition.label})</FormLabel>
                 <FormControl>
-                  <Textarea placeholder={`Notas específicas para ${periodDefinition.label.toLowerCase()}...`} {...field} value={field.value ?? ''} />
+                  <Textarea placeholder={`Notas específicas para ${periodDefinition.label.toLowerCase()}...`} {...field} value={field.value ?? ''} onFocus={(e) => e.target.select()} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

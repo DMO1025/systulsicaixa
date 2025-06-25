@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
+import { getSafeNumericValue } from '@/lib/utils';
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -45,8 +45,43 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
   renderChannelInputs
 }) => {
   const ActivePeriodMainIcon = getPeriodIcon(periodId);
-  const periodTotal = calculatePeriodTotal(periodId);
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
+
+  const watchedData = form.watch();
+
+  const periodTotal = useMemo(() => {
+    const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
+
+    const madrugadaData = watchedData.madrugada;
+    let madrugadaTotal = 0;
+    if (madrugadaData?.channels) {
+        madrugadaTotal += getVtotal('madrugada.channels.madrugadaRoomServicePagDireto.vtotal');
+        madrugadaTotal += getVtotal('madrugada.channels.madrugadaRoomServiceValorServico.vtotal');
+    }
+
+    const cafeDiretoTotal = getVtotal('cafeDaManha.channels.cdmDiretoCartao.vtotal');
+    const cafeAssinadoTotal = getVtotal('cafeDaManha.channels.cdmCafeAssinado.vtotal');
+
+    let almocoPTTotal = 0;
+    const almocoPTData = watchedData.almocoPrimeiroTurno;
+    if (almocoPTData?.subTabs) {
+        for (const subTabKey in almocoPTData.subTabs) {
+            const subTab = almocoPTData.subTabs[subTabKey];
+            if (subTab?.channels) {
+                for (const channelKey in subTab.channels) {
+                    const channel = subTab.channels[channelKey as keyof typeof subTab.channels];
+                    almocoPTTotal += getSafeNumericValue(channel, 'vtotal', 0);
+                }
+            }
+        }
+    }
+
+    const frigobarPTTotal = 
+        getVtotal('frigobar.subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') +
+        getVtotal('frigobar.subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal');
+
+    return madrugadaTotal + cafeDiretoTotal + cafeAssinadoTotal + almocoPTTotal + frigobarPTTotal;
+  }, [watchedData]);
 
   useEffect(() => {
     if (periodConfig?.subTabs && activeSubTabs && setActiveSubTabs && !activeSubTabs[periodId]) {
@@ -71,7 +106,8 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
             <CardTitle>{periodDefinition.label}</CardTitle>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-sm text-muted-foreground">Total Vendas (Período): <span className="font-semibold text-foreground">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Almoço 1º Turno + Frigobar 1º Turno)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>
@@ -129,7 +165,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
               <FormItem className="mt-6">
                 <FormLabel>Observações do Período ({periodDefinition.label})</FormLabel>
                 <FormControl>
-                  <Textarea placeholder={`Notas específicas para ${periodDefinition.label.toLowerCase()}...`} {...field} value={field.value ?? ''} />
+                  <Textarea placeholder={`Notas específicas para ${periodDefinition.label.toLowerCase()}...`} {...field} value={field.value ?? ''} onFocus={(e) => e.target.select()} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

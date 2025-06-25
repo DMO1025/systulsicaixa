@@ -438,7 +438,8 @@ export default function PeriodEntryPage() {
                                   type="number" 
                                   placeholder="0" 
                                   {...field} 
-                                  value={field.value ?? ''} 
+                                  value={field.value ?? ''}
+                                  onFocus={(e) => e.target.select()}
                                   onChange={e => {
                                     const rawValue = e.target.value;
                                     const newQty = rawValue === '' ? undefined : parseFloat(rawValue);
@@ -459,29 +460,49 @@ export default function PeriodEntryPage() {
                       />
                     )}
                     {channelCfg.vtotal && (
-                    <FormField
-                        control={currentForm.control}
-                        name={`${basePath}.${channelId}.vtotal` as any}
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                             <FormControl>
-                                <div className="relative">
-                                  {VTotalIcon && <VTotalIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />}
-                                  <Input
-                                    type="number"
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    {...field}
-                                    value={field.value ?? ''}
-                                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                                    className="h-8 text-sm text-right w-full pl-7"
-                                    disabled={isVtotalDisabledByUnitPrice}
-                                  />
-                                </div>
-                              </FormControl>
-                            <FormMessage className="text-xs mt-1 text-right" />
-                          </FormItem>
-                        )}
+                      <FormField
+                          control={currentForm.control}
+                          name={`${basePath}.${channelId}.vtotal` as any}
+                          render={({ field }) => {
+                              const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                  const rawValue = e.target.value;
+                                  const digitsOnly = rawValue.replace(/\D/g, '');
+                                  if (digitsOnly === '') {
+                                      field.onChange(undefined);
+                                  } else {
+                                      const numberValue = parseInt(digitsOnly, 10);
+                                      field.onChange(numberValue / 100);
+                                  }
+                              };
+
+                              const formatCurrencyForDisplay = (val: number | undefined) => {
+                                  if (val === undefined || val === null) return '';
+                                  return val.toLocaleString('pt-BR', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                  });
+                              };
+
+                              return (
+                                <FormItem className="flex-1">
+                                    <FormControl>
+                                      <div className="relative">
+                                        {VTotalIcon && <VTotalIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />}
+                                        <Input
+                                          type="text"
+                                          placeholder="0,00"
+                                          value={formatCurrencyForDisplay(field.value)}
+                                          onChange={handleCurrencyChange}
+                                          onFocus={(e) => e.target.select()}
+                                          className="h-8 text-sm text-right w-full pl-7"
+                                          disabled={isVtotalDisabledByUnitPrice}
+                                        />
+                                      </div>
+                                    </FormControl>
+                                  <FormMessage className="text-xs mt-1 text-right" />
+                                </FormItem>
+                              )
+                          }}
                       />
                     )}
                   </div>
@@ -601,7 +622,12 @@ export default function PeriodEntryPage() {
                       <FormItem>
                         <FormLabel>Observações Gerais do Dia</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Notas sobre o dia, eventos especiais, etc." {...field} value={field.value ?? ''}/>
+                          <Textarea 
+                            placeholder="Notas sobre o dia, eventos especiais, etc." 
+                            {...field} 
+                            value={field.value ?? ''}
+                            onFocus={(e) => e.target.select()}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

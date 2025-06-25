@@ -126,7 +126,7 @@ const EventosForm: React.FC<PeriodFormProps> = ({
                     <FormItem className="flex-grow mr-4">
                       <FormLabel className="text-base font-semibold">Nome do Evento #{eventItems.length - eventIndex}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Confraternização Empresa X" {...field} value={field.value ?? ''} className="h-9 text-sm bg-background" />
+                        <Input placeholder="Ex: Confraternização Empresa X" {...field} value={field.value ?? ''} className="h-9 text-sm bg-background" onFocus={(e) => e.target.select()} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -157,7 +157,7 @@ const EventosForm: React.FC<PeriodFormProps> = ({
               <FormItem className="mt-6 pt-4 border-t">
                 <FormLabel className="text-base">Observações Gerais do Período de Eventos</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Notas gerais sobre todos os eventos do dia..." {...field} value={field.value ?? ''} />
+                  <Textarea placeholder="Notas gerais sobre todos os eventos do dia..." {...field} value={field.value ?? ''} onFocus={(e) => e.target.select()} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -310,7 +310,7 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                   render={({ field }) => (
                     <FormItem className="lg:col-span-2 xl:col-span-1 min-w-[150px]">
                       <FormLabel className="text-xs flex items-center"><Info className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Descrição (Outro)</FormLabel>
-                      <FormControl><Input placeholder="Especifique o serviço" {...field} value={field.value ?? ''} className="h-8 text-xs"/></FormControl>
+                      <FormControl><Input placeholder="Especifique o serviço" {...field} value={field.value ?? ''} className="h-8 text-xs" onFocus={(e) => e.target.select()} /></FormControl>
                       <FormMessage className="text-xs"/>
                     </FormItem>
                   )}
@@ -332,6 +332,7 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                           const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
                           field.onChange(val);
                         }}
+                        onFocus={(e) => e.target.select()}
                         className="h-8 text-xs"
                       />
                     </FormControl>
@@ -342,23 +343,43 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
               <FormField
                 control={form.control}
                 name={`eventos.items.${eventIndex}.subEvents.${subEventIndex}.totalValue`}
-                render={({ field }) => (
-                  <FormItem className="min-w-[100px]">
-                    <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        step="0.01"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                        className="h-8 text-xs"
-                      />
-                    </FormControl>
-                    <FormMessage className="text-xs"/>
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                        const rawValue = e.target.value;
+                        const digitsOnly = rawValue.replace(/\D/g, '');
+                        if (digitsOnly === '') {
+                            field.onChange(undefined);
+                        } else {
+                            const numberValue = parseInt(digitsOnly, 10);
+                            field.onChange(numberValue / 100);
+                        }
+                    };
+
+                    const formatCurrencyForDisplay = (val: number | undefined) => {
+                        if (val === undefined || val === null) return '';
+                        return val.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        });
+                    };
+
+                    return (
+                        <FormItem className="min-w-[100px]">
+                          <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="0,00"
+                              value={formatCurrencyForDisplay(field.value)}
+                              onChange={handleCurrencyChange}
+                              onFocus={(e) => e.target.select()}
+                              className="h-8 text-xs"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs"/>
+                        </FormItem>
+                    )
+                }}
               />
             </div>
           </div>

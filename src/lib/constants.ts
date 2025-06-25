@@ -46,6 +46,9 @@ export const SALES_CHANNELS = {
   frgSTTotalQuartos: "TOTAL DE QUARTOS (2º Turno)",
   frgSTPagRestaurante: "PAGAMENTO RESTAURANTE (2º Turno)",
   frgSTPagHotel: "PAGAMENTO HOTÉL (2º Turno)",
+  frgJNTTotalQuartos: "TOTAL DE QUARTOS (Jantar)",
+  frgJNTPagRestaurante: "PAGAMENTO RESTAURANTE (Jantar)",
+  frgJNTPagHotel: "PAGAMENTO HOTÉL (Jantar)",
 
   // Default/Generic for other periods if they don't have specific structures
   genericTotalValue: "Valor Total (R$)",
@@ -319,6 +322,15 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, PeriodConfig> = {
           frgSTTotalQuartos: { qtd: true },
           frgSTPagRestaurante: { vtotal: true },
           frgSTPagHotel: { vtotal: true },
+        }
+      },
+      jantar: {
+        label: "Jantar",
+        icon: Moon,
+        channels: {
+          frgJNTTotalQuartos: { qtd: true },
+          frgJNTPagRestaurante: { vtotal: true },
+          frgJNTPagHotel: { vtotal: true },
         }
       }
     },
