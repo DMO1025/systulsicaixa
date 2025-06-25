@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpCircle } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 async function getManualContent(): Promise<string> {
   try {
@@ -46,6 +47,3 @@ export default async function HelpPage() {
     </div>
   );
 }
-
-// Re-import Button as it's used in the page but might not be in scope
-import { Button } from '@/components/ui/button';

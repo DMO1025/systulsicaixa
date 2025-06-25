@@ -10,10 +10,9 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { toPng } from 'html-to-image';
 import type { DateRange } from 'react-day-picker';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, GeneralReportViewData, PeriodReportViewData, PeriodData, EventosPeriodData, SalesChannelId } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, GeneralReportViewData, PeriodReportViewData, PeriodData, EventosPeriodData, SalesChannelId, ChartConfig } from '@/lib/types';
 import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
@@ -27,12 +26,13 @@ import PeriodSpecificReportView from '@/components/reports/PeriodSpecificReportV
 import SingleDayReportView from '@/components/reports/SingleDayReportView';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Filter } from "lucide-react";
+import ReportLineChart from '@/components/reports/ReportBarChart';
+import PeriodReportLineChart from '@/components/reports/PeriodReportBarChart';
 
 export default function ReportsPage() {
   useAuth();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const chartRef = useRef<HTMLDivElement>(null);
 
   const [allEntries, setAllEntries] = useState<DailyLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
@@ -147,6 +147,63 @@ export default function ReportsPage() {
     return generateReportData(filteredEntries, periodForReport);
   }, [filteredEntries, selectedPeriod, filterType]);
 
+  const { periodChartData, periodChartConfig, hasPeriodChartData } = useMemo(() => {
+    if (!reportData || reportData.type !== 'period') {
+        return { periodChartData: [], periodChartConfig: {}, hasPeriodChartData: false };
+    }
+
+    const { data } = reportData;
+    const dataForChart: Record<string, Record<string, any>> = {};
+    
+    const allTabInfo = [
+        { id: 'faturados', label: 'FATURADOS' }, { id: 'ifood', label: 'IFOOD' }, { id: 'rappi', label: 'RAPPI' },
+        { id: 'mesa', label: 'MESA' }, { id: 'hospedes', label: 'HÓSPEDES' }, { id: 'retirada', label: 'RETIRADA' },
+        { id: 'ci', label: 'C.I.' }, { id: 'roomService', label: 'ROOM SERVICE' }, { id: 'generic', label: 'DIVERSOS' },
+        { id: 'cdmHospedes', label: 'HÓSPEDES (CAFÉ)' }, { id: 'cdmAvulsos', label: 'AVULSOS (CAFÉ)' },
+    ];
+    
+    const availableCategories = allTabInfo.filter(tab => 
+        data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+    );
+
+    availableCategories.forEach(tab => {
+        const categoryId = tab.id;
+        const categoryData = data.dailyBreakdowns[categoryId];
+        
+        categoryData.forEach(dailyItem => {
+            const date = dailyItem.date;
+            if (!dataForChart[date]) {
+                dataForChart[date] = { date };
+            }
+            dataForChart[date][categoryId] = dailyItem.total ?? dailyItem.valor ?? 0;
+        });
+    });
+    
+    const finalChartData = Object.values(dataForChart).sort((a, b) => {
+        const dateA = a.date.split('/').reverse().join('-');
+        const dateB = b.date.split('/').reverse().join('-');
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+
+    const dynamicChartConfig: ChartConfig = {};
+    const colors = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "destructive", "primary", "secondary"];
+    let colorIndex = 0;
+    
+    availableCategories.forEach(tab => {
+        dynamicChartConfig[tab.id] = {
+            label: tab.label,
+            color: `hsl(var(--${colors[colorIndex % colors.length]}))`,
+        };
+        colorIndex++;
+    });
+
+    return {
+        periodChartData: finalChartData,
+        periodChartConfig: dynamicChartConfig,
+        hasPeriodChartData: finalChartData.length > 0
+    };
+}, [reportData]);
+
   const handleExport = async (formatType: 'pdf' | 'excel') => {
     const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
@@ -186,7 +243,7 @@ export default function ReportsPage() {
                     if (evData.items?.length > 0) {
                         periodRows.push(['Evento', 'Serviço', 'Local', 'Qtd', 'Valor']);
                         evData.items.forEach(item => {
-                            item.subEvents.forEach(sub => {
+                            (item.subEvents || []).forEach(sub => {
                                 const serviceLabel = sub.serviceType === 'OUTRO' ? sub.customServiceDescription || 'Outro' : EVENT_SERVICE_TYPE_OPTIONS.find(o => o.value === sub.serviceType)?.label || sub.serviceType;
                                 const locationLabel = EVENT_LOCATION_OPTIONS.find(o => o.value === sub.location)?.label || sub.location;
                                 periodRows.push([item.eventName || 'Evento Sem Nome', serviceLabel || '-', locationLabel || '-', sub.quantity || 0, sub.totalValue || 0]);
@@ -213,10 +270,11 @@ export default function ReportsPage() {
                         });
                     }
                 }
-
-                if (periodRows.length > 0 || (pData as any).periodObservations) {
+                
+                const hasObservations = (periodData as any)?.periodObservations?.trim().length > 0;
+                if (periodRows.length > 0 || hasObservations) {
                     aoa.push([pDef.label.toUpperCase(), '', periodTotal], ...periodRows);
-                    if ((pData as any).periodObservations) aoa.push(['Observações:', (pData as any).periodObservations]);
+                    if (hasObservations) aoa.push(['Observações:', (periodData as any).periodObservations]);
                     aoa.push([]);
                 }
             });
@@ -256,7 +314,7 @@ export default function ReportsPage() {
                             doc.setFontSize(10); writeText(item.eventName || 'Evento Sem Nome', 14, y); y+= 5;
                             (doc as any).autoTable({
                                 startY: y, head: [['Serviço', 'Local', 'Qtd', 'Valor']],
-                                body: item.subEvents.map(sub => [EVENT_SERVICE_TYPE_OPTIONS.find(o=>o.value===sub.serviceType)?.label||sub.serviceType, EVENT_LOCATION_OPTIONS.find(o=>o.value===sub.location)?.label||sub.location, formatNumber(sub.quantity), formatCurrency(sub.totalValue)]),
+                                body: (item.subEvents || []).map(sub => [EVENT_SERVICE_TYPE_OPTIONS.find(o=>o.value===sub.serviceType)?.label||sub.serviceType, EVENT_LOCATION_OPTIONS.find(o=>o.value===sub.location)?.label||sub.location, formatNumber(sub.quantity), formatCurrency(sub.totalValue)]),
                                 theme: 'grid', styles: { fontSize: 8 }, headStyles: { fontSize: 9 }
                             });
                             y = (doc as any).lastAutoTable.finalY + 5;
@@ -350,15 +408,6 @@ export default function ReportsPage() {
             (doc as any).autoTable({ startY: finalY, head: [tableHeaders], body: tableBody, foot: [tableFooter], theme: 'grid', headStyles: { fontSize: 7, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 }});
             finalY = (doc as any).lastAutoTable.finalY + 10;
             
-            if (chartRef.current) {
-                try {
-                    const dataUrl = await toPng(chartRef.current, { quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff' });
-                    const imgWidth = doc.internal.pageSize.getWidth() - 28;
-                    const imgHeight = (chartRef.current.offsetHeight * imgWidth) / chartRef.current.offsetWidth;
-                    if (finalY + imgHeight > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); finalY = 20; }
-                    doc.addImage(dataUrl, 'PNG', 14, finalY, imgWidth, imgHeight);
-                } catch (err) { console.error('Falha ao capturar imagem do relatório geral:', err); }
-            }
             doc.save(`${exportFileName}.pdf`);
         }
     } else { // Period-specific reports
@@ -441,15 +490,6 @@ export default function ReportsPage() {
               }
             });
 
-            if (chartRef.current) {
-              try {
-                const dataUrl = await toPng(chartRef.current, { quality: 0.95, pixelRatio: 2 });
-                const chartWidth = doc.internal.pageSize.getWidth() - 28;
-                const chartHeight = chartWidth * (9 / 16);
-                if (finalY + 10 + chartHeight > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); finalY = 20; } else { finalY += 10; }
-                doc.addImage(dataUrl, 'PNG', 14, finalY, chartWidth, chartHeight);
-              } catch (err) { console.error('Falha ao capturar imagem do gráfico:', err); }
-            }
             doc.save(`${exportFileName}.pdf`);
         }
     }
@@ -500,6 +540,22 @@ export default function ReportsPage() {
         datesWithEntries={datesWithEntries}
       />
 
+      {!isLoadingEntries && filterType !== 'date' && reportData && (
+        reportData.type === 'general' ? (
+          <ReportLineChart 
+            data={reportData.data.dailyBreakdowns} 
+            title="Evolução Diária no Período"
+            description="Visualização dos valores diários que compõem o total do período filtrado."
+          />
+        ) : reportData.type === 'period' && hasPeriodChartData ? (
+          <PeriodReportLineChart 
+            data={periodChartData} 
+            config={periodChartConfig}
+            title={`Evolução Diária - ${reportData.data.reportTitle}`} 
+          />
+        ) : null
+      )}
+
       <Card>
         <CardHeader>
             <CardTitle>Resultados</CardTitle>
@@ -512,8 +568,8 @@ export default function ReportsPage() {
             <SingleDayReportView entry={filteredEntries[0]} />
           ) : reportData ? (
             reportData.type === 'general' 
-              ? <GeneralReportView ref={chartRef} data={reportData.data} visiblePeriods={visiblePeriodDefinitions} showChart={filterType !== 'date'} />
-              : <PeriodSpecificReportView data={reportData.data} periodId={selectedPeriod} chartRef={chartRef} showChart={filterType !== 'date'} />
+              ? <GeneralReportView data={reportData.data} visiblePeriods={visiblePeriodDefinitions} />
+              : <PeriodSpecificReportView data={reportData.data} periodId={selectedPeriod} />
           ) : (
             <div className="text-center py-10 text-muted-foreground"><Filter className="mx-auto h-12 w-12 mb-4" /><p>Nenhum registro encontrado. Selecione os filtros.</p></div>
           )}

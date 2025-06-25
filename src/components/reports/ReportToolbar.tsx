@@ -80,159 +80,159 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     const modifiers = { hasEntry: datesWithEntries };
     const modifiersClassNames = { hasEntry: 'has-entry-dot' };
 
-
     return (
         <Card>
-            <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
-                <div>
-                    <CardTitle>Filtros de Relatório</CardTitle>
-                    <CardDescription>Selecione os filtros para gerar e exportar os relatórios.</CardDescription>
-                </div>
-                <div className="flex space-x-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={() => handleExport('pdf')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> PDF</Button>
-                    <Button variant="outline" onClick={() => handleExport('excel')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> Excel</Button>
-                </div>
+            <CardHeader>
+                <CardTitle>Filtros de Relatório</CardTitle>
+                <CardDescription>Selecione os filtros para gerar e exportar os relatórios.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 md:space-y-0 md:flex md:flex-wrap md:gap-4 items-end">
-                <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                    <Label htmlFor="filterType">Tipo de Filtro</Label>
-                    <Select value={filterType} onValueChange={(value) => {
-                        setFilterType(value as FilterType)
-                        if (isPeriodFilterDisabled) {
-                            // If we manually change the filter, disable the "lock" from URL params
-                            const newUrl = new URL(window.location.href);
-                            newUrl.searchParams.delete('filterFocus');
-                            window.history.replaceState({}, '', newUrl);
-                        }
-                    }}>
-                    <SelectTrigger id="filterType" className="w-full">
-                        <SelectValue placeholder="Selecione o tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="date">Por Data Específica</SelectItem>
-                        <SelectItem value="range">Por Intervalo de Datas</SelectItem>
-                        <SelectItem value="period">Por Período (dentro do Mês)</SelectItem>
-                        <SelectItem value="month">Geral (Mês Inteiro)</SelectItem>
-                    </SelectContent>
-                    </Select>
-                </div>
-
-                {filterType === 'date' && (
-                    <div className="space-y-2 min-w-full md:min-w-[240px] flex-grow md:flex-grow-0">
-                        <Label htmlFor="date">Data Específica</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                            </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                            <Calendar
-                                mode="single"
-                                selected={selectedDate}
-                                onSelect={setSelectedDate}
-                                initialFocus
-                                locale={ptBR}
-                                modifiers={modifiers}
-                                modifiersClassNames={modifiersClassNames}
-                            />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                )}
-                
-                {filterType === 'range' && (
-                    <div className="space-y-2 min-w-full md:min-w-[280px] flex-grow md:flex-grow-0">
-                        <Label htmlFor="date-range">Intervalo de Datas</Label>
-                         <Popover>
-                            <PopoverTrigger asChild>
-                            <Button id="date-range" variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedRange?.from ? (
-                                selectedRange.to ? (
-                                    <>
-                                    {format(selectedRange.from, "LLL dd, y", {locale: ptBR})} -{" "}
-                                    {format(selectedRange.to, "LLL dd, y", {locale: ptBR})}
-                                    </>
-                                ) : (
-                                    format(selectedRange.from, "LLL dd, y", {locale: ptBR})
-                                )
-                                ) : (
-                                <span>Escolha um intervalo</span>
-                                )}
-                            </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                initialFocus
-                                mode="range"
-                                defaultMonth={selectedRange?.from}
-                                selected={selectedRange}
-                                onSelect={setSelectedRange}
-                                numberOfMonths={2}
-                                locale={ptBR}
-                                modifiers={modifiers}
-                                modifiersClassNames={modifiersClassNames}
-                            />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                )}
-
-                {filterType === 'period' && (
+            <CardContent className="space-y-4">
+                <div className="space-y-4 md:space-y-0 md:flex md:flex-wrap md:gap-4 items-end">
                     <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                    <Label htmlFor="period">Período</Label>
-                    <Select value={String(selectedPeriod)} onValueChange={(value) => setSelectedPeriod(value as PeriodId | 'all')}>
-                        <SelectTrigger id="period" className="w-full">
-                        <SelectValue placeholder="Selecione o período" />
+                        <Label htmlFor="filterType">Tipo de Filtro</Label>
+                        <Select value={filterType} onValueChange={(value) => {
+                            setFilterType(value as FilterType)
+                            if (isPeriodFilterDisabled) {
+                                const newUrl = new URL(window.location.href);
+                                newUrl.searchParams.delete('filterFocus');
+                                window.history.replaceState({}, '', newUrl);
+                            }
+                        }}>
+                        <SelectTrigger id="filterType" className="w-full">
+                            <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
                         <SelectContent>
-                        <SelectItem value="all">Todos os Períodos</SelectItem>
-                        {visiblePeriodDefinitions.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                            <SelectItem value="date">Por Data Específica</SelectItem>
+                            <SelectItem value="range">Por Intervalo de Datas</SelectItem>
+                            <SelectItem value="period">Por Período (dentro do Mês)</SelectItem>
+                            <SelectItem value="month">Geral (Mês Inteiro)</SelectItem>
                         </SelectContent>
-                    </Select>
+                        </Select>
                     </div>
-                )}
 
-                {(filterType === 'month' || filterType === 'period') && (
-                    <>
-                        <div className="space-y-2 min-w-full md:min-w-[150px] flex-grow md:flex-grow-0">
-                            <Label htmlFor="month-picker">Mês</Label>
-                            <Select
-                                value={selectedMonthIndex.toString()}
-                                onValueChange={handleMonthChange}
-                                disabled={isPeriodFilterDisabled}
-                            >
-                                <SelectTrigger id="month-picker" className="w-full">
-                                    <SelectValue placeholder="Selecione o Mês" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {months.map(month => (
-                                        <SelectItem key={month.value} value={month.value.toString()}>{month.label.charAt(0).toUpperCase() + month.label.slice(1)}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    {filterType === 'date' && (
+                        <div className="space-y-2 min-w-full md:min-w-[240px] flex-grow md:flex-grow-0">
+                            <Label htmlFor="date">Data Específica</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedDate}
+                                    onSelect={setSelectedDate}
+                                    initialFocus
+                                    locale={ptBR}
+                                    modifiers={modifiers}
+                                    modifiersClassNames={modifiersClassNames}
+                                />
+                                </PopoverContent>
+                            </Popover>
                         </div>
-                        <div className="space-y-2 min-w-full md:min-w-[120px] flex-grow md:flex-grow-0">
-                            <Label htmlFor="year-picker">Ano</Label>
-                            <Select
-                                value={selectedYear.toString()}
-                                onValueChange={handleYearChange}
-                                disabled={isPeriodFilterDisabled}
-                            >
-                                <SelectTrigger id="year-picker" className="w-full">
-                                    <SelectValue placeholder="Selecione o Ano" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {years.map(year => (
-                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    )}
+                    
+                    {filterType === 'range' && (
+                        <div className="space-y-2 min-w-full md:min-w-[280px] flex-grow md:flex-grow-0">
+                            <Label htmlFor="date-range">Intervalo de Datas</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                <Button id="date-range" variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {selectedRange?.from ? (
+                                    selectedRange.to ? (
+                                        <>
+                                        {format(selectedRange.from, "LLL dd, y", {locale: ptBR})} -{" "}
+                                        {format(selectedRange.to, "LLL dd, y", {locale: ptBR})}
+                                        </>
+                                    ) : (
+                                        format(selectedRange.from, "LLL dd, y", {locale: ptBR})
+                                    )
+                                    ) : (
+                                    <span>Escolha um intervalo</span>
+                                    )}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={selectedRange?.from}
+                                    selected={selectedRange}
+                                    onSelect={setSelectedRange}
+                                    numberOfMonths={2}
+                                    locale={ptBR}
+                                    modifiers={modifiers}
+                                    modifiersClassNames={modifiersClassNames}
+                                />
+                                </PopoverContent>
+                            </Popover>
                         </div>
-                    </>
-                )}
+                    )}
+
+                    {filterType === 'period' && (
+                        <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
+                        <Label htmlFor="period">Período</Label>
+                        <Select value={String(selectedPeriod)} onValueChange={(value) => setSelectedPeriod(value as PeriodId | 'all')}>
+                            <SelectTrigger id="period" className="w-full">
+                            <SelectValue placeholder="Selecione o período" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="all">Todos os Períodos</SelectItem>
+                            {visiblePeriodDefinitions.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        </div>
+                    )}
+
+                    {(filterType === 'month' || filterType === 'period') && (
+                        <>
+                            <div className="space-y-2 min-w-full md:min-w-[150px] flex-grow md:flex-grow-0">
+                                <Label htmlFor="month-picker">Mês</Label>
+                                <Select
+                                    value={selectedMonthIndex.toString()}
+                                    onValueChange={handleMonthChange}
+                                    disabled={isPeriodFilterDisabled}
+                                >
+                                    <SelectTrigger id="month-picker" className="w-full">
+                                        <SelectValue placeholder="Selecione o Mês" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {months.map(month => (
+                                            <SelectItem key={month.value} value={month.value.toString()}>{month.label.charAt(0).toUpperCase() + month.label.slice(1)}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2 min-w-full md:min-w-[120px] flex-grow md:flex-grow-0">
+                                <Label htmlFor="year-picker">Ano</Label>
+                                <Select
+                                    value={selectedYear.toString()}
+                                    onValueChange={handleYearChange}
+                                    disabled={isPeriodFilterDisabled}
+                                >
+                                    <SelectTrigger id="year-picker" className="w-full">
+                                        <SelectValue placeholder="Selecione o Ano" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(year => (
+                                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </>
+                    )}
+                </div>
+                <div className="pt-4 mt-4 border-t flex flex-col md:flex-row md:items-center justify-end gap-4">
+                    <div className="flex space-x-2 w-full md:w-auto">
+                        <Button variant="outline" onClick={() => handleExport('pdf')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> PDF</Button>
+                        <Button variant="outline" onClick={() => handleExport('excel')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> Excel</Button>
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );

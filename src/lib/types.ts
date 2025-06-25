@@ -5,6 +5,7 @@ import type { DateRange } from 'react-day-picker';
 // Re-export from constants to have a single source of truth for types
 export type { PeriodId, SalesChannelId, PaymentMethodId, EventLocationKey, EventServiceTypeKey, SummaryCardItemId, OperatorShift, UserRole } from './constants';
 export type PageId = 'dashboard' | 'entry' | 'reports';
+export type ChartConfig = ShadCNChartConfig;
 
 export interface SalesItem {
   qtd?: number; 
