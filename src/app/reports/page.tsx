@@ -204,6 +204,22 @@ export default function ReportsPage() {
     };
 }, [reportData]);
 
+  const getColumnWidths = (data: any[][]): { wch: number }[] => {
+    const widths: { wch: number }[] = [];
+    if (!data || data.length === 0) return widths;
+
+    const maxLengths: number[] = [];
+    data.forEach(row => {
+        (row as any[]).forEach((cell, i) => {
+            const length = cell ? String(cell).length : 0;
+            if (!maxLengths[i] || length > maxLengths[i]) {
+                maxLengths[i] = length;
+            }
+        });
+    });
+    return maxLengths.map(len => ({ wch: Math.max(12, len + 2) }));
+  };
+
   const handleExport = async (formatType: 'pdf' | 'excel') => {
     const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
@@ -259,7 +275,9 @@ export default function ReportsPage() {
                             }
                         });
                     };
-                    if (pData.channels) periodRows.push(['Item', 'Qtd', 'Valor']);
+                    if (periodData && (pData.channels || pData.subTabs)) {
+                        periodRows.push(['Item', 'Qtd', 'Valor']);
+                    }
                     if (pData.channels) processChannels(pData.channels);
                     if (pData.subTabs) {
                         Object.entries(pData.subTabs).forEach(([subTabKey, subTabData]) => {
@@ -282,6 +300,7 @@ export default function ReportsPage() {
             if (entry.generalObservations) aoa.push(['Observações Gerais do Dia:', entry.generalObservations]);
             
             const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = getColumnWidths(aoa);
             XLSX.utils.book_append_sheet(wb, ws, 'Relatório Diário');
             XLSX.writeFile(wb, `${exportFileName}.xlsx`);
         } else { // PDF
@@ -297,7 +316,7 @@ export default function ReportsPage() {
             PERIOD_DEFINITIONS.forEach(pDef => {
                 const periodData = entry[pDef.id];
                 if (!periodData) return;
-                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData);
+                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData as any);
                 const hasObservations = (periodData as any).periodObservations?.trim().length > 0;
                 let hasContent = periodTotal > 0 || hasObservations;
                 if (!hasContent && pDef.id === 'eventos') hasContent = (periodData as EventosPeriodData).items?.length > 0;
@@ -374,7 +393,7 @@ export default function ReportsPage() {
         if (formatType === 'excel') {
             const wb = XLSX.utils.book_new();
             const headers = ["Data", ...periodsToExport.map(p => p.label), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"];
-            const sheetData = dailyBreakdowns.map(row => {
+            const dataRows = dailyBreakdowns.map(row => {
                 const rowData: (string|number)[] = [row.date];
                 periodsToExport.forEach(pDef => rowData.push(row.periodTotals[pDef.id]?.valor ?? 0));
                 rowData.push(row.totalComCI, row.totalReajusteCI, row.totalSemCI);
@@ -383,9 +402,11 @@ export default function ReportsPage() {
             const footer: (string|number)[] = ["TOTAL"];
             periodsToExport.forEach(pDef => footer.push(summary.periodTotals[pDef.id]?.valor ?? 0));
             footer.push(summary.grandTotalComCI, summary.grandTotalReajusteCI, summary.grandTotalSemCI);
-            sheetData.push(footer);
+            
+            const dataForSheet = [headers, ...dataRows, footer];
+            const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
+            ws['!cols'] = getColumnWidths(dataForSheet);
 
-            const ws = XLSX.utils.aoa_to_sheet([headers, ...sheetData]);
             XLSX.utils.book_append_sheet(wb, ws, 'Geral por Período');
             XLSX.writeFile(wb, `${exportFileName}.xlsx`);
         } else {
@@ -445,14 +466,20 @@ export default function ReportsPage() {
                 }
             });
             summaryData.push([], ['SUBTOTAL GERAL COM CI', subtotalGeralComCI.qtd, subtotalGeralComCI.total], ['SUBTOTAL GERAL SEM CI', subtotalGeralSemCI.qtd, subtotalGeralSemCI.total]);
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumo Consolidado');
+            
+            const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+            summaryWs['!cols'] = getColumnWidths(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumo Consolidado');
 
             tabDefinitions.forEach(tab => {
                 const breakdownData = dailyBreakdowns[tab.id];
                 if (breakdownData?.length > 0) {
                   const headers = tab.cols.map(c => c.label);
                   const sheetData = breakdownData.map(row => tab.cols.map(col => row[col.key]));
-                  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...sheetData]), tab.label.substring(0, 30));
+                  const dataForSheet = [headers, ...sheetData];
+                  const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
+                  ws['!cols'] = getColumnWidths(dataForSheet);
+                  XLSX.utils.book_append_sheet(wb, ws, tab.label.substring(0, 30));
                 }
             });
             XLSX.writeFile(wb, `${exportFileName}.xlsx`);

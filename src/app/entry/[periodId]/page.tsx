@@ -25,7 +25,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useRouter, useParams as useNextParams } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
-import { getDailyEntry, saveDailyEntry } from '@/services/dailyEntryService';
+import { getDailyEntry, saveDailyEntry, getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -181,6 +181,7 @@ export default function PeriodEntryPage() {
   const [isDataLoading, setIsDataLoading] = useState(true); // For data fetching
   const [unitPricesConfig, setUnitPricesConfig] = useState<ChannelUnitPricesConfig>({});
   const [isDateInitialized, setIsDateInitialized] = useState(false);
+  const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
   
   const activePeriodId = params.periodId as PeriodId;
 
@@ -248,6 +249,24 @@ export default function PeriodEntryPage() {
     }
     fetchInitialConfigs();
   }, [toast]);
+  
+  useEffect(() => {
+    async function fetchDatesWithEntries() {
+      try {
+        const allEntries = await getAllDailyEntries();
+        const dates = allEntries
+          .map(entry => {
+            const date = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+            return isValid(date) ? date : null;
+          })
+          .filter((date): date is Date => date !== null);
+        setDatesWithEntries(dates);
+      } catch (error) {
+        console.error("Failed to fetch dates with entries:", error);
+      }
+    }
+    fetchDatesWithEntries();
+  }, []);
 
   // Refactored data loading logic to depend on the date string and initialization status
   useEffect(() => {
@@ -616,6 +635,9 @@ export default function PeriodEntryPage() {
       isMainFormLoading: isLoading || isDataLoading,
     })
   };
+  
+  const modifiers = { hasEntry: datesWithEntries };
+  const modifiersClassNames = { hasEntry: 'has-entry-dot' };
 
 
   return (
@@ -668,6 +690,8 @@ export default function PeriodEntryPage() {
                                 disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                 initialFocus
                                 locale={ptBR}
+                                modifiers={modifiers}
+                                modifiersClassNames={modifiersClassNames}
                               />
                             </PopoverContent>
                           </Popover>
