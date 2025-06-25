@@ -1,9 +1,9 @@
 
-'use server';
 /**
  * @fileOverview An AI flow to analyze monthly dashboard data and provide business insights.
  *
  * - generateDashboardAnalysis - A function that takes summarized dashboard data and returns an AI-generated analysis.
+ * - DashboardAnalysisInputSchema - The Zod schema for the input.
  * - DashboardAnalysisInput - The input type for the analysis function.
  * - DashboardAnalysisOutput - The return type for the analysis function.
  */
@@ -17,7 +17,7 @@ const AccumulatedItemSchema = z.object({
   totalValue: z.number().describe('The total revenue value for this category.'),
 });
 
-const DashboardAnalysisInputSchema = z.object({
+export const DashboardAnalysisInputSchema = z.object({
   month: z.string().describe('The month and year the data refers to (e.g., "Julho 2024").'),
   totalRevenue: z.number().describe('The total revenue for the month from all sources.'),
   totalTransactions: z.number().describe('The total quantity of items/transactions for the month.'),

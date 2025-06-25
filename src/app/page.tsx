@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
-import type { DailyLogEntry, PeriodId, EventosPeriodData, SalesItem, EvolutionChartConfig, ProcessedDailyTotal, AcumulativoMensalItem, MonthlyEvolutionDataItem, PeriodData, Settings } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, EventosPeriodData, SalesItem, EvolutionChartConfig, ProcessedDailyTotal, AcumulativoMensalItem, MonthlyEvolutionDataItem, PeriodData, Settings, DashboardAnalysisInput } from '@/lib/types';
 import { PERIOD_DEFINITIONS, SALES_CHANNELS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
 import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSafeNumericValue } from '@/lib/utils';
 import { getSetting } from '@/services/settingsService';
-import { generateDashboardAnalysis, type DashboardAnalysisInput } from '@/ai/flows/dashboard-analysis-flow';
 import ReactMarkdown from 'react-markdown';
 
 
@@ -536,13 +535,29 @@ export default function DashboardPage() {
         }
       };
 
-      const result = await generateDashboardAnalysis(input);
+      const response = await fetch('/api/dashboard-analysis', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'An error occurred while fetching the analysis.');
+      }
+      
+      const result = await response.json();
+
       if (result.analysis) {
         setAnalysis(result.analysis);
       }
     } catch (error) {
         console.error("Error generating AI analysis:", error);
-        setAnalysis("Ocorreu um erro ao gerar a análise. Por favor, tente novamente.");
+        setAnalysis(
+          `Ocorreu um erro ao gerar a análise. Isso pode acontecer se a solicitação demorar muito para ser processada (timeout) ou se a chave de API do Google não estiver configurada no ambiente da Vercel. Por favor, tente novamente.`
+        );
     } finally {
         setIsAnalyzing(false);
     }
