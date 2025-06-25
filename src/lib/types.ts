@@ -1,4 +1,3 @@
-
 import type { OperatorShift, UserRole } from './constants';
 import type { ChartConfig as ShadCNChartConfig } from "@/components/ui/chart";
 import type { DateRange } from 'react-day-picker';
@@ -142,6 +141,7 @@ export interface MonthlyEvolutionDataItem {
   valorComCI: number;
   valorSemCI: number;
   reajusteCIValor: number;
+  valorCI: number;
   qtdComCI: number;
   qtdSemCI: number;
 }

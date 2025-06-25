@@ -3,8 +3,8 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Tooltip, Legend, Bar as RechartsBar, CartesianGrid } from 'recharts';
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Legend, Bar as RechartsBar, CartesianGrid } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { MonthlyEvolutionDataItem, EvolutionChartConfig } from '@/lib/types';
 
 interface MonthlyEvolutionChartProps {
@@ -18,12 +18,12 @@ const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, cha
     <Card>
       <CardHeader>
         <CardTitle>Evolução Mensal (Últimos 3 Meses)</CardTitle>
-        <CardDescription>Valores COM CI, SEM CI e Reajustes CI.</CardDescription>
+        <CardDescription>Receita mensal por categoria.</CardDescription>
       </CardHeader>
       <CardContent>
         {data.length > 0 ? (
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
-            <RechartsBarChart data={data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+            <RechartsBarChart data={data} margin={{ top: 5, right: 40, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis 
                 dataKey="month" 
@@ -36,32 +36,28 @@ const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, cha
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
+                width={80}
               />
-              <Tooltip 
+              <ChartTooltip 
+                cursor={{ fill: 'hsl(var(--muted))' }}
                 content={<ChartTooltipContent 
-                            formatter={(value, name, props) => {
-                              const { payload } = props;
-                              let displayValue = `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                              let qtyLabel = "";
-                              if (name === chartConfig.valorComCI.label && payload.qtdComCI !== undefined) {
-                                qtyLabel = ` (Qtd: ${payload.qtdComCI.toLocaleString('pt-BR')})`;
-                              } else if (name === chartConfig.valorSemCI.label && payload.qtdSemCI !== undefined) {
-                                qtyLabel = ` (Qtd: ${payload.qtdSemCI.toLocaleString('pt-BR')})`;
-                              }
-                              return (
-                                <div className="flex flex-col">
-                                  <span>{displayValue}</span>
-                                  {qtyLabel && <span className="text-xs text-muted-foreground">{qtyLabel}</span>}
+                            formatter={(value, name) => (
+                              <div className="flex flex-col items-start gap-1">
+                                <div className="font-bold text-foreground">
+                                  {`R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                 </div>
-                              );
-                            }}
+                                <div className="text-sm text-muted-foreground">
+                                  {name}
+                                </div>
+                              </div>
+                            )}
                             labelKey="month"
                           />} 
               />
               <Legend />
-              <RechartsBar dataKey="valorComCI" fill="var(--color-valorComCI)" radius={[4, 4, 0, 0]} name={chartConfig.valorComCI.label as string} />
-              <RechartsBar dataKey="valorSemCI" fill="var(--color-valorSemCI)" radius={[4, 4, 0, 0]} name={chartConfig.valorSemCI.label as string} />
-              <RechartsBar dataKey="reajusteCIValor" fill="var(--color-reajusteCIValor)" radius={[4, 4, 0, 0]} name={chartConfig.reajusteCIValor.label as string} />
+              <RechartsBar dataKey="valorSemCI" stackId="a" fill="var(--color-valorSemCI)" name={chartConfig.valorSemCI.label as string} />
+              <RechartsBar dataKey="valorCI" stackId="a" fill="var(--color-valorCI)" name={chartConfig.valorCI.label as string} />
+              <RechartsBar dataKey="reajusteCIValor" stackId="a" fill="var(--color-reajusteCIValor)" radius={[4, 4, 0, 0]} name={chartConfig.reajusteCIValor.label as string} />
             </RechartsBarChart>
           </ChartContainer>
         ) : (

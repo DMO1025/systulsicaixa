@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,11 +27,9 @@ import { Button } from '@/components/ui/button';
 
 
 const evolutionChartConfig: EvolutionChartConfig = {
-  valorComCI: { label: "Valor COM CI", color: "hsl(var(--chart-1))" },
-  valorSemCI: { label: "Valor SEM CI", color: "hsl(var(--chart-2))" },
-  reajusteCIValor: { label: "Reajuste CI", color: "hsl(var(--chart-3))" },
-  qtdComCI: { label: "Qtd COM CI", color: "hsl(var(--chart-4))" },
-  qtdSemCI: { label: "Qtd SEM CI", color: "hsl(var(--chart-5))" },
+  valorSemCI: { label: "Valor Líquido", color: "hsl(var(--chart-1))" },
+  valorCI: { label: "Consumo Interno", color: "hsl(var(--chart-2))" },
+  reajusteCIValor: { label: "Reajuste C.I.", color: "hsl(var(--chart-3))" },
 };
 
 const calculatePeriodGrandTotal = (periodEntryData: PeriodData | EventosPeriodData | undefined | string): { qtd: number; valor: number } => {
@@ -457,7 +454,8 @@ export default function DashboardPage() {
             return {
                 month: data.monthLabel,
                 valorComCI: data.valorComCI,
-                valorSemCI: data.valorComCI - data.valorCI, 
+                valorSemCI: data.valorComCI - data.valorCI - data.reajusteCIValor,
+                valorCI: data.valorCI,
                 reajusteCIValor: data.reajusteCIValor,
                 qtdComCI: data.qtdComCI,
                 qtdSemCI: data.qtdComCI - data.qtdCI,

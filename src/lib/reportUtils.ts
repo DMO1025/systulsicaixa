@@ -9,7 +9,7 @@ const getReportTitleLabel = (periodId: PeriodId | "all"): string => {
   return periodDef ? periodDef.label.toUpperCase() : "DESCONHECIDO";
 };
 
-const calculatePeriodGrandTotal = (periodEntryData: PeriodData | EventosPeriodData | undefined | string): { qtd: number; valor: number } => {
+export const calculatePeriodGrandTotal = (periodEntryData: PeriodData | EventosPeriodData | undefined | string): { qtd: number; valor: number } => {
   if (!periodEntryData || typeof periodEntryData === 'string') return { qtd: 0, valor: 0 };
 
   let totalQtd = 0;
@@ -75,10 +75,13 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     prefixes.forEach(prefix => {
       const pData = periodEntryData as PeriodData;
       const cifKey = `${prefix}CiEFaturados`;
+      
+      const hotelValor = getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorHotel.vtotal`);
+      const funcionarioValor = getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorFuncionario.vtotal`);
       data.faturadosQtd += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}FaturadosQtd.qtd`);
-      data.faturadosHotelValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorHotel.vtotal`);
-      data.faturadosFuncionarioValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorFuncionario.vtotal`);
-      data.faturadosTotalValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}TotalFaturado.vtotal`);
+      data.faturadosHotelValor += hotelValor;
+      data.faturadosFuncionarioValor += funcionarioValor;
+      data.faturadosTotalValor += hotelValor + funcionarioValor;
 
       data.ifoodQtd += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryIfoodQtd.qtd`);
       data.ifoodValor += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}DeliveryIfoodValor.vtotal`);
@@ -131,14 +134,6 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     const pData = periodEntryData as PeriodData;
     data.genericPeriodQtd += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTTotalQuartos.qtd') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTTotalQuartos.qtd');
     data.genericPeriodValor += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
-  } else if (periodId === 'eventos') {
-    const evData = periodEntryData as EventosPeriodData;
-    (evData.items || []).forEach(item => {
-      (item.subEvents || []).forEach(subEvent => {
-        data.genericPeriodQtd += subEvent.quantity || 0;
-        data.genericPeriodValor += subEvent.totalValue || 0;
-      });
-    });
   } else if (['baliAlmoco', 'baliHappy', 'deliverysEventos', 'extras', 'cafeJasmin', 'italianoAlmoco', 'italianoJantar', 'indianoAlmoco', 'indianoJantar', 'breakfast'].includes(periodId)) {
     const pData = periodEntryData as PeriodData;
     if (pData.channels) {
@@ -243,14 +238,13 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
       
       const dailyResults: Record<string, DailyCategoryDataItem[]> = {
         faturados: [], ifood: [], rappi: [], mesa: [], hospedes: [], retirada: [], ci: [], roomService: [], generic: [],
-        cafeDaManhaDetails: [],
+        cdmHospedes: [], cdmAvulsos: [],
       };
       const summaryAcc: Record<string, { qtd: number; total: number; reajuste?: number }> = {
         faturados: { qtd: 0, total: 0 }, ifood: { qtd: 0, total: 0 }, rappi: { qtd: 0, total: 0 },
         mesa: { qtd: 0, total: 0 }, hospedes: { qtd: 0, total: 0 }, retirada: { qtd: 0, total: 0 },
         consumoInterno: { qtd: 0, total: 0, reajuste: 0 }, roomService: { qtd: 0, total: 0 }, generic: {qtd: 0, total: 0},
-        cdmListaHospedes: { qtd: 0, total: 0 }, cdmNoShow: { qtd: 0, total: 0 }, cdmSemCheckIn: { qtd: 0, total: 0 },
-        cdmCafeAssinado: { qtd: 0, total: 0 }, cdmDiretoCartao: { qtd: 0, total: 0 },
+        cdmHospedes: { qtd: 0, total: 0 }, cdmAvulsos: { qtd: 0, total: 0 },
       };
 
       filteredEntries.forEach(entry => {
@@ -258,20 +252,32 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
         const dailyData = extractDetailedCategoryDataForPeriod(entry, selectedPeriod);
         
         if (selectedPeriod === 'cafeDaManha') {
-            dailyResults.cafeDaManhaDetails.push({
-                date: entryDateStr,
-                listaHospedesQtd: dailyData.cdmListaHospedesQtd, listaHospedesValor: dailyData.cdmListaHospedesValor,
-                noShowQtd: dailyData.cdmNoShowQtd, noShowValor: dailyData.cdmNoShowValor,
-                semCheckInQtd: dailyData.cdmSemCheckInQtd, semCheckInValor: dailyData.cdmSemCheckInValor,
-                cafeAssinadoQtd: dailyData.cdmCafeAssinadoQtd, cafeAssinadoValor: dailyData.cdmCafeAssinadoValor,
-                diretoCartaoQtd: dailyData.cdmDiretoCartaoQtd, diretoCartaoValor: dailyData.cdmDiretoCartaoValor,
-            });
+            const hospedesTotalValor = dailyData.cdmListaHospedesValor + dailyData.cdmNoShowValor + dailyData.cdmSemCheckInValor;
+            const hospedesTotalQtd = dailyData.cdmListaHospedesQtd + dailyData.cdmNoShowQtd + dailyData.cdmSemCheckInQtd;
+            if (hospedesTotalValor > 0 || hospedesTotalQtd > 0) {
+                dailyResults.cdmHospedes.push({
+                    date: entryDateStr,
+                    listaQtd: dailyData.cdmListaHospedesQtd, listaValor: dailyData.cdmListaHospedesValor,
+                    noShowQtd: dailyData.cdmNoShowQtd, noShowValor: dailyData.cdmNoShowValor,
+                    semCheckInQtd: dailyData.cdmSemCheckInQtd, semCheckInValor: dailyData.cdmSemCheckInValor,
+                    total: hospedesTotalValor
+                });
+            }
+            summaryAcc.cdmHospedes.qtd += hospedesTotalQtd;
+            summaryAcc.cdmHospedes.total += hospedesTotalValor;
 
-            summaryAcc.cdmListaHospedes.qtd += dailyData.cdmListaHospedesQtd; summaryAcc.cdmListaHospedes.total += dailyData.cdmListaHospedesValor;
-            summaryAcc.cdmNoShow.qtd += dailyData.cdmNoShowQtd; summaryAcc.cdmNoShow.total += dailyData.cdmNoShowValor;
-            summaryAcc.cdmSemCheckIn.qtd += dailyData.cdmSemCheckInQtd; summaryAcc.cdmSemCheckIn.total += dailyData.cdmSemCheckInValor;
-            summaryAcc.cdmCafeAssinado.qtd += dailyData.cdmCafeAssinadoQtd; summaryAcc.cdmCafeAssinado.total += dailyData.cdmCafeAssinadoValor;
-            summaryAcc.cdmDiretoCartao.qtd += dailyData.cdmDiretoCartaoQtd; summaryAcc.cdmDiretoCartao.total += dailyData.cdmDiretoCartaoValor;
+            const avulsosTotalValor = dailyData.cdmCafeAssinadoValor + dailyData.cdmDiretoCartaoValor;
+            const avulsosTotalQtd = dailyData.cdmCafeAssinadoQtd + dailyData.cdmDiretoCartaoQtd;
+            if (avulsosTotalValor > 0 || avulsosTotalQtd > 0) {
+                dailyResults.cdmAvulsos.push({
+                    date: entryDateStr,
+                    assinadoQtd: dailyData.cdmCafeAssinadoQtd, assinadoValor: dailyData.cdmCafeAssinadoValor,
+                    diretoQtd: dailyData.cdmDiretoCartaoQtd, diretoValor: dailyData.cdmDiretoCartaoValor,
+                    total: avulsosTotalValor
+                });
+            }
+            summaryAcc.cdmAvulsos.qtd += avulsosTotalQtd;
+            summaryAcc.cdmAvulsos.total += avulsosTotalValor;
         } else {
             if (dailyData.faturadosTotalValor > 0 || dailyData.faturadosQtd > 0) { dailyResults.faturados.push({ date: entryDateStr, qtd: dailyData.faturadosQtd, hotel: dailyData.faturadosHotelValor, funcionario: dailyData.faturadosFuncionarioValor, total: dailyData.faturadosTotalValor }); }
             if (dailyData.ifoodValor > 0 || dailyData.ifoodQtd > 0) { dailyResults.ifood.push({ date: entryDateStr, qtd: dailyData.ifoodQtd, valor: dailyData.ifoodValor }); }

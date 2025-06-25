@@ -30,6 +30,7 @@ interface ReportToolbarProps {
     handleExport: (format: 'pdf' | 'excel') => void;
     isDataAvailable: boolean;
     isPeriodFilterDisabled: boolean;
+    datesWithEntries: Date[];
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -46,7 +47,8 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     setSelectedRange,
     handleExport,
     isDataAvailable,
-    isPeriodFilterDisabled
+    isPeriodFilterDisabled,
+    datesWithEntries
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -74,6 +76,10 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
             setSelectedMonth(newDate);
         }
     };
+    
+    const modifiers = { hasEntry: datesWithEntries };
+    const modifiersClassNames = { hasEntry: 'has-entry-dot' };
+
 
     return (
         <Card>
@@ -90,7 +96,15 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
             <CardContent className="space-y-4 md:space-y-0 md:flex md:flex-wrap md:gap-4 items-end">
                 <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
                     <Label htmlFor="filterType">Tipo de Filtro</Label>
-                    <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
+                    <Select value={filterType} onValueChange={(value) => {
+                        setFilterType(value as FilterType)
+                        if (isPeriodFilterDisabled) {
+                            // If we manually change the filter, disable the "lock" from URL params
+                            const newUrl = new URL(window.location.href);
+                            newUrl.searchParams.delete('filterFocus');
+                            window.history.replaceState({}, '', newUrl);
+                        }
+                    }}>
                     <SelectTrigger id="filterType" className="w-full">
                         <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
@@ -114,7 +128,15 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ptBR} />
+                            <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={setSelectedDate}
+                                initialFocus
+                                locale={ptBR}
+                                modifiers={modifiers}
+                                modifiersClassNames={modifiersClassNames}
+                            />
                             </PopoverContent>
                         </Popover>
                     </div>
@@ -150,6 +172,8 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                 onSelect={setSelectedRange}
                                 numberOfMonths={2}
                                 locale={ptBR}
+                                modifiers={modifiers}
+                                modifiersClassNames={modifiersClassNames}
                             />
                             </PopoverContent>
                         </Popover>

@@ -56,4 +56,3 @@ const MonthlyAccumulatedTable: React.FC<MonthlyAccumulatedTableProps> = ({ data 
 };
 
 export default MonthlyAccumulatedTable;
-

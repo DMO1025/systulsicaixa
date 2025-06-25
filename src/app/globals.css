@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Style for react-day-picker to indicate days with entries */
+.has-entry-dot {
+  position: relative; /* Needed for absolute positioning of the dot */
+}
+/* The dot itself */
+.has-entry-dot::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background-color: hsl(var(--destructive));
+  bottom: 6px; /* Adjust position to be below the number */
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* Hide the dot when the day is selected, because the background will cover it */
+.has-entry-dot[aria-selected="true"]::after {
+  display: none;
+}
+/* Hide the dot on days outside the current month */
+.has-entry-dot.day-outside::after {
+    display: none;
+}
 
 
 @layer base {
@@ -25,11 +49,11 @@
     --border: 220 9% 85%;
     --input: 220 9% 88%;
     --ring: 211 9% 32%;
-    --chart-1: 211 9% 32%;
-    --chart-2: 220 9% 62%;
-    --chart-3: 212 21% 70%;
-    --chart-4: 211 9% 50%;
-    --chart-5: 220 9% 75%;
+    --chart-1: 220 89% 60%;
+    --chart-2: 26 98% 50%;
+    --chart-3: 160 87% 40%;
+    --chart-4: 340 86% 60%;
+    --chart-5: 45 93% 47%;
     --radius: 0.5rem;
     --sidebar-background: 212 21% 97%;
     --sidebar-foreground: 211 9% 25%;
@@ -61,11 +85,11 @@
     --border: 211 9% 25%;
     --input: 211 9% 25%;
     --ring: 212 21% 84%;
-    --chart-1: 212 21% 84%;
-    --chart-2: 220 9% 62%;
-    --chart-3: 212 21% 60%;
-    --chart-4: 211 9% 40%;
-    --chart-5: 220 9% 50%;
+    --chart-1: 220 89% 60%;
+    --chart-2: 26 98% 50%;
+    --chart-3: 160 87% 40%;
+    --chart-4: 340 86% 60%;
+    --chart-5: 45 93% 47%;
     --sidebar-background: 211 9% 18%;
     --sidebar-foreground: 212 21% 84%;
     --sidebar-primary: 212 21% 84%;

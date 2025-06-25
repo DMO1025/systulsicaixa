@@ -13,15 +13,18 @@ import 'jspdf-autotable';
 import { toPng } from 'html-to-image';
 import type { DateRange } from 'react-day-picker';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, GeneralReportViewData, PeriodReportViewData } from '@/lib/types';
-import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG, SALES_CHANNELS } from '@/lib/constants';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, GeneralReportViewData, PeriodReportViewData, PeriodData, EventosPeriodData, SalesChannelId } from '@/lib/types';
+import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
-import { generateReportData } from '@/lib/reportUtils';
+import { generateReportData, calculatePeriodGrandTotal } from '@/lib/reportUtils';
+import { getSafeNumericValue } from '@/lib/utils';
+
 
 import ReportToolbar from '@/components/reports/ReportToolbar';
 import GeneralReportView from '@/components/reports/GeneralReportView';
 import PeriodSpecificReportView from '@/components/reports/PeriodSpecificReportView';
+import SingleDayReportView from '@/components/reports/SingleDayReportView';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 
@@ -43,6 +46,7 @@ export default function ReportsPage() {
   });
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [visibilityConfig, setVisibilityConfig] = useState<DashboardItemVisibilityConfig>({});
+  const hasSetFromParams = useRef(false);
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -64,6 +68,15 @@ export default function ReportsPage() {
     }
     fetchInitialData();
   }, [toast]);
+  
+  const datesWithEntries = useMemo(() => {
+    return allEntries
+      .map(entry => {
+        const date = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+        return isValid(date) ? date : null;
+      })
+      .filter((date): date is Date => date !== null);
+  }, [allEntries]);
 
   const visiblePeriodDefinitions = useMemo(() => {
     return PERIOD_DEFINITIONS.filter(pDef => {
@@ -79,19 +92,22 @@ export default function ReportsPage() {
   }, [visibilityConfig]);
 
   useEffect(() => {
+    if (isLoadingEntries || hasSetFromParams.current) return;
+
     const filterFocusParam = searchParams.get('filterFocus');
     const periodIdParam = searchParams.get('periodId') as PeriodId | null;
     const monthParam = searchParams.get('month');
-
+    
     if (filterFocusParam === 'item' && periodIdParam && monthParam) {
       const parsedMonth = parseISO(monthParam);
       if (isValid(parsedMonth)) {
         setFilterType('period');
         setSelectedPeriod(periodIdParam);
         setSelectedMonth(parsedMonth);
+        hasSetFromParams.current = true;
       }
     }
-  }, [searchParams]);
+  }, [searchParams, isLoadingEntries]);
 
   useEffect(() => {
     let entriesToDisplay: DailyLogEntry[] = [];
@@ -126,20 +142,173 @@ export default function ReportsPage() {
   }, [allEntries, filterType, selectedDate, selectedMonth, selectedRange]);
 
   const reportData = useMemo((): ReportData | null => {
-    const periodForReport = filterType === 'range' ? 'all' : selectedPeriod;
+    const periodForReport = (filterType === 'range' || filterType === 'month') ? 'all' : selectedPeriod;
+    if (filterType === 'date') return null; // Let the dedicated component handle its own data
     return generateReportData(filteredEntries, periodForReport);
   }, [filteredEntries, selectedPeriod, filterType]);
 
   const handleExport = async (formatType: 'pdf' | 'excel') => {
+    const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
+
+    if (filterType === 'date' && filteredEntries.length > 0) {
+        const entry = filteredEntries[0];
+        const reportDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+        const reportDateStr = isValid(reportDate) ? format(reportDate, 'dd/MM/yyyy') : 'Data Inválida';
+        const exportFileName = `Relatorio_Diario_${isValid(reportDate) ? format(reportDate, 'yyyy-MM-dd') : 'data_invalida'}`;
+
+        let totalComCI = 0, totalQtd = 0;
+        PERIOD_DEFINITIONS.forEach(pDef => {
+            const { qtd, valor } = calculatePeriodGrandTotal(entry[pDef.id]);
+            totalQtd += qtd; totalComCI += valor;
+        });
+        const almocoCIValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
+        const jantarCIValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
+        const reajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
+        const reajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
+        const totalCIValor = almocoCIValor + jantarCIValor;
+        const totalReajusteCI = reajusteCIAlmoco + reajusteCIJantar;
+        const totalSemCI = totalComCI - totalCIValor - totalReajusteCI;
+
+        if (formatType === 'excel') {
+            const wb = XLSX.utils.book_new();
+            let aoa: (string|number)[][] = [];
+            aoa.push([`Relatório Diário - ${reportDateStr}`], [], ["Receita Total (com CI)", totalComCI], ["Receita Total (sem CI)", totalSemCI], ["Total de Itens/Transações", totalQtd], []);
+
+            PERIOD_DEFINITIONS.forEach(pDef => {
+                const periodData = entry[pDef.id];
+                if (!periodData) return;
+                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData);
+                let periodRows: (string|number)[][] = [];
+
+                if (pDef.id === 'eventos') {
+                    const evData = periodData as EventosPeriodData;
+                    if (evData.items?.length > 0) {
+                        periodRows.push(['Evento', 'Serviço', 'Local', 'Qtd', 'Valor']);
+                        evData.items.forEach(item => {
+                            item.subEvents.forEach(sub => {
+                                const serviceLabel = sub.serviceType === 'OUTRO' ? sub.customServiceDescription || 'Outro' : EVENT_SERVICE_TYPE_OPTIONS.find(o => o.value === sub.serviceType)?.label || sub.serviceType;
+                                const locationLabel = EVENT_LOCATION_OPTIONS.find(o => o.value === sub.location)?.label || sub.location;
+                                periodRows.push([item.eventName || 'Evento Sem Nome', serviceLabel || '-', locationLabel || '-', sub.quantity || 0, sub.totalValue || 0]);
+                            });
+                        });
+                    }
+                } else {
+                    const pData = periodData as PeriodData;
+                    const processChannels = (channels: any, prefix = "") => {
+                        Object.entries(channels).forEach(([channelId, values]: [string, any]) => {
+                            if (values && (values.qtd || values.vtotal)) {
+                                periodRows.push([prefix + (SALES_CHANNELS[channelId as SalesChannelId] || channelId), values.qtd || 0, values.vtotal || 0]);
+                            }
+                        });
+                    };
+                    if (pData.channels) periodRows.push(['Item', 'Qtd', 'Valor']);
+                    if (pData.channels) processChannels(pData.channels);
+                    if (pData.subTabs) {
+                        Object.entries(pData.subTabs).forEach(([subTabKey, subTabData]) => {
+                            if (subTabData?.channels && Object.values(subTabData.channels).some(ch => ch?.qtd || ch?.vtotal)) {
+                                periodRows.push([subTabKey.toUpperCase()]);
+                                processChannels(subTabData.channels, "  ");
+                            }
+                        });
+                    }
+                }
+
+                if (periodRows.length > 0 || (pData as any).periodObservations) {
+                    aoa.push([pDef.label.toUpperCase(), '', periodTotal], ...periodRows);
+                    if ((pData as any).periodObservations) aoa.push(['Observações:', (pData as any).periodObservations]);
+                    aoa.push([]);
+                }
+            });
+
+            if (entry.generalObservations) aoa.push(['Observações Gerais do Dia:', entry.generalObservations]);
+            
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            XLSX.utils.book_append_sheet(wb, ws, 'Relatório Diário');
+            XLSX.writeFile(wb, `${exportFileName}.xlsx`);
+        } else { // PDF
+            const doc = new jsPDF();
+            let y = 15;
+            const writeText = (text: string, x: number, yPos: number, options = {}) => doc.text(text, x, yPos, options);
+            const checkPageBreak = () => { if (y > 270) { doc.addPage(); y = 20; } };
+
+            doc.setFontSize(16); writeText(`Relatório Diário - ${reportDateStr}`, 14, y); y += 10;
+            doc.setFontSize(10); writeText(`Receita Total (com CI): ${formatCurrency(totalComCI)}`, 14, y); writeText(`Receita Total (sem CI): ${formatCurrency(totalSemCI)}`, 100, y); y += 7;
+            writeText(`Total de Itens/Transações: ${formatNumber(totalQtd)}`, 14, y); y += 10;
+
+            PERIOD_DEFINITIONS.forEach(pDef => {
+                const periodData = entry[pDef.id];
+                if (!periodData) return;
+                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData);
+                const hasObservations = (periodData as any).periodObservations?.trim().length > 0;
+                let hasContent = periodTotal > 0 || hasObservations;
+                if (!hasContent && pDef.id === 'eventos') hasContent = (periodData as EventosPeriodData).items?.length > 0;
+                if (!hasContent) return;
+
+                checkPageBreak();
+                doc.setFontSize(12); writeText(`${pDef.label.toUpperCase()} - Total: ${formatCurrency(periodTotal)}`, 14, y); y += 7;
+
+                if (pDef.id === 'eventos') {
+                    const evData = periodData as EventosPeriodData;
+                    if (evData.items?.length > 0) {
+                        evData.items.forEach(item => {
+                            checkPageBreak();
+                            doc.setFontSize(10); writeText(item.eventName || 'Evento Sem Nome', 14, y); y+= 5;
+                            (doc as any).autoTable({
+                                startY: y, head: [['Serviço', 'Local', 'Qtd', 'Valor']],
+                                body: item.subEvents.map(sub => [EVENT_SERVICE_TYPE_OPTIONS.find(o=>o.value===sub.serviceType)?.label||sub.serviceType, EVENT_LOCATION_OPTIONS.find(o=>o.value===sub.location)?.label||sub.location, formatNumber(sub.quantity), formatCurrency(sub.totalValue)]),
+                                theme: 'grid', styles: { fontSize: 8 }, headStyles: { fontSize: 9 }
+                            });
+                            y = (doc as any).lastAutoTable.finalY + 5;
+                        });
+                    }
+                } else {
+                    let body: any[][] = [];
+                    const processChannels = (channels: any, prefix = "") => {
+                        Object.entries(channels).forEach(([id, val]: [string, any]) => {
+                           if(val?.qtd || val?.vtotal) body.push([prefix + (SALES_CHANNELS[id as SalesChannelId] || id), formatNumber(val.qtd), formatCurrency(val.vtotal)]);
+                        });
+                    };
+                    const pData = periodData as PeriodData;
+                    if (pData.channels) processChannels(pData.channels);
+                    if (pData.subTabs) {
+                        Object.entries(pData.subTabs).forEach(([key, val]) => {
+                            if(val?.channels && Object.values(val.channels).some(ch => ch?.qtd || ch?.vtotal)) {
+                                body.push([{ content: key.toUpperCase(), colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
+                                processChannels(val.channels, '  ');
+                            }
+                        });
+                    }
+                    if(body.length > 0){
+                        (doc as any).autoTable({ startY: y, head: [['Item', 'Qtd', 'Valor']], body, theme: 'grid', styles: {fontSize: 8}, headStyles: {fontSize: 9}});
+                        y = (doc as any).lastAutoTable.finalY + 5;
+                    }
+                }
+                 if(hasObservations){
+                    checkPageBreak();
+                    doc.setFontSize(10); writeText('Observações:', 14, y); y += 5;
+                    doc.setFontSize(9);
+                    const splitText = doc.splitTextToSize((periodData as any).periodObservations, 180);
+                    writeText(splitText, 14, y); y += splitText.length * 4 + 5;
+                }
+            });
+            if(entry.generalObservations) {
+                checkPageBreak();
+                doc.setFontSize(12); writeText('Observações Gerais do Dia', 14, y); y += 7;
+                doc.setFontSize(9); writeText(doc.splitTextToSize(entry.generalObservations, 180), 14, y);
+            }
+            doc.save(`${exportFileName}.pdf`);
+        }
+        return;
+    }
+
     if (!reportData) {
       toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
 
     const exportFileName = `Relatorio_${reportData.data.reportTitle.replace(/[\s()]/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}`;
-    const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-    const formatNumber = (value: number) => (value || 0).toLocaleString('pt-BR');
-
+    
     if (reportData.type === 'general') {
         const { dailyBreakdowns, summary } = reportData.data;
         const periodsToExport = visiblePeriodDefinitions;
@@ -149,124 +318,59 @@ export default function ReportsPage() {
             const headers = ["Data", ...periodsToExport.map(p => p.label), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"];
             const sheetData = dailyBreakdowns.map(row => {
                 const rowData: (string|number)[] = [row.date];
-                periodsToExport.forEach(pDef => {
-                    rowData.push(row.periodTotals[pDef.id]?.valor ?? 0);
-                });
+                periodsToExport.forEach(pDef => rowData.push(row.periodTotals[pDef.id]?.valor ?? 0));
                 rowData.push(row.totalComCI, row.totalReajusteCI, row.totalSemCI);
                 return rowData;
             });
             const footer: (string|number)[] = ["TOTAL"];
-            periodsToExport.forEach(pDef => {
-                footer.push(summary.periodTotals[pDef.id]?.valor ?? 0);
-            });
+            periodsToExport.forEach(pDef => footer.push(summary.periodTotals[pDef.id]?.valor ?? 0));
             footer.push(summary.grandTotalComCI, summary.grandTotalReajusteCI, summary.grandTotalSemCI);
             sheetData.push(footer);
 
             const ws = XLSX.utils.aoa_to_sheet([headers, ...sheetData]);
             XLSX.utils.book_append_sheet(wb, ws, 'Geral por Período');
             XLSX.writeFile(wb, `${exportFileName}.xlsx`);
-        } else { 
-            const doc = new jsPDF({ orientation: 'landscape' });
-            doc.setFontSize(16);
-            doc.text(reportData.data.reportTitle, 14, 20);
-            doc.setFontSize(9);
-            doc.setTextColor(100);
-            doc.text(`Período de Referência: ${reportData.data.reportTitle}`, 14, 25);
-            
-            const head = [["Data", ...periodsToExport.map(p => p.label.substring(0, 15)), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"]];
-            const body = dailyBreakdowns.map(row => {
-                const rowData = [row.date];
-                periodsToExport.forEach(pDef => {
-                    rowData.push(formatCurrency(row.periodTotals[pDef.id]?.valor ?? 0));
-                });
-                rowData.push(formatCurrency(row.totalComCI), formatCurrency(row.totalReajusteCI), formatCurrency(row.totalSemCI));
-                return rowData;
-            });
-            const foot = [["TOTAL"]];
-            periodsToExport.forEach(pDef => {
-                foot[0].push(formatCurrency(summary.periodTotals[pDef.id]?.valor ?? 0));
-            });
-            foot[0].push(formatCurrency(summary.grandTotalComCI), formatCurrency(summary.grandTotalReajusteCI), formatCurrency(summary.grandTotalSemCI));
-
-            (doc as any).autoTable({
-                startY: 30, head, body, foot,
-                theme: 'grid',
-                headStyles: { fillColor: [74, 180, 155], fontSize: 6, cellPadding: 1 },
-                styles: { fontSize: 6, cellPadding: 1 },
-                footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' }
-            });
-            doc.save(`${exportFileName}.pdf`);
-        }
-    } else if (selectedPeriod === 'cafeDaManha') {
-        const { dailyBreakdowns, summary, subtotalGeralComCI } = reportData.data;
-        const cdmBreakdown = dailyBreakdowns.cafeDaManhaDetails || [];
-        
-        const summaryItems = [
-            { label: SALES_CHANNELS.cdmListaHospedes, data: summary.cdmListaHospedes },
-            { label: SALES_CHANNELS.cdmNoShow, data: summary.cdmNoShow },
-            { label: SALES_CHANNELS.cdmSemCheckIn, data: summary.cdmSemCheckIn },
-            { label: SALES_CHANNELS.cdmCafeAssinado, data: summary.cdmCafeAssinado },
-            { label: SALES_CHANNELS.cdmDiretoCartao, data: summary.cdmDiretoCartao },
-        ];
-
-        if (formatType === 'excel') {
-            const wb = XLSX.utils.book_new();
-            
-            const summarySheetData = [
-                [`Relatório: ${reportData.data.reportTitle}`],
-                [`Mês: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`], [],
-                ['Item', 'Qtd', 'Total']
-            ];
-            summaryItems.forEach(item => {
-                if(item.data) summarySheetData.push([item.label, item.data.qtd, item.data.total]);
-            });
-            summarySheetData.push([]);
-            summarySheetData.push(['SUBTOTAL GERAL', subtotalGeralComCI.qtd, subtotalGeralComCI.total]);
-            const wsSummary = XLSX.utils.aoa_to_sheet(summarySheetData);
-            XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
-
-            const detailHeaders = ["Data", "Lista Hósp. (Qtd)", "Lista Hósp. (Vlr)", "No Show (Qtd)", "No Show (Vlr)", "Sem Check-in (Qtd)", "Sem Check-in (Vlr)", "Assinado (Qtd)", "Assinado (Vlr)", "Direto (Qtd)", "Direto (Vlr)"];
-            const detailSheetData = cdmBreakdown.map(row => [
-                row.date, row.listaHospedesQtd, row.listaHospedesValor, row.noShowQtd, row.noShowValor,
-                row.semCheckInQtd, row.semCheckInValor, row.cafeAssinadoQtd, row.cafeAssinadoValor,
-                row.diretoCartaoQtd, row.diretoCartaoValor
-            ]);
-            const wsDetail = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailSheetData]);
-            XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalhes Diários');
-
-            XLSX.writeFile(wb, `${exportFileName}.xlsx`);
         } else {
             const doc = new jsPDF({ orientation: 'landscape' });
             doc.setFontSize(16); doc.text(reportData.data.reportTitle, 14, 20);
-            doc.setFontSize(9); doc.text(`Mês de Referência: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`, 14, 25);
+            doc.setFontSize(9); doc.setTextColor(100); doc.text(`Período de Referência: ${reportData.data.reportTitle}`, 14, 25);
+            let finalY = 30;
 
-            const summaryHead = [['Item', 'Qtd', 'Total']];
-            const summaryBody = summaryItems.map(item => [item.label, formatNumber(item.data?.qtd ?? 0), formatCurrency(item.data?.total ?? 0)]);
-            const summaryFoot = [['SUBTOTAL GERAL', formatNumber(subtotalGeralComCI.qtd), formatCurrency(subtotalGeralComCI.total)]];
-            (doc as any).autoTable({ startY: 30, head: summaryHead, body: summaryBody, foot: summaryFoot, theme: 'grid' });
-
-            const detailHead = [['Data', 'LH Qtd', 'LH Vlr', 'NS Qtd', 'NS Vlr', 'SCI Qtd', 'SCI Vlr', 'Ass. Qtd', 'Ass. Vlr', 'Dir. Qtd', 'Dir. Vlr']];
-            const detailBody = cdmBreakdown.map(row => [
-                row.date,
-                formatNumber(row.listaHospedesQtd), formatCurrency(row.listaHospedesValor),
-                formatNumber(row.noShowQtd), formatCurrency(row.noShowValor),
-                formatNumber(row.semCheckInQtd), formatCurrency(row.semCheckInValor),
-                formatNumber(row.cafeAssinadoQtd), formatCurrency(row.cafeAssinadoValor),
-                formatNumber(row.diretoCartaoQtd), formatCurrency(row.diretoCartaoValor),
-            ]);
-            (doc as any).autoTable({ startY: (doc as any).lastAutoTable.finalY + 10, head: detailHead, body: detailBody, theme: 'grid', headStyles: { fontSize: 7 }, styles: { fontSize: 6 } });
-
+            const tableHeaders = ["Data", ...periodsToExport.map(p => p.label), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"];
+            const tableBody = dailyBreakdowns.map(row => {
+                const rowData: (string|number)[] = [row.date];
+                periodsToExport.forEach(pDef => rowData.push(formatCurrency(row.periodTotals[pDef.id]?.valor ?? 0)));
+                rowData.push(formatCurrency(row.totalComCI), formatCurrency(row.totalReajusteCI), formatCurrency(row.totalSemCI));
+                return rowData;
+            });
+            const tableFooter: (string|number)[] = ["TOTAL"];
+            periodsToExport.forEach(pDef => tableFooter.push(formatCurrency(summary.periodTotals[pDef.id]?.valor ?? 0)));
+            tableFooter.push(formatCurrency(summary.grandTotalComCI), formatCurrency(summary.grandTotalReajusteCI), formatCurrency(summary.grandTotalSemCI));
+            
+            (doc as any).autoTable({ startY: finalY, head: [tableHeaders], body: tableBody, foot: [tableFooter], theme: 'grid', headStyles: { fontSize: 7, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 }});
+            finalY = (doc as any).lastAutoTable.finalY + 10;
+            
+            if (chartRef.current) {
+                try {
+                    const dataUrl = await toPng(chartRef.current, { quality: 0.95, pixelRatio: 2, backgroundColor: '#ffffff' });
+                    const imgWidth = doc.internal.pageSize.getWidth() - 28;
+                    const imgHeight = (chartRef.current.offsetHeight * imgWidth) / chartRef.current.offsetWidth;
+                    if (finalY + imgHeight > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); finalY = 20; }
+                    doc.addImage(dataUrl, 'PNG', 14, finalY, imgWidth, imgHeight);
+                } catch (err) { console.error('Falha ao capturar imagem do relatório geral:', err); }
+            }
             doc.save(`${exportFileName}.pdf`);
         }
-    } else { 
+    } else { // Period-specific reports
         const { reportTitle, summary, subtotalGeralComCI, subtotalGeralSemCI, dailyBreakdowns } = reportData.data;
-        const summaryTableItems = [
+        const summaryItems = [
             { item: "FATURADOS", dataKey: "faturados" }, { item: "IFOOD", dataKey: "ifood" },
             { item: "RAPPI", dataKey: "rappi" }, { item: "MESA", dataKey: "mesa" },
             { item: "HÓSPEDES", dataKey: "hospedes" }, { item: "RETIRADA", dataKey: "retirada" },
             { item: "ROOM SERVICE", dataKey: "roomService" }, { item: "CONSUMO INTERNO", dataKey: "consumoInterno" },
             { item: "DIVERSOS", dataKey: "generic" },
         ];
+        const cdmSummaryItems = [ { item: "HÓSPEDES (CAFÉ)", dataKey: "cdmHospedes" }, { item: "AVULSOS (CAFÉ)", dataKey: "cdmAvulsos" } ];
         const tabDefinitions = [
             { id: 'faturados', label: 'FATURADOS', cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD FAT.', isNum: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'funcionario', label: 'R$ FUNC.', isCurrency: true}, {key: 'total', label: 'TOTAL FAT.', isCurrency: true}] },
             { id: 'ifood', label: 'IFOOD', cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
@@ -277,138 +381,91 @@ export default function ReportsPage() {
             { id: 'ci', label: 'C.I.', cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD CI', isNum: true}, {key: 'reajuste', label: 'R$ REAJ.', isCurrency: true}, {key: 'total', label: 'R$ TOTAL CI', isCurrency: true}] },
             { id: 'roomService', label: 'ROOM SERVICE', cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
             { id: 'generic', label: 'DIVERSOS', cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
+            { id: 'cdmHospedes', label: 'HÓSPEDES (CAFÉ)', cols: [ {key: 'date', label: 'DATA'}, {key: 'listaQtd', label: 'LISTA QTD', isNum: true}, {key: 'listaValor', label: 'LISTA VLR', isCurrency: true}, {key: 'noShowQtd', label: 'NO-SHOW QTD', isNum: true}, {key: 'noShowValor', label: 'NO-SHOW VLR', isCurrency: true}, {key: 'semCheckInQtd', label: 'S/ CHECK-IN QTD', isNum: true}, {key: 'semCheckInValor', label: 'S/ CHECK-IN VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
+            { id: 'cdmAvulsos', label: 'AVULSOS (CAFÉ)', cols: [ {key: 'date', label: 'DATA'}, {key: 'assinadoQtd', label: 'ASSINADO QTD', isNum: true}, {key: 'assinadoValor', label: 'ASSINADO VLR', isCurrency: true}, {key: 'diretoQtd', label: 'DIRETO QTD', isNum: true}, {key: 'diretoValor', label: 'DIRETO VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
         ];
-
-
+        
         if (formatType === 'excel') {
-          const wb = XLSX.utils.book_new();
-          let summaryData = [
-            [`Relatório: ${reportTitle}`],
-            [`Mês de Referência: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`],
-            [],
-            ['Item', 'Qtd', 'Total']
-          ];
-          summaryTableItems.forEach(item => {
-            const data = summary[item.dataKey as keyof typeof summary];
-            if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && data.reajuste !== 0))) {
-              summaryData.push([item.item, formatNumber(data.qtd), formatCurrency(data.total)]);
-            }
-          });
-          summaryData.push([]);
-          summaryData.push(['SUBTOTAL GERAL COM CI', formatNumber(subtotalGeralComCI.qtd), formatCurrency(subtotalGeralComCI.total)]);
-          summaryData.push(['SUBTOTAL GERAL SEM CI', formatNumber(subtotalGeralSemCI.qtd), formatCurrency(subtotalGeralSemCI.total)]);
-          const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-          XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo Consolidado');
+            const wb = XLSX.utils.book_new();
+            const itemsToSummarize = selectedPeriod === 'cafeDaManha' ? cdmSummaryItems : summaryItems;
+            let summaryData: any[][] = [[`Relatório: ${reportTitle}`], [`Mês de Referência: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`], [], ['Item', 'Qtd', 'Total']];
+            itemsToSummarize.forEach(item => {
+                const data = summary[item.dataKey as keyof typeof summary];
+                if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && data.reajuste !== 0))) {
+                  summaryData.push([item.item, data.qtd, data.total]);
+                }
+            });
+            summaryData.push([], ['SUBTOTAL GERAL COM CI', subtotalGeralComCI.qtd, subtotalGeralComCI.total], ['SUBTOTAL GERAL SEM CI', subtotalGeralSemCI.qtd, subtotalGeralSemCI.total]);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumo Consolidado');
 
-          tabDefinitions.forEach(tab => {
-            const breakdownData = dailyBreakdowns[tab.id];
-            if (breakdownData && breakdownData.length > 0) {
-              const headers = tab.cols.map(c => c.label);
-              const sheetData = breakdownData.map(row => 
-                tab.cols.map(col => {
-                  const value = row[col.key];
-                  if (col.isCurrency) return Number(value) || 0;
-                  if (col.isNum) return Number(value) || 0;
-                  return value;
-                })
-              );
-              const wsDetail = XLSX.utils.aoa_to_sheet([headers, ...sheetData]);
-              XLSX.utils.book_append_sheet(wb, wsDetail, tab.label.substring(0, 30));
-            }
-          });
-          XLSX.writeFile(wb, `${exportFileName}.xlsx`);
-        } else if (formatType === 'pdf') {
-          const doc = new jsPDF();
-          let finalY = 20;
+            tabDefinitions.forEach(tab => {
+                const breakdownData = dailyBreakdowns[tab.id];
+                if (breakdownData?.length > 0) {
+                  const headers = tab.cols.map(c => c.label);
+                  const sheetData = breakdownData.map(row => tab.cols.map(col => row[col.key]));
+                  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...sheetData]), tab.label.substring(0, 30));
+                }
+            });
+            XLSX.writeFile(wb, `${exportFileName}.xlsx`);
+        } else {
+            const doc = new jsPDF();
+            let finalY = 20;
+            doc.setFontSize(14); doc.text(reportTitle, 14, finalY); finalY += 5;
+            doc.setFontSize(9); doc.setTextColor(100); doc.text(`Mês de Referência: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`, 14, finalY); finalY += 10;
+            
+            const itemsToSummarize = selectedPeriod === 'cafeDaManha' ? cdmSummaryItems : summaryItems;
+            const summaryBody = itemsToSummarize.map(item => {
+                const data = summary[item.dataKey as keyof typeof summary];
+                if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && data.reajuste !== 0))) {
+                  return [item.item, formatNumber(data.qtd), formatCurrency(data.total)];
+                } return null;
+            }).filter(Boolean) as (string|number)[][];
+            
+            (doc as any).autoTable({ startY: finalY, head: [['Item', 'Qtd', 'Total']], body: summaryBody, foot: [['SUBTOTAL COM CI', formatNumber(subtotalGeralComCI.qtd), formatCurrency(subtotalGeralComCI.total)], ['SUBTOTAL SEM CI', formatNumber(subtotalGeralSemCI.qtd), formatCurrency(subtotalGeralSemCI.total)]], theme: 'striped' });
+            finalY = (doc as any).lastAutoTable.finalY + 10;
 
-          doc.setFontSize(14);
-          doc.text(reportTitle, 14, finalY);
-          finalY += 5;
-          doc.setFontSize(9);
-          doc.setTextColor(100);
-          doc.text(`Mês de Referência: ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`, 14, finalY);
-          finalY += 10;
-          
-          const summaryHead = [['Item', 'Qtd', 'Total']];
-          const summaryBody = summaryTableItems
-            .map(item => {
-              const data = summary[item.dataKey as keyof typeof summary];
-              if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && data.reajuste !== 0))) {
-                return [item.item, formatNumber(data.qtd), formatCurrency(data.total)];
+            tabDefinitions.forEach(tab => {
+              const breakdownData = dailyBreakdowns[tab.id];
+              if (breakdownData?.length > 0) {
+                if (finalY > 250) { doc.addPage(); finalY = 20; }
+                doc.setFontSize(10); doc.text(`Detalhes - ${tab.label}`, 14, finalY); finalY += 7;
+                (doc as any).autoTable({
+                    startY: finalY, head: [tab.cols.map(c => c.label)],
+                    body: breakdownData.map(row => tab.cols.map(col => {
+                        const value = row[col.key] ?? '-';
+                        return col.isCurrency ? formatCurrency(Number(value) || 0) : col.isNum ? formatNumber(Number(value) || 0) : value;
+                    })),
+                    theme: 'grid', headStyles: { fontSize: 7, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 }
+                });
+                finalY = (doc as any).lastAutoTable.finalY + 10;
               }
-              return null;
-            }).filter(Boolean) as (string | number)[][];
-          summaryBody.push(['', '', '']);
-          summaryBody.push([{content: 'SUBTOTAL GERAL COM CI', styles: {fontStyle: 'bold'}}, {content: formatNumber(subtotalGeralComCI.qtd), styles: {fontStyle: 'bold'}}, {content: formatCurrency(subtotalGeralComCI.total), styles: {fontStyle: 'bold'}}]);
-          summaryBody.push([{content: 'SUBTOTAL GERAL SEM CI', styles: {fontStyle: 'bold'}}, {content: formatNumber(subtotalGeralSemCI.qtd), styles: {fontStyle: 'bold'}}, {content: formatCurrency(subtotalGeralSemCI.total), styles: {fontStyle: 'bold'}}]);
-          
-          (doc as any).autoTable({
-            startY: finalY, head: summaryHead, body: summaryBody, theme: 'striped',
-            headStyles: { fillColor: [74, 180, 155], fontSize: 7 }, styles: { fontSize: 6 },
-            didDrawPage: (data: any) => { finalY = data.cursor.y; }
-          });
+            });
 
-          tabDefinitions.forEach(tab => {
-            const breakdownData = dailyBreakdowns[tab.id];
-            if (breakdownData && breakdownData.length > 0) {
-              finalY = (doc as any).lastAutoTable.finalY || finalY;
-              finalY += 10;
-              if (finalY > 250) { doc.addPage(); finalY = 20; }
-              doc.setFontSize(10);
-              doc.text(`Detalhes - ${tab.label}`, 14, finalY);
-              finalY += 7;
-              const detailHead = [tab.cols.map(c => c.label)];
-              const detailBody = breakdownData.map(row => 
-                tab.cols.map(col => {
-                  const value = row[col.key] ?? '-';
-                  if (col.isCurrency) return formatCurrency(Number(value) || 0);
-                  if (col.isNum) return formatNumber(Number(value) || 0);
-                  return value;
-                })
-              );
-              (doc as any).autoTable({
-                startY: finalY, head: detailHead, body: detailBody, theme: 'grid',
-                headStyles: { fontSize: 7, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 },
-                didDrawPage: (data: any) => { finalY = data.cursor.y; }
-              });
+            if (chartRef.current) {
+              try {
+                const dataUrl = await toPng(chartRef.current, { quality: 0.95, pixelRatio: 2 });
+                const chartWidth = doc.internal.pageSize.getWidth() - 28;
+                const chartHeight = chartWidth * (9 / 16);
+                if (finalY + 10 + chartHeight > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); finalY = 20; } else { finalY += 10; }
+                doc.addImage(dataUrl, 'PNG', 14, finalY, chartWidth, chartHeight);
+              } catch (err) { console.error('Falha ao capturar imagem do gráfico:', err); }
             }
-          });
-
-          if (chartRef.current) {
-            try {
-              const dataUrl = await toPng(chartRef.current, { quality: 0.95, pixelRatio: 2 });
-              const chartWidth = doc.internal.pageSize.getWidth() - 28;
-              const chartHeight = chartWidth * (9 / 16); // 16:9 aspect ratio
-
-              finalY = (doc as any).lastAutoTable.finalY || finalY;
-              if (finalY + 10 + chartHeight > doc.internal.pageSize.getHeight() - 15) {
-                doc.addPage();
-                finalY = 20;
-              } else {
-                finalY += 10;
-              }
-              doc.addImage(dataUrl, 'PNG', 14, finalY, chartWidth, chartHeight);
-            } catch (err) {
-              console.error('Falha ao capturar imagem do gráfico:', err);
-              toast({ title: "Erro na Exportação", description: "Não foi possível incluir o gráfico no PDF.", variant: "destructive" });
-            }
-          }
-
-          doc.save(`${exportFileName}.pdf`);
+            doc.save(`${exportFileName}.pdf`);
         }
     }
   };
 
   const getReportDescription = () => {
       if (isLoadingEntries) return "Carregando registros...";
-      if (!reportData) return "Nenhum registro encontrado para os filtros selecionados.";
       
       switch (filterType) {
         case 'date':
-          return `Mostrando dados para ${selectedDate ? format(selectedDate, "dd/MM/yyyy", {locale: ptBR}) : 'data selecionada'}.`;
+          return `Mostrando o resumo detalhado para ${selectedDate ? format(selectedDate, "dd/MM/yyyy", {locale: ptBR}) : 'data selecionada'}.`;
         case 'month':
         case 'period':
-          return `Mostrando dados para ${reportData.data.reportTitle} de ${format(selectedMonth, "MMMM yyyy", {locale: ptBR})}.`;
+          if (!reportData) return "Nenhum registro encontrado para os filtros selecionados.";
+          const reportTitleForPeriod = reportData.data.reportTitle === 'GERAL (MÊS)' ? 'Todos os Períodos' : reportData.data.reportTitle;
+          return `Mostrando dados para ${reportTitleForPeriod} de ${format(selectedMonth, "MMMM yyyy", {locale: ptBR})}.`;
         case 'range':
             if (selectedRange?.from) {
                 const fromDate = format(selectedRange.from, "dd/MM/yyyy", {locale: ptBR});
@@ -438,8 +495,9 @@ export default function ReportsPage() {
         selectedRange={selectedRange}
         setSelectedRange={setSelectedRange}
         handleExport={handleExport}
-        isDataAvailable={!!reportData}
-        isPeriodFilterDisabled={searchParams.get('filterFocus') === 'item' && !!searchParams.get('month')}
+        isDataAvailable={!!reportData || (filterType === 'date' && filteredEntries.length > 0)}
+        isPeriodFilterDisabled={hasSetFromParams.current}
+        datesWithEntries={datesWithEntries}
       />
 
       <Card>
@@ -450,10 +508,12 @@ export default function ReportsPage() {
         <CardContent>
           {isLoadingEntries ? (
             <div className="text-center py-10 text-muted-foreground"><Filter className="mx-auto h-12 w-12 mb-4 animate-pulse" /><p>Carregando dados...</p></div>
+          ) : filterType === 'date' && filteredEntries.length > 0 ? (
+            <SingleDayReportView entry={filteredEntries[0]} />
           ) : reportData ? (
             reportData.type === 'general' 
-              ? <GeneralReportView data={reportData.data} visiblePeriods={visiblePeriodDefinitions} />
-              : <PeriodSpecificReportView data={reportData.data} periodId={selectedPeriod} chartRef={chartRef} />
+              ? <GeneralReportView ref={chartRef} data={reportData.data} visiblePeriods={visiblePeriodDefinitions} showChart={filterType !== 'date'} />
+              : <PeriodSpecificReportView data={reportData.data} periodId={selectedPeriod} chartRef={chartRef} showChart={filterType !== 'date'} />
           ) : (
             <div className="text-center py-10 text-muted-foreground"><Filter className="mx-auto h-12 w-12 mb-4" /><p>Nenhum registro encontrado. Selecione os filtros.</p></div>
           )}
