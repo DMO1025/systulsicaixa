@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useEffect } from 'react';
@@ -11,6 +12,7 @@ import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
+import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -52,35 +54,30 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
   const periodTotal = useMemo(() => {
     const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
 
-    const madrugadaData = watchedData.madrugada;
-    let madrugadaTotal = 0;
-    if (madrugadaData?.channels) {
-        madrugadaTotal += getVtotal('madrugada.channels.madrugadaRoomServicePagDireto.vtotal');
-        madrugadaTotal += getVtotal('madrugada.channels.madrugadaRoomServiceValorServico.vtotal');
-    }
+    const madrugadaTotal = getVtotal('madrugada.channels.madrugadaRoomServicePagDireto.vtotal') +
+                         getVtotal('madrugada.channels.madrugadaRoomServiceValorServico.vtotal');
 
     const cafeDiretoTotal = getVtotal('cafeDaManha.channels.cdmDiretoCartao.vtotal');
     const cafeAssinadoTotal = getVtotal('cafeDaManha.channels.cdmCafeAssinado.vtotal');
-
-    let almocoPTTotal = 0;
+    
+    let almocoPTSubTabsTotal = 0;
     const almocoPTData = watchedData.almocoPrimeiroTurno;
     if (almocoPTData?.subTabs) {
         for (const subTabKey in almocoPTData.subTabs) {
+            if (subTabKey === 'frigobar') continue; // Exclude frigobar, it will be added separately
             const subTab = almocoPTData.subTabs[subTabKey];
             if (subTab?.channels) {
                 for (const channelKey in subTab.channels) {
                     const channel = subTab.channels[channelKey as keyof typeof subTab.channels];
-                    almocoPTTotal += getSafeNumericValue(channel, 'vtotal', 0);
+                    almocoPTSubTabsTotal += getSafeNumericValue(channel, 'vtotal', 0);
                 }
             }
         }
     }
+    
+    const frigobarPTTotal = getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagHotel.vtotal');
 
-    const frigobarPTTotal = 
-        getVtotal('frigobar.subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') +
-        getVtotal('frigobar.subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal');
-
-    return madrugadaTotal + cafeDiretoTotal + cafeAssinadoTotal + almocoPTTotal + frigobarPTTotal;
+    return madrugadaTotal + cafeDiretoTotal + cafeAssinadoTotal + almocoPTSubTabsTotal + frigobarPTTotal;
   }, [watchedData]);
 
   useEffect(() => {
@@ -106,8 +103,8 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
             <CardTitle>{periodDefinition.label}</CardTitle>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Almoço 1º Turno + Frigobar 1º Turno)</p>
+            <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Café Assinado + Almoço 1º Turno + Frigobar 1º Turno)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>
@@ -118,7 +115,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
             <ScrollArea className="pb-2">
               <TabsList className="mb-4">
                 {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
-                  const SubIcon = getSubTabIcon(periodId, subTabKey);
+                  const SubIcon = subTabKey === 'frigobar' ? Refrigerator : getSubTabIcon(periodId, subTabKey);
                   return (
                     <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
                       <SubIcon className="h-4 w-4" />

@@ -169,20 +169,31 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
     const cafeHospedesTotalQtd = cdmListaHospedesQtd + cdmNoShowQtd + cdmSemCheckInQtd;
     const cafeHospedesTotalValor = cdmListaHospedesValor + cdmNoShowValor + cdmSemCheckInValor;
 
-    const almocoPrimeiroTurnoValor = calculateTotalValorForPeriod('almocoPrimeiroTurno', data);
-    const almocoSegundoTurnoValor = calculateTotalValorForPeriod('almocoSegundoTurno', data);
-    const almocoValor = almocoPrimeiroTurnoValor + almocoSegundoTurnoValor;
-
-    const almocoPrimeiroTurnoQtd = calculateTotalQtdForPeriod('almocoPrimeiroTurno', data);
-    const almocoSegundoTurnoQtd = calculateTotalQtdForPeriod('almocoSegundoTurno', data);
-    const almocoQtd = almocoPrimeiroTurnoQtd + almocoSegundoTurnoQtd;
-
+    const almocoValor = calculateTotalValorForPeriod('almocoPrimeiroTurno', data) + calculateTotalValorForPeriod('almocoSegundoTurno', data);
+    const almocoQtd = calculateTotalQtdForPeriod('almocoPrimeiroTurno', data) + calculateTotalQtdForPeriod('almocoSegundoTurno', data);
+    
     const jantarValor = calculateTotalValorForPeriod('jantar', data);
     const jantarQtd = calculateTotalQtdForPeriod('jantar', data);
     
-    const frigobarValor = calculateTotalValorForPeriod('frigobar', data);
-    const frigobarQtd = calculateTotalQtdForPeriod('frigobar', data); 
+    // Frigobar calculation - new structure
+    const frigobarPTValor = getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagHotel.vtotal');
+    const frigobarPTQtd = getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTTotalQuartos.qtd');
+    const frigobarSTValor = getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagHotel.vtotal');
+    const frigobarSTQtd = getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTTotalQuartos.qtd');
+    const frigobarJNTValor = getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
+    const frigobarJNTQtd = getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTTotalQuartos.qtd');
     
+    // Frigobar calculation - fallback for old structure
+    const oldFrigobarPTValor = getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal');
+    const oldFrigobarPTQtd = getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTTotalQuartos.qtd');
+    const oldFrigobarSTValor = getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
+    const oldFrigobarSTQtd = getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTTotalQuartos.qtd');
+    const oldFrigobarJNTValor = getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTPagHotel.vtotal');
+    const oldFrigobarJNTQtd = getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTTotalQuartos.qtd');
+
+    const frigobarValor = frigobarPTValor + frigobarSTValor + frigobarJNTValor + oldFrigobarPTValor + oldFrigobarSTValor + oldFrigobarJNTValor;
+    const frigobarQtd = frigobarPTQtd + frigobarSTQtd + frigobarJNTQtd + oldFrigobarPTQtd + oldFrigobarSTQtd + oldFrigobarJNTQtd;
+
     const breakfastValor = calculateTotalValorForPeriod('breakfast', data);
     const breakfastQtd = calculateTotalQtdForPeriod('breakfast', data);
 

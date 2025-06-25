@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,28 +9,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
+import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
-
-interface PeriodFormProps {
-  form: UseFormReturn<DailyEntryFormData>;
-  periodId: PeriodId;
-  periodDefinition: PeriodDefinition;
-  periodConfig: PeriodConfig;
-  unitPricesConfig: ChannelUnitPricesConfig;
-  calculatePeriodTotal: (periodId: PeriodId) => number;
-  renderChannelInputs: (
-    channelsConfig: NonNullable<PeriodConfig['channels'] | SubTabConfig['channels']>,
-    basePath: string,
-    totalValue: number,
-    currentForm: UseFormReturn<DailyEntryFormData>,
-    currentUnitPrices: ChannelUnitPricesConfig,
-    currentPeriodId: PeriodId
-  ) => JSX.Element;
-  activeSubTabs?: Record<PeriodId, string>;
-  setActiveSubTabs?: React.Dispatch<React.SetStateAction<Record<PeriodId, string>>>;
-  calculateSubTabTotal?: (periodId: PeriodId, subTabId: string) => number;
-}
+import type { PeriodFormProps } from './MadrugadaForm';
 
 const FrigobarForm: React.FC<PeriodFormProps> = ({
   form,
@@ -42,20 +23,41 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
   unitPricesConfig,
   calculateSubTabTotal,
   calculatePeriodTotal,
-  renderChannelInputs
+  renderChannelInputs,
+  operatorShift,
 }) => {
   const ActivePeriodMainIcon = getPeriodIcon(periodId);
   const periodTotal = calculatePeriodTotal(periodId);
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
+  const visibleSubTabs = useMemo(() => {
+    if (!periodConfig.subTabs) {
+      return {};
+    }
+    if (!operatorShift) {
+      return periodConfig.subTabs;
+    }
+    
+    const filteredTabs: Record<string, SubTabConfig> = {};
+    Object.entries(periodConfig.subTabs).forEach(([key, value]) => {
+      if (operatorShift === 'first' && key === 'primeiroTurno') {
+        filteredTabs[key] = value;
+      } else if (operatorShift === 'second' && (key === 'segundoTurno' || key === 'jantar')) {
+        filteredTabs[key] = value;
+      }
+    });
+    return filteredTabs;
+  }, [periodConfig.subTabs, operatorShift]);
+
+
   useEffect(() => {
-    if (periodConfig?.subTabs && activeSubTabs && setActiveSubTabs && !activeSubTabs[periodId]) {
-      const firstSubTabKey = Object.keys(periodConfig.subTabs)[0];
+    if (visibleSubTabs && activeSubTabs && setActiveSubTabs && !activeSubTabs[periodId]) {
+      const firstSubTabKey = Object.keys(visibleSubTabs)[0];
       if (firstSubTabKey) {
         setActiveSubTabs(prev => ({ ...prev, [periodId]: firstSubTabKey }));
       }
     }
-  }, [periodId, periodConfig, activeSubTabs, setActiveSubTabs]);
+  }, [periodId, visibleSubTabs, activeSubTabs, setActiveSubTabs]);
 
   if (!activeSubTabs || !setActiveSubTabs || !calculateSubTabTotal) {
     return <p>Erro de configuração: Props para sub-abas ausentes.</p>;
@@ -76,11 +78,11 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
         <CardDescription>{cardDescriptionText}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {periodConfig.subTabs ? (
+        {Object.keys(visibleSubTabs).length > 0 ? (
           <Tabs value={activeSubTabs[periodId]} onValueChange={(value) => setActiveSubTabs(prev => ({...prev, [periodId]: value}))} className="w-full">
             <ScrollArea className="pb-2">
               <TabsList className="mb-4">
-                {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
+                {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig]) => {
                   const SubIcon = getSubTabIcon(periodId, subTabKey);
                   return (
                     <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
@@ -91,7 +93,7 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
                 })}
               </TabsList>
             </ScrollArea>
-            {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
+            {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig]) => {
               const subTabTotal = calculateSubTabTotal(periodId, subTabKey);
               return (
                 <TabsContent key={subTabKey} value={subTabKey}>
@@ -117,7 +119,7 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
             })}
           </Tabs>
         ) : (
-          <p className="text-sm text-muted-foreground">Configuração de sub-abas ausente.</p>
+          <p className="text-sm text-muted-foreground">Nenhuma aba disponível para o seu turno.</p>
         )}
 
         {periodConfig.observations && (

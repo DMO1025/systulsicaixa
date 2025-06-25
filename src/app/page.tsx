@@ -212,80 +212,75 @@ export default function DashboardPage() {
           let currentEntryTotalValor = 0;
           let currentEntryTotalQtd = 0;
           let entryGrandTotal = {valor: 0, qtd: 0};
+          
+          let allPeriodDefinitions = PERIOD_DEFINITIONS;
+          // Add a temporary frigobar definition if old data exists
+          if ((entry as any).frigobar) {
+             allPeriodDefinitions = [...PERIOD_DEFINITIONS, { id: "frigobar" }] as any;
+          }
 
+
+          allPeriodDefinitions.forEach(pDef => {
+            const { qtd, valor } = calculatePeriodGrandTotal(entry[pDef.id as keyof typeof entry]);
+            entryGrandTotal.qtd += qtd;
+            entryGrandTotal.valor += valor;
+          });
+
+          // Specific accumulations
           const rsMadrugadaData = calculatePeriodGrandTotal(entry.madrugada);
           accAcumulativo.roomService.pedidosQtd += getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPedidos.qtd');
           accAcumulativo.roomService.pratosMadrugadaQtd += getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPratos.qtd');
           accAcumulativo.roomService.valor += rsMadrugadaData.valor;
-          entryGrandTotal.valor += rsMadrugadaData.valor;
-          entryGrandTotal.qtd += rsMadrugadaData.qtd;
           
           const cafeTotal = calculatePeriodGrandTotal(entry.cafeDaManha);
           accAcumulativo.cafeDaManha.qtd += cafeTotal.qtd;
           accAcumulativo.cafeDaManha.valor += cafeTotal.valor;
-          entryGrandTotal.valor += cafeTotal.valor;
-          entryGrandTotal.qtd += cafeTotal.qtd;
 
           const breakfastTotal = calculatePeriodGrandTotal(entry.breakfast);
           accAcumulativo.breakfast.qtd += breakfastTotal.qtd;
           accAcumulativo.breakfast.valor += breakfastTotal.valor;
-          entryGrandTotal.valor += breakfastTotal.valor;
-          entryGrandTotal.qtd += breakfastTotal.qtd;
           
           const almocoPTTotal = calculatePeriodGrandTotal(entry.almocoPrimeiroTurno);
           const almocoSTTotal = calculatePeriodGrandTotal(entry.almocoSegundoTurno);
           accAcumulativo.almoco.qtd += almocoPTTotal.qtd + almocoSTTotal.qtd;
           accAcumulativo.almoco.valor += almocoPTTotal.valor + almocoSTTotal.valor;
-          entryGrandTotal.valor += almocoPTTotal.valor + almocoSTTotal.valor;
-          entryGrandTotal.qtd += almocoPTTotal.qtd + almocoSTTotal.qtd;
 
           const italianoAlmocoTotal = calculatePeriodGrandTotal(entry.italianoAlmoco);
           accAcumulativo.italianoAlmoco.qtd += italianoAlmocoTotal.qtd;
           accAcumulativo.italianoAlmoco.valor += italianoAlmocoTotal.valor;
-          entryGrandTotal.valor += italianoAlmocoTotal.valor;
-          entryGrandTotal.qtd += italianoAlmocoTotal.qtd;
 
           const italianoJantarTotal = calculatePeriodGrandTotal(entry.italianoJantar);
           accAcumulativo.italianoJantar.qtd += italianoJantarTotal.qtd;
           accAcumulativo.italianoJantar.valor += italianoJantarTotal.valor;
-          entryGrandTotal.valor += italianoJantarTotal.valor;
-          entryGrandTotal.qtd += italianoJantarTotal.qtd;
 
           const indianoAlmocoTotal = calculatePeriodGrandTotal(entry.indianoAlmoco);
           accAcumulativo.indianoAlmoco.qtd += indianoAlmocoTotal.qtd;
           accAcumulativo.indianoAlmoco.valor += indianoAlmocoTotal.valor;
-          entryGrandTotal.valor += indianoAlmocoTotal.valor;
-          entryGrandTotal.qtd += indianoAlmocoTotal.qtd;
 
           const indianoJantarTotal = calculatePeriodGrandTotal(entry.indianoJantar);
           accAcumulativo.indianoJantar.qtd += indianoJantarTotal.qtd;
           accAcumulativo.indianoJantar.valor += indianoJantarTotal.valor;
-          entryGrandTotal.valor += indianoJantarTotal.valor;
-          entryGrandTotal.qtd += indianoJantarTotal.qtd;
           
           const jantarTotal = calculatePeriodGrandTotal(entry.jantar);
           accAcumulativo.jantar.qtd += jantarTotal.qtd;
           accAcumulativo.jantar.valor += jantarTotal.valor;
-          entryGrandTotal.valor += jantarTotal.valor;
-          entryGrandTotal.qtd += jantarTotal.qtd;
 
           const baliAlmocoTotal = calculatePeriodGrandTotal(entry.baliAlmoco);
           accAcumulativo.baliAlmoco.qtd += baliAlmocoTotal.qtd;
           accAcumulativo.baliAlmoco.valor += baliAlmocoTotal.valor;
-          entryGrandTotal.valor += baliAlmocoTotal.valor;
-          entryGrandTotal.qtd += baliAlmocoTotal.qtd;
 
           const baliHappyTotal = calculatePeriodGrandTotal(entry.baliHappy);
           accAcumulativo.baliHappy.qtd += baliHappyTotal.qtd;
           accAcumulativo.baliHappy.valor += baliHappyTotal.valor;
-          entryGrandTotal.valor += baliHappyTotal.valor;
-          entryGrandTotal.qtd += baliHappyTotal.qtd;
           
-          const frigobarTotal = calculatePeriodGrandTotal(entry.frigobar);
-          accAcumulativo.frigobar.qtd += frigobarTotal.qtd;
-          accAcumulativo.frigobar.valor += frigobarTotal.valor;
-          entryGrandTotal.valor += frigobarTotal.valor;
-          entryGrandTotal.qtd += frigobarTotal.qtd;
+          // New frigobar calculation
+          const frigobarPT = calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any);
+          const frigobarST = calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any);
+          const frigobarJNT = calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any);
+          const oldFrigobar = calculatePeriodGrandTotal((entry as any).frigobar); // fallback
+          accAcumulativo.frigobar.qtd += frigobarPT.qtd + frigobarST.qtd + frigobarJNT.qtd + oldFrigobar.qtd;
+          accAcumulativo.frigobar.valor += frigobarPT.valor + frigobarST.valor + frigobarJNT.valor + oldFrigobar.valor;
+          
 
           const eventosData = entry.eventos as EventosPeriodData | undefined;
           let entryEventosDiretoQtd = 0, entryEventosDiretoValor = 0;
@@ -307,8 +302,6 @@ export default function DashboardPage() {
           accAcumulativo.eventosDireto.valor += entryEventosDiretoValor;
           accAcumulativo.eventosHotel.qtd += entryEventosHotelQtd;
           accAcumulativo.eventosHotel.valor += entryEventosHotelValor;
-          entryGrandTotal.valor += entryEventosDiretoValor + entryEventosHotelValor;
-          entryGrandTotal.qtd += entryEventosDiretoQtd + entryEventosHotelQtd;
 
           currentEntryTotalValor = entryGrandTotal.valor;
           currentEntryTotalQtd = entryGrandTotal.qtd;
@@ -390,8 +383,14 @@ export default function DashboardPage() {
                   
                   let grandTotalQtd = 0;
                   let grandTotalValor = 0;
-                  PERIOD_DEFINITIONS.forEach(pDef => {
-                    const {qtd, valor} = calculatePeriodGrandTotal(entry[pDef.id]);
+                  
+                  let allPeriodDefinitions = PERIOD_DEFINITIONS;
+                  if ((entry as any).frigobar) {
+                    allPeriodDefinitions = [...PERIOD_DEFINITIONS, { id: "frigobar" }] as any;
+                  }
+
+                  allPeriodDefinitions.forEach(pDef => {
+                    const {qtd, valor} = calculatePeriodGrandTotal(entry[pDef.id as keyof typeof entry]);
                     grandTotalQtd += qtd;
                     grandTotalValor += valor;
                   });

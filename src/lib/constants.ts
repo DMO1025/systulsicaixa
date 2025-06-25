@@ -17,7 +17,6 @@ export const PERIOD_DEFINITIONS = [
   { id: "baliAlmoco", label: "Bali Almoço", icon: Sun },
   { id: "baliHappy", label: "Bali Happy Hour", icon: Martini },
   { id: "eventos", label: "Eventos", icon: CalendarDays },
-  { id: "frigobar", label: "Frigobar", icon: Refrigerator },
 ] as const;
 
 export type PeriodId = typeof PERIOD_DEFINITIONS[number]['id'];
@@ -172,9 +171,9 @@ export type IndividualPeriodConfig = PeriodConfig;
 export type IndividualSubTabConfig = SubTabConfig;
 
 
-const commonAlmocoJantarStructureFactory = (
+const commonAlmocoJantarStructure = (
   periodPrefix: 'apt' | 'ast' | 'jnt'
-): PeriodConfig => {
+): Record<string, SubTabConfig> => {
   const CH_IDS = {
     ROOM_SERVICE_QTD_PEDIDOS: `${periodPrefix}RoomServiceQtdPedidos`,
     ROOM_SERVICE_PAG_DIRETO: `${periodPrefix}RoomServicePagDireto`,
@@ -203,7 +202,6 @@ const commonAlmocoJantarStructureFactory = (
   } as Record<string, SalesChannelId>;
 
   return {
-    subTabs: {
       roomService: {
         label: "ROOM SERVICE", icon: Utensils,
         channels: {
@@ -251,9 +249,7 @@ const commonAlmocoJantarStructureFactory = (
           [CH_IDS.CI_FATURADOS_TOTAL_CI]: { vtotal: true },
         }
       }
-    },
-    payments: false, observations: true
-  };
+    };
 };
 
 const _DEFAULT_DIRECT_CHANNELS_CONFIG: PeriodConfig = {
@@ -290,9 +286,48 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, PeriodConfig> = {
     payments: false,
     observations: true,
   },
-  almocoPrimeiroTurno: commonAlmocoJantarStructureFactory('apt'),
-  almocoSegundoTurno: commonAlmocoJantarStructureFactory('ast'),
-  jantar: commonAlmocoJantarStructureFactory('jnt'),
+  almocoPrimeiroTurno: {
+    subTabs: {
+      ...commonAlmocoJantarStructure('apt'),
+      frigobar: {
+        label: "FRIGOBAR", icon: Refrigerator,
+        channels: {
+          frgPTTotalQuartos: { qtd: true },
+          frgPTPagRestaurante: { vtotal: true },
+          frgPTPagHotel: { vtotal: true },
+        }
+      }
+    },
+    payments: false, observations: true
+  },
+  almocoSegundoTurno: {
+    subTabs: {
+      ...commonAlmocoJantarStructure('ast'),
+      frigobar: {
+        label: "FRIGOBAR", icon: Refrigerator,
+        channels: {
+          frgSTTotalQuartos: { qtd: true },
+          frgSTPagRestaurante: { vtotal: true },
+          frgSTPagHotel: { vtotal: true },
+        }
+      }
+    },
+    payments: false, observations: true
+  },
+  jantar: {
+    subTabs: {
+      ...commonAlmocoJantarStructure('jnt'),
+      frigobar: {
+        label: "FRIGOBAR", icon: Refrigerator,
+        channels: {
+          frgJNTTotalQuartos: { qtd: true },
+          frgJNTPagRestaurante: { vtotal: true },
+          frgJNTPagHotel: { vtotal: true },
+        }
+      }
+    },
+    payments: false, observations: true
+  },
 
   baliAlmoco: { ..._DEFAULT_DIRECT_CHANNELS_CONFIG, description: "Movimentação do Bali Bar durante o almoço." },
   baliHappy: { ..._DEFAULT_DIRECT_CHANNELS_CONFIG, description: "Movimentação do Bali Bar durante o happy hour." },
@@ -301,41 +336,6 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, PeriodConfig> = {
     description: "Registre múltiplos eventos, cada um com seus serviços detalhados.",
     customForm: true, 
     observations: true, 
-  },
-
-  frigobar: {
-    description: "Controle de consumo do frigobar por turno.",
-    subTabs: {
-      primeiroTurno: {
-        label: "Primeiro Turno",
-        icon: Sunrise,
-        channels: {
-          frgPTTotalQuartos: { qtd: true },
-          frgPTPagRestaurante: { vtotal: true },
-          frgPTPagHotel: { vtotal: true },
-        }
-      },
-      segundoTurno: {
-        label: "Segundo Turno",
-        icon: Sunset,
-        channels: {
-          frgSTTotalQuartos: { qtd: true },
-          frgSTPagRestaurante: { vtotal: true },
-          frgSTPagHotel: { vtotal: true },
-        }
-      },
-      jantar: {
-        label: "Jantar",
-        icon: Moon,
-        channels: {
-          frgJNTTotalQuartos: { qtd: true },
-          frgJNTPagRestaurante: { vtotal: true },
-          frgJNTPagHotel: { vtotal: true },
-        }
-      }
-    },
-    payments: false,
-    observations: true,
   },
   
   // New Period Configs with specific channels
@@ -438,7 +438,7 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
   { item: "JANTAR", periodId: "jantar" },
   { item: "BALI ALMOÇO", periodId: "baliAlmoco" },
   { item: "BALI HAPPY HOUR", periodId: "baliHappy" },
-  { item: "FRIGOBAR", periodId: "frigobar" },
+  { item: "FRIGOBAR" }, // No periodId as it's an aggregate now
   { item: "EVENTOS DIRETO", periodId: "eventos" },
   { item: "EVENTOS HOTEL", periodId: "eventos" },
 ] as const;

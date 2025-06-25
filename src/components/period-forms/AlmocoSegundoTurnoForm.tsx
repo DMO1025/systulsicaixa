@@ -12,6 +12,7 @@ import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
+import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -51,8 +52,6 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
   const watchedData = form.watch();
 
   const periodTotal = useMemo(() => {
-    const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
-
     let almocoSTTotal = 0;
     const almocoSTData = watchedData.almocoSegundoTurno;
     if (almocoSTData?.subTabs) {
@@ -67,11 +66,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
         }
     }
 
-    const frigobarSTTotal = 
-        getVtotal('frigobar.subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') +
-        getVtotal('frigobar.subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
-
-    return almocoSTTotal + frigobarSTTotal;
+    return almocoSTTotal;
   }, [watchedData]);
 
 
@@ -97,8 +92,8 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
             <CardTitle>{periodDefinition.label}</CardTitle>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno + Frigobar 2º Turno)</p>
+            <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>
@@ -109,7 +104,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
             <ScrollArea className="pb-2">
               <TabsList className="mb-4">
                 {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
-                  const SubIcon = getSubTabIcon(periodId, subTabKey);
+                  const SubIcon = subTabKey === 'frigobar' ? Refrigerator : getSubTabIcon(periodId, subTabKey);
                   return (
                     <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
                       <SubIcon className="h-4 w-4" />

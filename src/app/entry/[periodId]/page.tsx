@@ -17,7 +17,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { CalendarIcon, Loader2, List as ListIcon, DollarSign } from 'lucide-react';
 import { PERIOD_DEFINITIONS, SALES_CHANNELS, PeriodId, PERIOD_FORM_CONFIG, getPeriodIcon, type PeriodDefinition, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId, EVENT_SERVICE_TYPES, type EventServiceTypeKey, EVENT_LOCATION_OPTIONS, type EventLocationKey } from '@/lib/constants';
-import type { DailyEntryFormData, SalesItem, PeriodData, SubTabData, ChannelUnitPricesConfig, EventosPeriodData, DailyLogEntry, SubEventItem, EventItemData } from '@/lib/types';
+import type { DailyEntryFormData, SalesItem, PeriodData, SubTabData, ChannelUnitPricesConfig, EventosPeriodData, DailyLogEntry, SubEventItem, EventItemData, OperatorShift } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,7 +38,6 @@ import JantarForm from '@/components/period-forms/JantarForm';
 import BaliAlmocoForm from '@/components/period-forms/BaliAlmocoForm';
 import BaliHappyForm from '@/components/period-forms/BaliHappyForm';
 import EventosForm from '@/components/period-forms/EventosForm';
-import FrigobarForm from '@/components/period-forms/FrigobarForm';
 import ItalianoAlmocoForm from '@/components/period-forms/ItalianoAlmocoForm';
 import ItalianoJantarForm from '@/components/period-forms/ItalianoJantarForm';
 import IndianoAlmocoForm from '@/components/period-forms/IndianoAlmocoForm';
@@ -166,7 +165,6 @@ const PERIOD_FORM_COMPONENTS: Record<PeriodId, React.FC<GenericPeriodFormProps |
   baliAlmoco: BaliAlmocoForm,
   baliHappy: BaliHappyForm,
   eventos: EventosForm,
-  frigobar: FrigobarForm,
   italianoAlmoco: ItalianoAlmocoForm,
   italianoJantar: ItalianoJantarForm,
   indianoAlmoco: IndianoAlmocoForm,
@@ -175,13 +173,14 @@ const PERIOD_FORM_COMPONENTS: Record<PeriodId, React.FC<GenericPeriodFormProps |
 };
 
 export default function PeriodEntryPage() {
-  const { userRole } = useAuth();
+  const { userRole, operatorShift, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const params = useNextParams(); 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false); // For save operation
   const [isDataLoading, setIsDataLoading] = useState(true); // For data fetching
   const [unitPricesConfig, setUnitPricesConfig] = useState<ChannelUnitPricesConfig>({});
+  const [isDateInitialized, setIsDateInitialized] = useState(false);
   
   const activePeriodId = params.periodId as PeriodId;
 
@@ -193,9 +192,48 @@ export default function PeriodEntryPage() {
   });
 
   const watchedDate = form.watch("date");
+
+  // This effect runs once to initialize the date and then does not run again.
+  useEffect(() => {
+    if (authLoading || isDateInitialized) {
+      return; // Wait for auth, and only run once.
+    }
+  
+    let initialDate: Date | undefined;
+  
+    if (userRole === 'administrator') {
+      const storedDateStr = localStorage.getItem('entryflow-selected-date');
+      if (storedDateStr) {
+        const parsedDate = parseISO(storedDateStr);
+        if (isValid(parsedDate)) {
+          initialDate = parsedDate;
+        }
+      }
+    }
+    
+    if (!initialDate) {
+        initialDate = new Date();
+    }
+    
+    form.setValue('date', initialDate, { shouldValidate: true, shouldDirty: true });
+  
+    setIsDateInitialized(true);
+  
+  }, [authLoading, userRole, form, isDateInitialized]);
+
+
   const watchedDateString = useMemo(() => 
     watchedDate && isValid(watchedDate) ? format(watchedDate, 'yyyy-MM-dd') : null,
   [watchedDate]);
+
+
+  // This effect saves the date to localStorage for admins whenever they change it,
+  // but only after the initial date has been set.
+  useEffect(() => {
+    if (isDateInitialized && userRole === 'administrator' && watchedDate && isValid(watchedDate)) {
+      localStorage.setItem('entryflow-selected-date', watchedDate.toISOString());
+    }
+  }, [watchedDate, userRole, isDateInitialized]);
 
 
   useEffect(() => {
@@ -211,12 +249,11 @@ export default function PeriodEntryPage() {
     fetchInitialConfigs();
   }, [toast]);
 
-  // Refactored data loading logic
+  // Refactored data loading logic to depend on the date string and initialization status
   useEffect(() => {
     const loadAndSetData = async (dateToLoad: Date) => {
       setIsDataLoading(true);
 
-      // Always start with a clean, zeroed-out form structure for the effective date
       let dataToResetWith: DailyEntryFormData = { 
         ...initialDefaultValuesForAllPeriods, 
         date: dateToLoad 
@@ -225,13 +262,12 @@ export default function PeriodEntryPage() {
       try {
         const entryForDate = await getDailyEntry(dateToLoad);
 
-        // If an entry exists, merge its data into our default structure
         if (entryForDate) {
           dataToResetWith.generalObservations = entryForDate.generalObservations || '';
           
           PERIOD_DEFINITIONS.forEach(pDef => {
             const periodId = pDef.id;
-            const existingPeriodData = entryForDate[periodId];
+            const existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
 
             if (existingPeriodData) {
               if (periodId === 'eventos') {
@@ -250,7 +286,6 @@ export default function PeriodEntryPage() {
                 const periodDefaults = initialDefaultValuesForAllPeriods[periodId] as PeriodData;
                 const existing = existingPeriodData as PeriodData;
                 
-                // Deep merge logic to ensure all fields from defaults are present
                 dataToResetWith[periodId] = {
                   ...periodDefaults,
                   ...existing,
@@ -278,23 +313,47 @@ export default function PeriodEntryPage() {
               }
             }
           });
+          
+          // --- On-the-fly data migration from old frigobar structure ---
+          const oldFrigobarData = (entryForDate as any).frigobar as PeriodData | undefined;
+          if (oldFrigobarData?.subTabs) {
+            // Migrate 1st shift to Almoço PT
+            if (oldFrigobarData.subTabs.primeiroTurno) {
+              if (!dataToResetWith.almocoPrimeiroTurno!.subTabs) dataToResetWith.almocoPrimeiroTurno!.subTabs = {};
+              dataToResetWith.almocoPrimeiroTurno!.subTabs.frigobar = oldFrigobarData.subTabs.primeiroTurno;
+            }
+            // Migrate 2nd shift to Almoço ST
+             if (oldFrigobarData.subTabs.segundoTurno) {
+              if (!dataToResetWith.almocoSegundoTurno!.subTabs) dataToResetWith.almocoSegundoTurno!.subTabs = {};
+              dataToResetWith.almocoSegundoTurno!.subTabs.frigobar = oldFrigobarData.subTabs.segundoTurno;
+            }
+            // Migrate Jantar to Jantar
+            if (oldFrigobarData.subTabs.jantar) {
+              if (!dataToResetWith.jantar!.subTabs) dataToResetWith.jantar!.subTabs = {};
+              dataToResetWith.jantar!.subTabs.frigobar = oldFrigobarData.subTabs.jantar;
+            }
+          }
+
+
         }
-        // If no entry is found, `dataToResetWith` remains the clean default object.
       } catch (error) {
         console.error("Error loading data for date:", error);
         toast({ title: "Erro ao Carregar Dados", description: (error as Error).message || "Não foi possível carregar os lançamentos para esta data.", variant: "destructive" });
-        // On error, we still use the clean default object to reset the form.
       } finally {
         form.reset(dataToResetWith);
         setIsDataLoading(false);
       }
     };
 
-    const dateToProcess = userRole === 'operator' ? new Date() : watchedDate;
-    if(dateToProcess && isValid(dateToProcess)) {
-      loadAndSetData(dateToProcess);
+    if (isDateInitialized && watchedDateString) {
+        const dateToLoad = parseISO(watchedDateString);
+        if (isValid(dateToLoad)) {
+            loadAndSetData(dateToLoad);
+        }
+    } else {
+        setIsDataLoading(true);
     }
-  }, [watchedDateString, userRole, form, toast]);
+  }, [watchedDateString, form, toast, isDateInitialized]);
 
 
   const calculateSubTabTotal = useCallback((periodId: PeriodId, subTabId: string): number => {
@@ -368,6 +427,11 @@ export default function PeriodEntryPage() {
           id: subEvent.id || uuidv4(),
         }))
       }));
+    }
+    
+    // Explicitly remove the old top-level `frigobar` property if it exists
+    if ((dataToSubmit as any).frigobar) {
+      delete (dataToSubmit as any).frigobar;
     }
 
 
@@ -541,6 +605,7 @@ export default function PeriodEntryPage() {
     unitPricesConfig: unitPricesConfig,
     calculatePeriodTotal: calculatePeriodTotal,
     renderChannelInputs: renderChannelInputs,
+    operatorShift: operatorShift,
     ...( (activePeriodConfig.subTabs || activePeriodId === 'eventos') && { 
       activeSubTabs: activeSubTabs,
       setActiveSubTabs: setActiveSubTabs,

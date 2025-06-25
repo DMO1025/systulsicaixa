@@ -6,7 +6,7 @@ import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, OperatorShift } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon } from '@/lib/constants';
 
@@ -28,6 +28,7 @@ export interface PeriodFormProps {
   activeSubTabs?: Record<PeriodId, string>; // Optional, not used by Madrugada
   setActiveSubTabs?: React.Dispatch<React.SetStateAction<Record<PeriodId, string>>>; // Optional
   calculateSubTabTotal?: (periodId: PeriodId, subTabId: string) => number; // Optional
+  operatorShift?: OperatorShift | null;
 }
 
 const MadrugadaForm: React.FC<PeriodFormProps> = ({
