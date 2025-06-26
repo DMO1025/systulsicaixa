@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -500,6 +501,11 @@ export default function PeriodEntryPage() {
             
             const unitPriceForChannel = currentUnitPrices[channelId as SalesChannelId];
             const isVtotalDisabledByUnitPrice = typeof unitPriceForChannel === 'number' && !isNaN(unitPriceForChannel);
+            const isTotalFaturadoField = [
+              'aptCiEFaturadosTotalFaturado',
+              'astCiEFaturadosTotalFaturado',
+              'jntCiEFaturadosTotalFaturado'
+            ].includes(channelId);
 
             return (
               <div key={channelId} className="flex flex-col xs:flex-row items-start xs:items-center justify-between px-3 py-3 hover:bg-muted/20 transition-colors">
@@ -578,7 +584,7 @@ export default function PeriodEntryPage() {
                                           onChange={handleCurrencyChange}
                                           onFocus={(e) => e.target.select()}
                                           className="h-8 text-sm text-right w-full pl-7"
-                                          disabled={isVtotalDisabledByUnitPrice}
+                                          disabled={isVtotalDisabledByUnitPrice || isTotalFaturadoField}
                                         />
                                       </div>
                                     </FormControl>

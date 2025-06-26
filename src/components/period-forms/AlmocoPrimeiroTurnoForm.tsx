@@ -50,6 +50,20 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
   const watchedData = form.watch();
+  const watchedSubTabs = form.watch(`${periodId}.subTabs`);
+
+  useEffect(() => {
+    if (!watchedSubTabs?.ciEFaturados?.channels) return;
+    const hotelValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosValorHotel.vtotal', 0);
+    const funcionarioValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosValorFuncionario.vtotal', 0);
+    const calculatedTotal = hotelValue + funcionarioValue;
+    
+    const currentTotal = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosTotalFaturado.vtotal');
+
+    if (calculatedTotal !== currentTotal) {
+      form.setValue(`${periodId}.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalFaturado.vtotal`, calculatedTotal, { shouldDirty: true });
+    }
+  }, [watchedSubTabs, form, periodId]);
 
   const periodTotal = useMemo(() => {
     const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);

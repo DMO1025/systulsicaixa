@@ -50,6 +50,20 @@ const JantarForm: React.FC<PeriodFormProps> = ({
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
   const watchedData = form.watch();
+  const watchedSubTabs = form.watch(`${periodId}.subTabs`);
+
+  useEffect(() => {
+    if (!watchedSubTabs?.ciEFaturados?.channels) return;
+    const hotelValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosValorHotel.vtotal', 0);
+    const funcionarioValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosValorFuncionario.vtotal', 0);
+    const calculatedTotal = hotelValue + funcionarioValue;
+    
+    const currentTotal = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosTotalFaturado.vtotal');
+    
+    if (calculatedTotal !== currentTotal) {
+      form.setValue(`${periodId}.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalFaturado.vtotal`, calculatedTotal, { shouldDirty: true });
+    }
+  }, [watchedSubTabs, form, periodId]);
 
   const periodTotal = useMemo(() => {
     let jantarTotal = 0;

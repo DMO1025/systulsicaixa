@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { getSafeNumericValue } from '@/lib/utils';
@@ -68,19 +69,31 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
         return { qtd: totalQtd, valor: totalValor };
     };
 
-    // ALMOÇO (restaurant services + reajuste)
+    // ALMOÇO
     const almocoPTTotals = getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData);
     const almocoSTTotals = getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData);
+    
+    const faturadoPTValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosValorHotel.vtotal') +
+                            getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosValorFuncionario.vtotal');
+    const faturadoSTValor = getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosValorHotel.vtotal') +
+                            getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosValorFuncionario.vtotal');
+    const faturadoPTQtd = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosFaturadosQtd.qtd');
+    const faturadoSTQtd = getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosFaturadosQtd.qtd');
+
     const reajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') +
                            getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
-    const almocoValor = almocoPTTotals.valor + almocoSTTotals.valor + reajusteCIAlmoco;
-    const almocoQtd = almocoPTTotals.qtd + almocoSTTotals.qtd;
+    
+    const almocoValor = almocoPTTotals.valor + almocoSTTotals.valor + faturadoPTValor + faturadoSTValor + reajusteCIAlmoco;
+    const almocoQtd = almocoPTTotals.qtd + almocoSTTotals.qtd + faturadoPTQtd + faturadoSTQtd;
 
-    // JANTAR (restaurant services + reajuste)
+    // JANTAR
     const jantarTotals = getPeriodRestaurantTotal(entry.jantar as PeriodData);
+    const faturadoJantarValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosValorHotel.vtotal') +
+                                getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosValorFuncionario.vtotal');
+    const faturadoJantarQtd = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosFaturadosQtd.qtd');
     const reajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
-    const jantarValor = jantarTotals.valor + reajusteCIJantar;
-    const jantarQtd = jantarTotals.qtd;
+    const jantarValor = jantarTotals.valor + faturadoJantarValor + reajusteCIJantar;
+    const jantarQtd = jantarTotals.qtd + faturadoJantarQtd;
     
     // FRIGOBAR (all frigobar values from all periods, including old structure)
     const frigobarValor = 
