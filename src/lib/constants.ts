@@ -446,8 +446,7 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
 // --- Summary Card Constants ---
 export const SUMMARY_CARD_CONFIGURABLE_ITEMS = [
   { id: 'rsMadrugada', label: 'RS Madrugada' },
-  { id: 'avulsoAssinado', label: 'Avulso Assinado (Café)' },
-  { id: 'buffetCafeDireto', label: 'Buffet Café Direto' },
+  { id: 'avulsoAssinado', label: 'Avulsos Café da Manhã' },
   { id: 'breakfast', label: 'Breakfast' },
   { id: 'almoco', label: 'Almoço' },
   { id: 'jantar', label: 'Jantar' },

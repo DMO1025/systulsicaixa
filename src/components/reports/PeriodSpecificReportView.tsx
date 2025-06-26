@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -85,6 +84,10 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
         [periodId]
     );
 
+    const ticketMedio = data.subtotalGeralSemCI.qtd > 0 
+        ? data.subtotalGeralSemCI.total / data.subtotalGeralSemCI.qtd
+        : 0;
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -169,6 +172,10 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                                     <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.subtotalGeralComCI.total)}</TableCell>
                                 </TableRow>
                             )}
+                            <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO (SEM CI)</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(ticketMedio)}</TableCell>
+                            </TableRow>
                             </TableBody>
                         </Table>
                         </CardContent>

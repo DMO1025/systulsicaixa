@@ -1,3 +1,4 @@
+
 import type { OperatorShift, UserRole } from './constants';
 import type { ChartConfig as ShadCNChartConfig } from "@/components/ui/chart";
 import type { DateRange } from 'react-day-picker';
@@ -168,6 +169,7 @@ export interface GeneralReportDailyItem {
     totalSemCI: number;
     totalReajusteCI: number;
     totalQtd: number;
+    totalCIQtd: number;
 }
 export interface GeneralReportSummary {
     periodTotals: Partial<Record<import('./constants').PeriodId, { qtd: number; valor: number }>>;
@@ -175,6 +177,7 @@ export interface GeneralReportSummary {
     grandTotalSemCI: number;
     grandTotalReajusteCI: number;
     grandTotalQtd: number;
+    grandTotalCIQtd: number;
 }
 export interface GeneralReportViewData {
     dailyBreakdowns: GeneralReportDailyItem[];

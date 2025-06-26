@@ -5,15 +5,21 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Legend, Bar as RechartsBar, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import type { MonthlyEvolutionDataItem, EvolutionChartConfig } from '@/lib/types';
+import type { MonthlyEvolutionDataItem } from '@/lib/types';
+
+
+const chartConfig = {
+  valorSemCI: { label: "Valor Líquido", color: "hsl(var(--chart-1))" },
+  valorCI: { label: "Consumo Interno", color: "hsl(var(--chart-2))" },
+  reajusteCIValor: { label: "Reajuste C.I.", color: "hsl(var(--chart-3))" },
+};
 
 interface MonthlyEvolutionChartProps {
   data: MonthlyEvolutionDataItem[];
-  chartConfig: EvolutionChartConfig;
   isLoading: boolean;
 }
 
-const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, chartConfig, isLoading }) => {
+const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, isLoading }) => {
   return (
     <Card>
       <CardHeader>

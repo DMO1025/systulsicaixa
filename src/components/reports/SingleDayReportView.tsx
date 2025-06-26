@@ -6,9 +6,8 @@ import type { DailyLogEntry, PeriodData, EventosPeriodData, SalesChannelId } fro
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PERIOD_DEFINITIONS, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
-import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
-import { getSafeNumericValue } from '@/lib/utils';
-import { DollarSign, Hash } from 'lucide-react';
+import { processEntryForTotals } from '@/lib/reportUtils';
+import { DollarSign, Hash, ReceiptText } from 'lucide-react';
 
 interface SingleDayReportViewProps {
   entry: DailyLogEntry;
@@ -20,33 +19,16 @@ const formatNumber = (value: number | undefined) => (value || 0).toLocaleString(
 const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
 
     const totals = useMemo(() => {
-        let totalComCI = 0;
-        let totalQtd = 0;
-
-        PERIOD_DEFINITIONS.forEach(pDef => {
-            const periodId = pDef.id;
-            const { qtd, valor } = calculatePeriodGrandTotal(entry[periodId] as PeriodData | EventosPeriodData | undefined);
-            totalQtd += qtd;
-            totalComCI += valor;
-        });
-
-        const almocoCIValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') +
-                            getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
-        const jantarCIValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-
-        const reajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') +
-                                getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
-        const reajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
-
-        const totalCIValor = almocoCIValor + jantarCIValor;
-        const totalReajusteCI = reajusteCIAlmoco + reajusteCIJantar;
-
-        const totalSemCI = totalComCI - totalCIValor - totalReajusteCI;
+        const processed = processEntryForTotals(entry);
+        const ticketMedio = processed.grandTotal.semCI.qtd > 0 
+            ? processed.grandTotal.semCI.valor / processed.grandTotal.semCI.qtd 
+            : 0;
 
         return {
-            totalComCI,
-            totalSemCI,
-            totalQtd
+            totalComCI: processed.grandTotal.comCI.valor,
+            totalSemCI: processed.grandTotal.semCI.valor,
+            totalQtd: processed.grandTotal.comCI.qtd,
+            ticketMedio,
         };
     }, [entry]);
 
@@ -149,7 +131,7 @@ const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
                         <div>
@@ -177,6 +159,15 @@ const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
                         <Hash className="h-6 w-6 text-muted-foreground" />
                     </CardHeader>
                 </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
+                        <div>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Ticket Médio (sem CI)</CardTitle>
+                            <div className="text-2xl font-bold">{formatCurrency(totals.ticketMedio)}</div>
+                        </div>
+                        <ReceiptText className="h-6 w-6 text-muted-foreground" />
+                    </CardHeader>
+                </Card>
             </div>
 
             {PERIOD_DEFINITIONS.map(pDef => {
@@ -200,7 +191,8 @@ const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
                 
                 if (!hasVisibleContent) return null;
 
-                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData as any);
+                const periodTotals = processEntryForTotals(entry);
+                const periodTotal = (periodTotals as any)[pDef.id]?.valor || 0;
 
                 return (
                     <Card key={pDef.id}>

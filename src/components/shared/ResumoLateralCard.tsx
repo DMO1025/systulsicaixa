@@ -6,32 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import type { DailyEntryFormData, PeriodId, EventosPeriodData, EventItemData, SubEventItem, SummaryCardItemsConfig } from '@/lib/types';
+import type { DailyEntryFormData, SummaryCardItemsConfig, DailyLogEntry } from '@/lib/types';
 import { getSetting } from '@/services/settingsService';
 import { SUMMARY_CARD_CONFIGURABLE_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { ClipboardCopy, Loader2 } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { useToast } from '@/hooks/use-toast';
+import { processEntryForTotals } from '@/lib/reportUtils';
 
 interface ResumoLateralCardProps {
   dailyData: DailyEntryFormData; 
 }
-
-const getSafeNumericValue = (data: any, path: string, defaultValue: number = 0): number => {
-  if (data === undefined || data === null) return defaultValue;
-  const parts = path.split('.');
-  let current = data;
-  for (const part of parts) {
-    if (current && typeof current === 'object' && part in current) {
-      current = current[part];
-    } else {
-      return defaultValue;
-    }
-  }
-  const numValue = current !== undefined && current !== null ? parseFloat(String(current)) : defaultValue;
-  return isNaN(numValue) ? defaultValue : numValue;
-};
 
 
 const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
@@ -93,219 +79,65 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
   };
 
 
-  const calculateTotalValorForPeriod = (periodId: PeriodId, data: DailyEntryFormData) => {
-    if (periodId === 'eventos') {
-      return 0; 
-    }
-
-    const periodData = data[periodId];
-    if (!periodData || typeof periodData === 'string') return 0;
-
-    let total = 0;
-    if ('channels' in periodData && periodData.channels) {
-      Object.values(periodData.channels).forEach(channel => {
-        total += getSafeNumericValue(channel, 'vtotal');
-      });
-    }
-    if ('subTabs' in periodData && periodData.subTabs) {
-      Object.values(periodData.subTabs).forEach(subTab => {
-        if (subTab?.channels) {
-          Object.values(subTab.channels).forEach(channel => {
-            total += getSafeNumericValue(channel, 'vtotal');
-          });
-        }
-      });
-    }
-    return total;
-  };
-
-  const calculateTotalQtdForPeriod = (periodId: PeriodId, data: DailyEntryFormData) => {
-     if (periodId === 'eventos') {
-      return 0;
-    }
-    const periodData = data[periodId];
-     if (!periodData || typeof periodData === 'string') return 0;
-
-
-    let totalQtd = 0;
-    if ('channels' in periodData && periodData.channels) {
-      Object.values(periodData.channels).forEach(channel => {
-        totalQtd += getSafeNumericValue(channel, 'qtd');
-      });
-    }
-    if ('subTabs' in periodData && periodData.subTabs) {
-      Object.values(periodData.subTabs).forEach(subTab => {
-        if (subTab?.channels) {
-          Object.values(subTab.channels).forEach(channel => {
-            totalQtd += getSafeNumericValue(channel, 'qtd');
-          });
-        }
-      });
-    }
-    return totalQtd;
-  };
-
   const summary = useMemo(() => {
-    const data = dailyData; 
     const config = summaryConfig;
+    // This is now the single source of truth for all calculations.
+    const totals = processEntryForTotals(dailyData as DailyLogEntry);
 
-    const rsMadrugadaQtd = getSafeNumericValue(data, 'madrugada.channels.madrugadaRoomServiceQtdPedidos.qtd');
-    const rsMadrugadaItens = getSafeNumericValue(data, 'madrugada.channels.madrugadaRoomServiceQtdPratos.qtd');
-    const rsMadrugadaValor = getSafeNumericValue(data, 'madrugada.channels.madrugadaRoomServicePagDireto.vtotal') +
-                             getSafeNumericValue(data, 'madrugada.channels.madrugadaRoomServiceValorServico.vtotal');
-
-    const avulsoAssinadoQtd = getSafeNumericValue(data, 'cafeDaManha.channels.cdmCafeAssinado.qtd');
-    const avulsoAssinadoValor = getSafeNumericValue(data, 'cafeDaManha.channels.cdmCafeAssinado.vtotal');
-    const buffetCafeDiretoQtd = getSafeNumericValue(data, 'cafeDaManha.channels.cdmDiretoCartao.qtd');
-    const buffetCafeDiretoValor = getSafeNumericValue(data, 'cafeDaManha.channels.cdmDiretoCartao.vtotal');
-    
-    const cdmListaHospedesValor = getSafeNumericValue(data, 'cafeDaManha.channels.cdmListaHospedes.vtotal');
-    const cdmListaHospedesQtd = getSafeNumericValue(data, 'cafeDaManha.channels.cdmListaHospedes.qtd');
-    const cdmNoShowValor = getSafeNumericValue(data, 'cafeDaManha.channels.cdmNoShow.vtotal');
-    const cdmNoShowQtd = getSafeNumericValue(data, 'cafeDaManha.channels.cdmNoShow.qtd');
-    const cdmSemCheckInValor = getSafeNumericValue(data, 'cafeDaManha.channels.cdmSemCheckIn.vtotal');
-    const cdmSemCheckInQtd = getSafeNumericValue(data, 'cafeDaManha.channels.cdmSemCheckIn.qtd');
-
-    const cafeHospedesTotalQtd = cdmListaHospedesQtd + cdmNoShowQtd + cdmSemCheckInQtd;
-    const cafeHospedesTotalValor = cdmListaHospedesValor + cdmNoShowValor + cdmSemCheckInValor;
-
-    const almocoValor = calculateTotalValorForPeriod('almocoPrimeiroTurno', data) + calculateTotalValorForPeriod('almocoSegundoTurno', data);
-    const almocoQtd = calculateTotalQtdForPeriod('almocoPrimeiroTurno', data) + calculateTotalQtdForPeriod('almocoSegundoTurno', data);
-    
-    const jantarValor = calculateTotalValorForPeriod('jantar', data);
-    const jantarQtd = calculateTotalQtdForPeriod('jantar', data);
-    
-    // Frigobar calculation - new structure
-    const frigobarPTValor = getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagHotel.vtotal');
-    const frigobarPTQtd = getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTTotalQuartos.qtd');
-    const frigobarSTValor = getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagHotel.vtotal');
-    const frigobarSTQtd = getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.frigobar.channels.frgSTTotalQuartos.qtd');
-    const frigobarJNTValor = getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
-    const frigobarJNTQtd = getSafeNumericValue(data, 'jantar.subTabs.frigobar.channels.frgJNTTotalQuartos.qtd');
-    
-    // Frigobar calculation - fallback for old structure
-    const oldFrigobarPTValor = getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal');
-    const oldFrigobarPTQtd = getSafeNumericValue(data, 'frigobar.subTabs.primeiroTurno.channels.frgPTTotalQuartos.qtd');
-    const oldFrigobarSTValor = getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
-    const oldFrigobarSTQtd = getSafeNumericValue(data, 'frigobar.subTabs.segundoTurno.channels.frgSTTotalQuartos.qtd');
-    const oldFrigobarJNTValor = getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTPagHotel.vtotal');
-    const oldFrigobarJNTQtd = getSafeNumericValue(data, 'frigobar.subTabs.jantar.channels.frgJNTTotalQuartos.qtd');
-
-    const frigobarValor = frigobarPTValor + frigobarSTValor + frigobarJNTValor + oldFrigobarPTValor + oldFrigobarSTValor + oldFrigobarJNTValor;
-    const frigobarQtd = frigobarPTQtd + frigobarSTQtd + frigobarJNTQtd + oldFrigobarPTQtd + oldFrigobarSTQtd + oldFrigobarJNTQtd;
-
-    const breakfastValor = calculateTotalValorForPeriod('breakfast', data);
-    const breakfastQtd = calculateTotalQtdForPeriod('breakfast', data);
-
-    const italianoAlmocoValor = calculateTotalValorForPeriod('italianoAlmoco', data);
-    const italianoAlmocoQtd = calculateTotalQtdForPeriod('italianoAlmoco', data);
-    
-    const italianoJantarValor = calculateTotalValorForPeriod('italianoJantar', data);
-    const italianoJantarQtd = calculateTotalQtdForPeriod('italianoJantar', data);
-
-    const indianoAlmocoValor = calculateTotalValorForPeriod('indianoAlmoco', data);
-    const indianoAlmocoQtd = calculateTotalQtdForPeriod('indianoAlmoco', data);
-
-    const indianoJantarValor = calculateTotalValorForPeriod('indianoJantar', data);
-    const indianoJantarQtd = calculateTotalQtdForPeriod('indianoJantar', data);
-
-
-    let eventosDiretoValor = 0;
-    let eventosDiretoQtd = 0;
-    let eventosHotelValor = 0;
-    let eventosHotelQtd = 0;
-
-    const eventosData = data.eventos as EventosPeriodData | undefined;
-    (eventosData?.items || []).forEach(item => {
-      (item.subEvents || []).forEach(subEvent => {
-        const qty = subEvent.quantity || 0;
-        const val = subEvent.totalValue || 0;
-        if (subEvent.location === 'DIRETO') {
-          eventosDiretoQtd += qty;
-          eventosDiretoValor += val;
-        } else if (subEvent.location === 'HOTEL') {
-          eventosHotelQtd += qty;
-          eventosHotelValor += val;
-        }
-      });
-    });
-
+    // This is just for displaying the "Total Fita" subtotal value, based on visibility config.
     const totalFitaValor =
-      (config.rsMadrugada ? rsMadrugadaValor : 0) +
-      (config.avulsoAssinado ? avulsoAssinadoValor : 0) +
-      (config.buffetCafeDireto ? buffetCafeDiretoValor : 0) +
-      (config.breakfast ? breakfastValor : 0) +
-      (config.almoco ? almocoValor : 0) +
-      (config.jantar ? jantarValor : 0) +
-      (config.frigobar ? frigobarValor : 0) +
-      (config.rwItalianoAlmoco ? italianoAlmocoValor : 0) +
-      (config.rwItalianoJantar ? italianoJantarValor : 0) +
-      (config.rwIndianoAlmoco ? indianoAlmocoValor : 0) +
-      (config.rwIndianoJantar ? indianoJantarValor : 0);
+      (config.rsMadrugada ? totals.rsMadrugada.valor : 0) +
+      (config.avulsoAssinado ? totals.cafeAvulsos.valor : 0) +
+      (config.breakfast ? totals.breakfast.valor : 0) +
+      (config.almoco ? totals.almoco.valor : 0) +
+      (config.jantar ? totals.jantar.valor : 0) +
+      (config.frigobar ? totals.frigobar.valor : 0) +
+      (config.rwItalianoAlmoco ? totals.italianoAlmoco.valor : 0) +
+      (config.rwItalianoJantar ? totals.italianoJantar.valor : 0) +
+      (config.rwIndianoAlmoco ? totals.indianoAlmoco.valor : 0) +
+      (config.rwIndianoJantar ? totals.indianoJantar.valor : 0);
     
     const totalFitaQtd =
-      (config.rsMadrugada ? rsMadrugadaQtd : 0) +
-      (config.avulsoAssinado ? avulsoAssinadoQtd : 0) +
-      (config.buffetCafeDireto ? buffetCafeDiretoQtd : 0) +
-      (config.breakfast ? breakfastQtd : 0) +
-      (config.almoco ? almocoQtd : 0) +
-      (config.jantar ? jantarQtd : 0) +
-      (config.frigobar ? frigobarQtd : 0) +
-      (config.rwItalianoAlmoco ? italianoAlmocoQtd : 0) +
-      (config.rwItalianoJantar ? italianoJantarQtd : 0) +
-      (config.rwIndianoAlmoco ? indianoAlmocoQtd : 0) +
-      (config.rwIndianoJantar ? indianoJantarQtd : 0);
-
-    const almocoCIValor =
-      getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') +
-      getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
-    const almocoCIQtd =
-      getSafeNumericValue(data, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosConsumoInternoQtd.qtd') +
-      getSafeNumericValue(data, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosConsumoInternoQtd.qtd');
-    const jantarCIValor = getSafeNumericValue(data, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-    const jantarCIQtd = getSafeNumericValue(data, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosConsumoInternoQtd.qtd');
-
-    const totalGeralComCIValor = 
-        totalFitaValor +
-        (config.cafeHospedes ? cafeHospedesTotalValor : 0) +
-        (config.almocoCI ? almocoCIValor : 0) +
-        (config.jantarCI ? jantarCIValor : 0) +
-        (config.eventosDireto ? eventosDiretoValor : 0) +
-        (config.eventosHotel ? eventosHotelValor : 0);
-
-    const totalGeralComCIQtd = 
-        totalFitaQtd + 
-        (config.rsMadrugada ? rsMadrugadaItens : 0) + 
-        (config.cafeHospedes ? cafeHospedesTotalQtd : 0) +
-        (config.almocoCI ? almocoCIQtd : 0) +
-        (config.jantarCI ? jantarCIQtd : 0) +
-        (config.eventosDireto ? eventosDiretoQtd : 0) +
-        (config.eventosHotel ? eventosHotelQtd : 0);
-
-    const totalGeralSemCIValor = totalGeralComCIValor - (almocoCIValor + jantarCIValor);
-    const totalGeralSemCIQtd = totalGeralComCIQtd - (almocoCIQtd + jantarCIQtd);
+      (config.rsMadrugada ? totals.rsMadrugada.qtd : 0) +
+      (config.avulsoAssinado ? totals.cafeAvulsos.qtd : 0) +
+      (config.breakfast ? totals.breakfast.qtd : 0) +
+      (config.almoco ? totals.almoco.qtd : 0) +
+      (config.jantar ? totals.jantar.qtd : 0) +
+      (config.frigobar ? totals.frigobar.qtd : 0) +
+      (config.rwItalianoAlmoco ? totals.italianoAlmoco.qtd : 0) +
+      (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
+      (config.rwIndianoAlmoco ? totals.indianoAlmoco.qtd : 0) +
+      (config.rwIndianoJantar ? totals.indianoJantar.qtd : 0);
 
     return {
-      dateToDisplay: data.date,
-      rsMadrugadaQtd, rsMadrugadaItens, rsMadrugadaValor,
-      avulsoAssinadoQtd, avulsoAssinadoValor,
-      buffetCafeDiretoQtd, buffetCafeDiretoValor,
-      cafeHospedesTotalQtd, cafeHospedesTotalValor, 
-      almocoQtd, almocoValor,
-      jantarQtd, jantarValor,
-      frigobarQtd, frigobarValor,
-      breakfastQtd, breakfastValor,
-      italianoAlmocoQtd, italianoAlmocoValor,
-      italianoJantarQtd, italianoJantarValor,
-      indianoAlmocoQtd, indianoAlmocoValor,
-      indianoJantarQtd, indianoJantarValor,
-      eventosDiretoQtd, eventosDiretoValor,
-      eventosHotelQtd, eventosHotelValor,
-      totalFitaValor, totalFitaQtd,
-      almocoCIQtd, almocoCIValor,
-      jantarCIQtd, jantarCIValor,
-      totalGeralComCIQtd, totalGeralComCIValor,
-      totalGeralSemCIQtd, totalGeralSemCIValor,
+      dateToDisplay: dailyData.date,
+      
+      // Individual items for display rows
+      rsMadrugada: totals.rsMadrugada,
+      cafeAvulsos: totals.cafeAvulsos,
+      breakfast: totals.breakfast,
+      almoco: totals.almoco,
+      jantar: totals.jantar,
+      italianoAlmoco: totals.italianoAlmoco,
+      italianoJantar: totals.italianoJantar,
+      indianoAlmoco: totals.indianoAlmoco,
+      indianoJantar: totals.indianoJantar,
+      frigobar: totals.frigobar,
+
+      // Total Fita subtotal for display
+      totalFita: { qtd: totalFitaQtd, valor: totalFitaValor },
+
+      // "Outros Serviços" items for display
+      cafeHospedes: totals.cafeHospedes,
+      almocoCI: totals.almocoCI,
+      jantarCI: totals.jantarCI,
+      eventosDireto: totals.eventos.direto,
+      eventosHotel: totals.eventos.hotel,
+
+      // Grand Totals for final section (directly from the source of truth)
+      grandTotalComCI: totals.grandTotal.comCI,
+      grandTotalSemCI: totals.grandTotal.semCI,
+      totalCI: totals.totalCI,
     };
   }, [dailyData, summaryConfig]);
 
@@ -364,9 +196,9 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             {summaryConfig.rsMadrugada && (
               <TableRow>
                 <TableCell>RS MADRUGADA</TableCell>
-                <TableCell className="text-right">{summary.rsMadrugadaQtd || '0'}</TableCell>
-                <TableCell className="text-right">{summary.rsMadrugadaItens || '0'}</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.rsMadrugadaValor)}</TableCell>
+                <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.rsMadrugada.valor)}</TableCell>
               </TableRow>
             )}
 
@@ -375,26 +207,18 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             </TableRow>
             {summaryConfig.avulsoAssinado && (
               <TableRow>
-                <TableCell>AVULSO ASSINADO</TableCell>
-                <TableCell className="text-right">{summary.avulsoAssinadoQtd || '0'}</TableCell>
+                <TableCell>AVULSOS CAFÉ</TableCell>
+                <TableCell className="text-right">{summary.cafeAvulsos.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.avulsoAssinadoValor)}</TableCell>
-              </TableRow>
-            )}
-            {summaryConfig.buffetCafeDireto && (
-              <TableRow>
-                <TableCell>BUFFET CAFÉ DIRETO</TableCell>
-                <TableCell className="text-right">{summary.buffetCafeDiretoQtd || '0'}</TableCell>
-                <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.buffetCafeDiretoValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.cafeAvulsos.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.breakfast && (
               <TableRow>
                 <TableCell>BREAKFAST</TableCell>
-                <TableCell className="text-right">{summary.breakfastQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.breakfast.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.breakfastValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.breakfast.valor)}</TableCell>
               </TableRow>
             )}
 
@@ -404,64 +228,64 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             {summaryConfig.almoco && (
               <TableRow>
                 <TableCell>ALMOÇO</TableCell>
-                <TableCell className="text-right">{summary.almocoQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.almoco.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.almocoValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.almoco.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.jantar && (
               <TableRow>
                 <TableCell>JANTAR</TableCell>
-                <TableCell className="text-right">{summary.jantarQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.jantar.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.jantarValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.jantar.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.rwItalianoAlmoco && (
               <TableRow>
                 <TableCell>RW ITALIANO ALMOÇO</TableCell>
-                <TableCell className="text-right">{summary.italianoAlmocoQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.italianoAlmoco.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.italianoAlmocoValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.italianoAlmoco.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.rwItalianoJantar && (
               <TableRow>
                 <TableCell>RW ITALIANO JANTAR</TableCell>
-                <TableCell className="text-right">{summary.italianoJantarQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.italianoJantar.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.italianoJantarValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.italianoJantar.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.rwIndianoAlmoco && (
               <TableRow>
                 <TableCell>RW INDIANO ALMOÇO</TableCell>
-                <TableCell className="text-right">{summary.indianoAlmocoQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.indianoAlmoco.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.indianoAlmocoValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.indianoAlmoco.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.rwIndianoJantar && (
               <TableRow>
                 <TableCell>RW INDIANO JANTAR</TableCell>
-                <TableCell className="text-right">{summary.indianoJantarQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.indianoJantar.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.indianoJantarValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.indianoJantar.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.frigobar && (
               <TableRow>
                 <TableCell>FRIGOBAR</TableCell>
-                <TableCell className="text-right">{summary.frigobarQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.frigobar.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.frigobarValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.frigobar.valor)}</TableCell>
               </TableRow>
             )}
             <TableRow className="font-semibold">
               <TableCell>TOTAL FITA</TableCell>
-              <TableCell className="text-right">{summary.totalFitaQtd || '0'}</TableCell>
-               <TableCell className="text-right">{summary.rsMadrugadaItens || '0'}</TableCell> 
-              <TableCell className="text-right">{formatCurrency(summary.totalFitaValor)}</TableCell>
+              <TableCell className="text-right">{summary.totalFita.qtd || '0'}</TableCell>
+               <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell> 
+              <TableCell className="text-right">{formatCurrency(summary.totalFita.valor)}</TableCell>
             </TableRow>
 
             <TableRow className="bg-muted/30">
@@ -470,55 +294,60 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             {summaryConfig.cafeHospedes && (
               <TableRow>
                 <TableCell>CAFÉ HÓSPEDES</TableCell>
-                <TableCell className="text-right">{summary.cafeHospedesTotalQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.cafeHospedes.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.cafeHospedesTotalValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.cafeHospedes.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.almocoCI && (
               <TableRow>
                 <TableCell>ALMOÇO C.I</TableCell>
-                <TableCell className="text-right">{summary.almocoCIQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.almocoCI.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.almocoCIValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.almocoCI.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.jantarCI && (
               <TableRow>
                 <TableCell>JANTAR C.I</TableCell>
-                <TableCell className="text-right">{summary.jantarCIQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.jantarCI.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.jantarCIValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.jantarCI.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.eventosDireto && (
               <TableRow>
                 <TableCell>EVENTOS DIRETO</TableCell>
-                <TableCell className="text-right">{summary.eventosDiretoQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.eventosDireto.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell> 
-                <TableCell className="text-right">{formatCurrency(summary.eventosDiretoValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.eventosDireto.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.eventosHotel && (
               <TableRow>
                 <TableCell>EVENTOS HOTEL</TableCell>
-                <TableCell className="text-right">{summary.eventosHotelQtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.eventosHotel.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell> 
-                <TableCell className="text-right">{formatCurrency(summary.eventosHotelValor)}</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.eventosHotel.valor)}</TableCell>
               </TableRow>
             )}
 
             <TableRow className="font-semibold border-t-2 border-foreground">
               <TableCell>TOTAL GERAL COM CI</TableCell>
-              <TableCell className="text-right">{summary.totalGeralComCIQtd || '0'}</TableCell>
-               <TableCell className="text-right">{summary.rsMadrugadaItens || '0'}</TableCell>
-              <TableCell className="text-right">{formatCurrency(summary.totalGeralComCIValor)}</TableCell>
+              <TableCell className="text-right">{summary.grandTotalComCI.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{formatCurrency(summary.grandTotalComCI.valor)}</TableCell>
+            </TableRow>
+            <TableRow className="font-medium text-muted-foreground">
+                <TableCell className="pl-6">(-) Total C.I.</TableCell>
+                <TableCell colSpan={2}></TableCell>
+                <TableCell className="text-right">-{formatCurrency(summary.totalCI.valor)}</TableCell>
             </TableRow>
             <TableRow className="font-semibold">
               <TableCell>TOTAL GERAL SEM CI</TableCell>
-              <TableCell className="text-right">{summary.totalGeralSemCIQtd || '0'}</TableCell>
-              <TableCell className="text-right">{summary.rsMadrugadaItens || '0'}</TableCell>
-              <TableCell className="text-right">{formatCurrency(summary.totalGeralSemCIValor)}</TableCell>
+              <TableCell className="text-right">{summary.grandTotalSemCI.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{formatCurrency(summary.grandTotalSemCI.valor)}</TableCell>
             </TableRow>
           </TableBody>
         </Table>

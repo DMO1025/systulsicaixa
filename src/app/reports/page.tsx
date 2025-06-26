@@ -392,16 +392,29 @@ export default function ReportsPage() {
 
         if (formatType === 'excel') {
             const wb = XLSX.utils.book_new();
-            const headers = ["Data", ...periodsToExport.map(p => p.label), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"];
+            const headers: string[] = ["Data"];
+            periodsToExport.forEach(p => {
+                headers.push(`${p.label} (Qtd)`);
+                headers.push(`${p.label} (Valor)`);
+            });
+            headers.push("Total Qtd", "Total COM C.I", "Reajuste C.I", "Líquido Qtd", "Total SEM C.I");
+
             const dataRows = dailyBreakdowns.map(row => {
                 const rowData: (string|number)[] = [row.date];
-                periodsToExport.forEach(pDef => rowData.push(row.periodTotals[pDef.id]?.valor ?? 0));
-                rowData.push(row.totalComCI, row.totalReajusteCI, row.totalSemCI);
+                periodsToExport.forEach(pDef => {
+                    rowData.push(row.periodTotals[pDef.id]?.qtd ?? 0);
+                    rowData.push(row.periodTotals[pDef.id]?.valor ?? 0);
+                });
+                rowData.push(row.totalQtd, row.totalComCI, row.totalReajusteCI, row.totalQtd - row.totalCIQtd, row.totalSemCI);
                 return rowData;
             });
+
             const footer: (string|number)[] = ["TOTAL"];
-            periodsToExport.forEach(pDef => footer.push(summary.periodTotals[pDef.id]?.valor ?? 0));
-            footer.push(summary.grandTotalComCI, summary.grandTotalReajusteCI, summary.grandTotalSemCI);
+             periodsToExport.forEach(pDef => {
+                footer.push(summary.periodTotals[pDef.id]?.qtd ?? 0);
+                footer.push(summary.periodTotals[pDef.id]?.valor ?? 0);
+            });
+            footer.push(summary.grandTotalQtd, summary.grandTotalComCI, summary.grandTotalReajusteCI, summary.grandTotalQtd - summary.grandTotalCIQtd, summary.grandTotalSemCI);
             
             const dataForSheet = [headers, ...dataRows, footer];
             const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
@@ -415,18 +428,25 @@ export default function ReportsPage() {
             doc.setFontSize(9); doc.setTextColor(100); doc.text(`Período de Referência: ${reportData.data.reportTitle}`, 14, 25);
             let finalY = 30;
 
-            const tableHeaders = ["Data", ...periodsToExport.map(p => p.label), "Total COM C.I", "Reajuste C.I", "Total SEM C.I"];
+            const tableHeaders: string[] = ["Data"];
+            periodsToExport.forEach(p => tableHeaders.push(`${p.label} (Qtd/Valor)`));
+            tableHeaders.push("Total (Qtd/Valor)", "Reajuste C.I", "Líquido (Qtd/Valor)");
+
             const tableBody = dailyBreakdowns.map(row => {
                 const rowData: (string|number)[] = [row.date];
-                periodsToExport.forEach(pDef => rowData.push(formatCurrency(row.periodTotals[pDef.id]?.valor ?? 0)));
-                rowData.push(formatCurrency(row.totalComCI), formatCurrency(row.totalReajusteCI), formatCurrency(row.totalSemCI));
+                periodsToExport.forEach(pDef => rowData.push(`${formatNumber(row.periodTotals[pDef.id]?.qtd)} / ${formatCurrency(row.periodTotals[pDef.id]?.valor)}`));
+                rowData.push(`${formatNumber(row.totalQtd)} / ${formatCurrency(row.totalComCI)}`);
+                rowData.push(`- / ${formatCurrency(row.totalReajusteCI)}`);
+                rowData.push(`${formatNumber(row.totalQtd - row.totalCIQtd)} / ${formatCurrency(row.totalSemCI)}`);
                 return rowData;
             });
             const tableFooter: (string|number)[] = ["TOTAL"];
-            periodsToExport.forEach(pDef => tableFooter.push(formatCurrency(summary.periodTotals[pDef.id]?.valor ?? 0)));
-            tableFooter.push(formatCurrency(summary.grandTotalComCI), formatCurrency(summary.grandTotalReajusteCI), formatCurrency(summary.grandTotalSemCI));
+            periodsToExport.forEach(pDef => tableFooter.push(`${formatNumber(summary.periodTotals[pDef.id]?.qtd)} / ${formatCurrency(summary.periodTotals[pDef.id]?.valor)}`));
+            tableFooter.push(`${formatNumber(summary.grandTotalQtd)} / ${formatCurrency(summary.grandTotalComCI)}`);
+            tableFooter.push(`- / ${formatCurrency(summary.grandTotalReajusteCI)}`);
+            tableFooter.push(`${formatNumber(summary.grandTotalQtd - summary.grandTotalCIQtd)} / ${formatCurrency(summary.grandTotalSemCI)}`);
             
-            (doc as any).autoTable({ startY: finalY, head: [tableHeaders], body: tableBody, foot: [tableFooter], theme: 'grid', headStyles: { fontSize: 7, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 }});
+            (doc as any).autoTable({ startY: finalY, head: [tableHeaders], body: tableBody, foot: [tableFooter], theme: 'grid', headStyles: { fontSize: 6, cellPadding: 1 }, styles: { fontSize: 6, cellPadding: 1 }});
             finalY = (doc as any).lastAutoTable.finalY + 10;
             
             doc.save(`${exportFileName}.pdf`);
@@ -469,7 +489,7 @@ export default function ReportsPage() {
             
             const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
             summaryWs['!cols'] = getColumnWidths(summaryData);
-            XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumo Consolidado');
+            XLSX.utils.book_append_sheet(wb, ws, 'Resumo Consolidado');
 
             tabDefinitions.forEach(tab => {
                 const breakdownData = dailyBreakdowns[tab.id];

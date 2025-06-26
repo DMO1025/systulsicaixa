@@ -22,8 +22,7 @@ const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="px-4 py-2 text-xs sticky top-0 bg-card z-10">ID (Data)</TableHead>
-              <TableHead className="px-4 py-2 text-xs sticky top-0 bg-card z-10">DATA FORMATADA</TableHead>
+              <TableHead className="px-4 py-2 text-xs sticky top-0 bg-card z-10">DATA</TableHead>
               <TableHead className="px-4 py-2 text-xs text-right sticky top-0 bg-card z-10">QTD TOTAL</TableHead>
               <TableHead className="px-4 py-2 text-xs text-right sticky top-0 bg-card z-10">VALOR TOTAL</TableHead>
             </TableRow>
@@ -31,14 +30,13 @@ const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
           <TableBody>
             {dailyTotals.length > 0 ? dailyTotals.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="font-medium px-4 py-2 text-xs">{row.id}</TableCell>
                 <TableCell className="px-4 py-2 text-xs">{row.date}</TableCell>
                 <TableCell className="text-right px-4 py-2 text-xs">{row.totalQtd.toLocaleString('pt-BR')}</TableCell>
                 <TableCell className="text-right px-4 py-2 text-xs">R$ {row.totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-4">
                   Nenhum lançamento encontrado.
                 </TableCell>
               </TableRow>

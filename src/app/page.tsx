@@ -1,17 +1,18 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
-import type { DailyLogEntry, PeriodId, EventosPeriodData, SalesItem, EvolutionChartConfig, ProcessedDailyTotal, AcumulativoMensalItem, MonthlyEvolutionDataItem, PeriodData, Settings, DashboardAnalysisInput } from '@/lib/types';
-import { PERIOD_DEFINITIONS, SALES_CHANNELS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
+import type { DailyLogEntry, PeriodId, DashboardAnalysisInput } from '@/lib/types';
+import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
 import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { getSafeNumericValue } from '@/lib/utils';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
+import { processEntryForTotals } from '@/lib/reportUtils';
 
 
 import SummaryCards from '@/components/dashboard/SummaryCards';
@@ -25,48 +26,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
-
-const evolutionChartConfig: EvolutionChartConfig = {
-  valorSemCI: { label: "Valor Líquido", color: "hsl(var(--chart-1))" },
-  valorCI: { label: "Consumo Interno", color: "hsl(var(--chart-2))" },
-  reajusteCIValor: { label: "Reajuste C.I.", color: "hsl(var(--chart-3))" },
-};
-
-const calculatePeriodGrandTotal = (periodEntryData: PeriodData | EventosPeriodData | undefined | string): { qtd: number; valor: number } => {
-  if (!periodEntryData || typeof periodEntryData === 'string') return { qtd: 0, valor: 0 };
-
-  let totalQtd = 0;
-  let totalValor = 0;
-
-  if ('items' in periodEntryData) { 
-    const evData = periodEntryData as EventosPeriodData;
-    (evData.items || []).forEach(item => {
-      (item.subEvents || []).forEach(subEvent => {
-        totalQtd += subEvent.quantity || 0;
-        totalValor += subEvent.totalValue || 0;
-      });
-    });
-  } else { 
-    const pData = periodEntryData as PeriodData;
-    if (pData.channels) {
-      Object.values(pData.channels).forEach(channel => {
-        totalQtd += getSafeNumericValue(channel, 'qtd');
-        totalValor += getSafeNumericValue(channel, 'vtotal');
-      });
-    }
-    if (pData.subTabs) {
-      Object.values(pData.subTabs).forEach(subTab => {
-        if (subTab?.channels) {
-          Object.values(subTab.channels).forEach(channel => {
-            totalQtd += getSafeNumericValue(channel, 'qtd');
-            totalValor += getSafeNumericValue(channel, 'vtotal');
-          });
-        }
-      });
-    }
-  }
-  return { qtd: totalQtd, valor: totalValor };
-};
 
 const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth: Date, setSelectedMonth: (date: Date) => void }) => {
     const selectedYear = selectedMonth.getFullYear();
@@ -138,21 +97,28 @@ const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth:
 export default function DashboardPage() {
   const { userRole } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [dailyTotals, setDailyTotals] = useState<ProcessedDailyTotal[]>([]);
-  
-  const [totalCIAlmoco, setTotalCIAlmoco] = useState({ qtd: 0, valor: 0 });
-  const [totalCIJantar, setTotalCIJantar] = useState({ qtd: 0, valor: 0 });
-  const [totalReajusteCIAlmocoValor, setTotalReajusteCIAlmocoValor] = useState(0);
-  const [totalReajusteCIJantarValor, setTotalReajusteCIJantarValor] = useState(0);
-
-  const [acumulativoMensalData, setAcumulativoMensalData] = useState<AcumulativoMensalItem[]>([]);
-  const [monthlyEvolutionData, setMonthlyEvolutionData] = useState<MonthlyEvolutionDataItem[]>([]);
-  
   const [selectedMonth, setSelectedMonth] = useState<Date>(startOfMonth(new Date()));
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [hasDataForMonth, setHasDataForMonth] = useState(false);
 
+  // Memoized state for all processed data
+  const processedData = useMemo(() => {
+    return {
+      dailyTotals: [],
+      acumulativoMensalData: [],
+      monthlyEvolutionData: [],
+      totalCIAlmoco: { qtd: 0, valor: 0 },
+      totalCIJantar: { qtd: 0, valor: 0 },
+      totalReajusteCI: 0,
+      overallTotalRevenue: 0,
+      overallTotalTransactions: 0,
+      totalGeralSemCI: { qtd: 0, valor: 0 },
+      totalConsumoInternoGeral: { qtd: 0, valor: 0 },
+    };
+  }, []);
+
+  const [dashboardData, setDashboardData] = useState(processedData);
 
   useEffect(() => {
     async function fetchDataAndProcess() {
@@ -180,12 +146,15 @@ export default function DashboardPage() {
 
         setHasDataForMonth(entriesForMonth.length > 0);
         
-        let accCIAlmocoQtd = 0;
-        let accCIAlmocoValor = 0;
-        let accCIJantarQtd = 0;
-        let accCIJantarValor = 0;
-        let accReajusteCIAlmoco = 0;
-        let accReajusteCIJantar = 0;
+        let monthGrandTotalQtd = 0;
+        let monthGrandTotalValor = 0;
+        let monthGrandTotalSemCIQtd = 0;
+        let monthGrandTotalSemCIValor = 0;
+        let monthGrandTotalReajusteCI = 0;
+        let monthGrandTotalCIQtd = 0;
+        let monthGrandTotalCIValor = 0;
+        let monthTotalCIAlmoco = { qtd: 0, valor: 0 };
+        let monthTotalCIJantar = { qtd: 0, valor: 0 };
 
         const accAcumulativo = {
           roomService: { pedidosQtd: 0, pratosMadrugadaQtd: 0, valor: 0 },
@@ -205,117 +174,50 @@ export default function DashboardPage() {
         };
         
         const processedTotals = entriesForMonth.map(entry => {
-          let currentEntryTotalValor = 0;
-          let currentEntryTotalQtd = 0;
-          let entryGrandTotal = {valor: 0, qtd: 0};
+          const entryTotals = processEntryForTotals(entry);
           
-          let allPeriodDefinitions = PERIOD_DEFINITIONS;
-          // Add a temporary frigobar definition if old data exists
-          if ((entry as any).frigobar) {
-             allPeriodDefinitions = [...PERIOD_DEFINITIONS, { id: "frigobar" }] as any;
-          }
+          monthGrandTotalQtd += entryTotals.grandTotal.comCI.qtd;
+          monthGrandTotalValor += entryTotals.grandTotal.comCI.valor;
+          monthGrandTotalSemCIQtd += entryTotals.grandTotal.semCI.qtd;
+          monthGrandTotalSemCIValor += entryTotals.grandTotal.semCI.valor;
+          monthGrandTotalReajusteCI += entryTotals.reajusteCI.total;
+          monthGrandTotalCIQtd += entryTotals.totalCI.qtd;
+          monthGrandTotalCIValor += entryTotals.totalCI.valor;
+          monthTotalCIAlmoco.qtd += entryTotals.almocoCI.qtd;
+          monthTotalCIAlmoco.valor += entryTotals.almocoCI.valor;
+          monthTotalCIJantar.qtd += entryTotals.jantarCI.qtd;
+          monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
 
+          // Accumulate for monthly table
+          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtd;
+          accAcumulativo.roomService.valor += entryTotals.rsMadrugada.valor;
+          accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
+          accAcumulativo.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
+          accAcumulativo.breakfast.qtd += entryTotals.breakfast.qtd;
+          accAcumulativo.breakfast.valor += entryTotals.breakfast.valor;
+          accAcumulativo.almoco.qtd += entryTotals.almoco.qtd;
+          accAcumulativo.almoco.valor += entryTotals.almoco.valor;
+          accAcumulativo.jantar.qtd += entryTotals.jantar.qtd;
+          accAcumulativo.jantar.valor += entryTotals.jantar.valor;
+          accAcumulativo.italianoAlmoco.qtd += entryTotals.italianoAlmoco.qtd;
+          accAcumulativo.italianoAlmoco.valor += entryTotals.italianoAlmoco.valor;
+          accAcumulativo.italianoJantar.qtd += entryTotals.italianoJantar.qtd;
+          accAcumulativo.italianoJantar.valor += entryTotals.italianoJantar.valor;
+          accAcumulativo.indianoAlmoco.qtd += entryTotals.indianoAlmoco.qtd;
+          accAcumulativo.indianoAlmoco.valor += entryTotals.indianoAlmoco.valor;
+          accAcumulativo.indianoJantar.qtd += entryTotals.indianoJantar.qtd;
+          accAcumulativo.indianoJantar.valor += entryTotals.indianoJantar.valor;
+          accAcumulativo.baliAlmoco.qtd += entryTotals.baliAlmoco.qtd;
+          accAcumulativo.baliAlmoco.valor += entryTotals.baliAlmoco.valor;
+          accAcumulativo.baliHappy.qtd += entryTotals.baliHappy.qtd;
+          accAcumulativo.baliHappy.valor += entryTotals.baliHappy.valor;
+          accAcumulativo.frigobar.qtd += entryTotals.frigobar.qtd;
+          accAcumulativo.frigobar.valor += entryTotals.frigobar.valor;
+          accAcumulativo.eventosDireto.qtd += entryTotals.eventos.direto.qtd;
+          accAcumulativo.eventosDireto.valor += entryTotals.eventos.direto.valor;
+          accAcumulativo.eventosHotel.qtd += entryTotals.eventos.hotel.qtd;
+          accAcumulativo.eventosHotel.valor += entryTotals.eventos.hotel.valor;
 
-          allPeriodDefinitions.forEach(pDef => {
-            const { qtd, valor } = calculatePeriodGrandTotal(entry[pDef.id as keyof typeof entry]);
-            entryGrandTotal.qtd += qtd;
-            entryGrandTotal.valor += valor;
-          });
-
-          // Specific accumulations
-          const rsMadrugadaData = calculatePeriodGrandTotal(entry.madrugada);
-          accAcumulativo.roomService.pedidosQtd += getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPedidos.qtd');
-          accAcumulativo.roomService.pratosMadrugadaQtd += getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPratos.qtd');
-          accAcumulativo.roomService.valor += rsMadrugadaData.valor;
-          
-          const cafeTotal = calculatePeriodGrandTotal(entry.cafeDaManha);
-          accAcumulativo.cafeDaManha.qtd += cafeTotal.qtd;
-          accAcumulativo.cafeDaManha.valor += cafeTotal.valor;
-
-          const breakfastTotal = calculatePeriodGrandTotal(entry.breakfast);
-          accAcumulativo.breakfast.qtd += breakfastTotal.qtd;
-          accAcumulativo.breakfast.valor += breakfastTotal.valor;
-          
-          const almocoPTTotal = calculatePeriodGrandTotal(entry.almocoPrimeiroTurno);
-          const almocoSTTotal = calculatePeriodGrandTotal(entry.almocoSegundoTurno);
-          accAcumulativo.almoco.qtd += almocoPTTotal.qtd + almocoSTTotal.qtd;
-          accAcumulativo.almoco.valor += almocoPTTotal.valor + almocoSTTotal.valor;
-
-          const italianoAlmocoTotal = calculatePeriodGrandTotal(entry.italianoAlmoco);
-          accAcumulativo.italianoAlmoco.qtd += italianoAlmocoTotal.qtd;
-          accAcumulativo.italianoAlmoco.valor += italianoAlmocoTotal.valor;
-
-          const italianoJantarTotal = calculatePeriodGrandTotal(entry.italianoJantar);
-          accAcumulativo.italianoJantar.qtd += italianoJantarTotal.qtd;
-          accAcumulativo.italianoJantar.valor += italianoJantarTotal.valor;
-
-          const indianoAlmocoTotal = calculatePeriodGrandTotal(entry.indianoAlmoco);
-          accAcumulativo.indianoAlmoco.qtd += indianoAlmocoTotal.qtd;
-          accAcumulativo.indianoAlmoco.valor += indianoAlmocoTotal.valor;
-
-          const indianoJantarTotal = calculatePeriodGrandTotal(entry.indianoJantar);
-          accAcumulativo.indianoJantar.qtd += indianoJantarTotal.qtd;
-          accAcumulativo.indianoJantar.valor += indianoJantarTotal.valor;
-          
-          const jantarTotal = calculatePeriodGrandTotal(entry.jantar);
-          accAcumulativo.jantar.qtd += jantarTotal.qtd;
-          accAcumulativo.jantar.valor += jantarTotal.valor;
-
-          const baliAlmocoTotal = calculatePeriodGrandTotal(entry.baliAlmoco);
-          accAcumulativo.baliAlmoco.qtd += baliAlmocoTotal.qtd;
-          accAcumulativo.baliAlmoco.valor += baliAlmocoTotal.valor;
-
-          const baliHappyTotal = calculatePeriodGrandTotal(entry.baliHappy);
-          accAcumulativo.baliHappy.qtd += baliHappyTotal.qtd;
-          accAcumulativo.baliHappy.valor += baliHappyTotal.valor;
-          
-          // New frigobar calculation
-          const frigobarPT = calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any);
-          const frigobarST = calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any);
-          const frigobarJNT = calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any);
-          const oldFrigobar = calculatePeriodGrandTotal((entry as any).frigobar); // fallback
-          accAcumulativo.frigobar.qtd += frigobarPT.qtd + frigobarST.qtd + frigobarJNT.qtd + oldFrigobar.qtd;
-          accAcumulativo.frigobar.valor += frigobarPT.valor + frigobarST.valor + frigobarJNT.valor + oldFrigobar.valor;
-          
-
-          const eventosData = entry.eventos as EventosPeriodData | undefined;
-          let entryEventosDiretoQtd = 0, entryEventosDiretoValor = 0;
-          let entryEventosHotelQtd = 0, entryEventosHotelValor = 0;
-          (eventosData?.items || []).forEach(item => {
-            (item.subEvents || []).forEach(subEvent => {
-              const qty = subEvent.quantity || 0;
-              const val = subEvent.totalValue || 0;
-              if (subEvent.location === 'DIRETO') {
-                entryEventosDiretoQtd += qty;
-                entryEventosDiretoValor += val;
-              } else if (subEvent.location === 'HOTEL') {
-                entryEventosHotelQtd += qty;
-                entryEventosHotelValor += val;
-              }
-            });
-          });
-          accAcumulativo.eventosDireto.qtd += entryEventosDiretoQtd;
-          accAcumulativo.eventosDireto.valor += entryEventosDiretoValor;
-          accAcumulativo.eventosHotel.qtd += entryEventosHotelQtd;
-          accAcumulativo.eventosHotel.valor += entryEventosHotelValor;
-
-          currentEntryTotalValor = entryGrandTotal.valor;
-          currentEntryTotalQtd = entryGrandTotal.qtd;
-          
-          const entryCIAlmocoQtd = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosConsumoInternoQtd.qtd') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosConsumoInternoQtd.qtd');
-          const entryCIAlmocoValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
-          const entryCIJantarQtd = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosConsumoInternoQtd.qtd');
-          const entryCIJantarValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-          const entryReajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
-          const entryReajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
-          
-          accCIAlmocoQtd += entryCIAlmocoQtd;
-          accCIAlmocoValor += entryCIAlmocoValor;
-          accCIJantarQtd += entryCIJantarQtd;
-          accCIJantarValor += entryCIJantarValor;
-          accReajusteCIAlmoco += entryReajusteCIAlmoco;
-          accReajusteCIJantar += entryReajusteCIJantar;
-          
           let formattedDate = "Data Inválida";
           if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
             const [year, month, day] = entry.id.split('-');
@@ -325,8 +227,8 @@ export default function DashboardPage() {
           return {
             id: entry.id,
             date: formattedDate,
-            totalQtd: currentEntryTotalQtd,
-            totalValor: currentEntryTotalValor,
+            totalQtd: entryTotals.grandTotal.comCI.qtd,
+            totalValor: entryTotals.grandTotal.comCI.valor,
           };
         }).sort((a, b) => { 
             const dateAValid = a.id && typeof a.id === 'string' && a.id.match(/^\d{4}-\d{2}-\d{2}$/);
@@ -346,6 +248,7 @@ export default function DashboardPage() {
             return 0; 
         });
 
+        // Monthly Evolution Data
         const monthlyAggregates: Record<string, {
             monthLabel: string;
             valorComCI: number; qtdComCI: number;
@@ -358,10 +261,7 @@ export default function DashboardPage() {
             const monthKey = format(targetMonthStartDate, "yyyy-MM");
             const monthLabel = format(targetMonthStartDate, "MMM/yy", { locale: ptBR });
             monthlyAggregates[monthKey] = {
-                monthLabel,
-                valorComCI: 0, qtdComCI: 0,
-                valorCI: 0, qtdCI: 0,
-                reajusteCIValor: 0,
+                monthLabel, valorComCI: 0, qtdComCI: 0, valorCI: 0, qtdCI: 0, reajusteCIValor: 0,
             };
         }
 
@@ -370,44 +270,37 @@ export default function DashboardPage() {
           if (isValid(entryDateObj)) {
               const entryMonthKey = format(entryDateObj, "yyyy-MM");
               if (monthlyAggregates[entryMonthKey]) {
-                  const entryCIAlmocoQtd = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosConsumoInternoQtd.qtd') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosConsumoInternoQtd.qtd');
-                  const entryCIAlmocoValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
-                  const entryCIJantarQtd = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosConsumoInternoQtd.qtd');
-                  const entryCIJantarValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-                  const entryReajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
-                  const entryReajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
-                  
-                  let grandTotalQtd = 0;
-                  let grandTotalValor = 0;
-                  
-                  let allPeriodDefinitions = PERIOD_DEFINITIONS;
-                  if ((entry as any).frigobar) {
-                    allPeriodDefinitions = [...PERIOD_DEFINITIONS, { id: "frigobar" }] as any;
-                  }
-
-                  allPeriodDefinitions.forEach(pDef => {
-                    const {qtd, valor} = calculatePeriodGrandTotal(entry[pDef.id as keyof typeof entry]);
-                    grandTotalQtd += qtd;
-                    grandTotalValor += valor;
-                  });
-
-                  monthlyAggregates[entryMonthKey].valorComCI += grandTotalValor;
-                  monthlyAggregates[entryMonthKey].qtdComCI += grandTotalQtd;
-                  monthlyAggregates[entryMonthKey].valorCI += entryCIAlmocoValor + entryCIJantarValor; 
-                  monthlyAggregates[entryMonthKey].qtdCI += entryCIAlmocoQtd + entryCIJantarQtd; 
-                  monthlyAggregates[entryMonthKey].reajusteCIValor += entryReajusteCIAlmoco + entryReajusteCIJantar;
+                  const entryTotals = processEntryForTotals(entry);
+                  monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
+                  monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
+                  monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
+                  monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
+                  monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.reajusteCI.total;
               }
           }
         });
         
-        setDailyTotals(processedTotals);
-        setTotalCIAlmoco({ qtd: accCIAlmocoQtd, valor: accCIAlmocoValor });
-        setTotalCIJantar({ qtd: accCIJantarQtd, valor: accCIJantarValor });
-        setTotalReajusteCIAlmocoValor(accReajusteCIAlmoco);
-        setTotalReajusteCIJantarValor(accReajusteCIJantar);
+        const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
+            const dateA = parseISO(keyA + "-01");
+            const dateB = parseISO(keyB + "-01");
+            return dateA.getTime() - dateB.getTime(); 
+        });
         
+        const finalMonthlyEvolutionData = sortedMonthKeys.map(monthKey => {
+            const data = monthlyAggregates[monthKey];
+            return {
+                month: data.monthLabel,
+                valorComCI: data.valorComCI,
+                valorSemCI: data.valorComCI - data.valorCI - data.reajusteCIValor,
+                valorCI: data.valorCI,
+                reajusteCIValor: data.reajusteCIValor,
+                qtdComCI: data.qtdComCI,
+                qtdSemCI: data.qtdComCI - data.qtdCI,
+            };
+        });
+          
         const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
-        const initialAcumulativoMensalState: AcumulativoMensalItem[] = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.map(config => ({
+        const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.map(config => ({
             item: config.item,
             qtdDisplay: config.item === 'ROOM SERVICE' ? '0 / 0' : '0',
             valorTotal: 0,
@@ -416,7 +309,6 @@ export default function DashboardPage() {
                 : undefined,
             periodId: config.periodId as PeriodId | undefined,
         }));
-
 
         const updatedAcumulativoMensalData = initialAcumulativoMensalState.map(item => {
             switch (item.item) {
@@ -441,28 +333,19 @@ export default function DashboardPage() {
         const finalVisibleData = updatedAcumulativoMensalData.filter(item => {
           return visibilityConfig?.[item.item] !== false; 
         });
-        setAcumulativoMensalData(finalVisibleData);
-
-        const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
-            const dateA = parseISO(keyA + "-01");
-            const dateB = parseISO(keyB + "-01");
-            return dateA.getTime() - dateB.getTime(); 
-        });
         
-        const finalMonthlyEvolutionData = sortedMonthKeys.map(monthKey => {
-            const data = monthlyAggregates[monthKey];
-            return {
-                month: data.monthLabel,
-                valorComCI: data.valorComCI,
-                valorSemCI: data.valorComCI - data.valorCI - data.reajusteCIValor,
-                valorCI: data.valorCI,
-                reajusteCIValor: data.reajusteCIValor,
-                qtdComCI: data.qtdComCI,
-                qtdSemCI: data.qtdComCI - data.qtdCI,
-            };
+        setDashboardData({
+          dailyTotals: processedTotals,
+          acumulativoMensalData: finalVisibleData,
+          monthlyEvolutionData: finalMonthlyEvolutionData.reverse(),
+          totalCIAlmoco: monthTotalCIAlmoco,
+          totalCIJantar: monthTotalCIJantar,
+          totalConsumoInternoGeral: { qtd: monthGrandTotalCIQtd, valor: monthGrandTotalCIValor },
+          totalGeralSemCI: { qtd: monthGrandTotalSemCIQtd, valor: monthGrandTotalSemCIValor },
+          overallTotalRevenue: monthGrandTotalValor,
+          overallTotalTransactions: monthGrandTotalQtd,
+          totalReajusteCI: monthGrandTotalReajusteCI,
         });
-          
-        setMonthlyEvolutionData(finalMonthlyEvolutionData.reverse());
 
       } catch (error: any) {
         console.error("Falha ao buscar ou processar os lançamentos para o dashboard:", error);
@@ -473,63 +356,38 @@ export default function DashboardPage() {
     fetchDataAndProcess();
   }, [selectedMonth]);
 
-  const overallTotalRevenue = useMemo(() => {
-    return dailyTotals.reduce((sum, item) => sum + item.totalValor, 0);
-  }, [dailyTotals]);
+  const ticketMedio = useMemo(() => {
+    return dashboardData.totalGeralSemCI.qtd > 0 ? dashboardData.totalGeralSemCI.valor / dashboardData.totalGeralSemCI.qtd : 0;
+  }, [dashboardData.totalGeralSemCI]);
 
-  const overallTotalTransactions = useMemo(() => {
-    return dailyTotals.reduce((sum, item) => sum + item.totalQtd, 0);
-  }, [dailyTotals]);
-
-  const totalConsumoInternoGeral = useMemo(() => {
-    return {
-      qtd: totalCIAlmoco.qtd + totalCIJantar.qtd,
-      valor: totalCIAlmoco.valor + totalCIJantar.valor,
-    };
-  }, [totalCIAlmoco, totalCIJantar]);
-
-  const overallTotalReajusteCI = useMemo(() => {
-    return totalReajusteCIAlmocoValor + totalReajusteCIJantarValor;
-  }, [totalReajusteCIAlmocoValor, totalReajusteCIJantarValor]);
-
-  const totalGeralSemCI = useMemo(() => {
-    const valorSemCI = overallTotalRevenue - totalConsumoInternoGeral.valor - overallTotalReajusteCI;
-    const qtdSemCI = overallTotalTransactions - totalConsumoInternoGeral.qtd;
-
-    return {
-      qtd: qtdSemCI,
-      valor: valorSemCI,
-    };
-  }, [overallTotalTransactions, overallTotalRevenue, totalConsumoInternoGeral, overallTotalReajusteCI]);
-  
   const handleGenerateAnalysis = async () => {
     setIsAnalyzing(true);
     setAnalysis('');
     try {
       const input: DashboardAnalysisInput = {
         month: format(selectedMonth, 'MMMM yyyy', { locale: ptBR }),
-        totalRevenue: overallTotalRevenue,
-        totalTransactions: overallTotalTransactions,
+        totalRevenue: dashboardData.overallTotalRevenue,
+        totalTransactions: dashboardData.overallTotalTransactions,
         totalCIRecords: {
-          almoco: totalCIAlmoco,
-          jantar: totalCIJantar,
-          total: totalConsumoInternoGeral
+          almoco: dashboardData.totalCIAlmoco,
+          jantar: dashboardData.totalCIJantar,
+          total: dashboardData.totalConsumoInternoGeral
         },
-        accumulatedItems: acumulativoMensalData.map(item => ({
+        accumulatedItems: dashboardData.acumulativoMensalData.map(item => ({
           name: item.item,
           quantity: item.qtdDisplay,
           totalValue: item.valorTotal
         })),
         generalTotals: {
           withCI: {
-            quantity: overallTotalTransactions,
-            value: overallTotalRevenue
+            quantity: dashboardData.overallTotalTransactions,
+            value: dashboardData.overallTotalRevenue
           },
           withoutCI: {
-            quantity: totalGeralSemCI.qtd,
-            value: totalGeralSemCI.valor
+            quantity: dashboardData.totalGeralSemCI.qtd,
+            value: dashboardData.totalGeralSemCI.valor
           },
-          ciAdjustment: overallTotalReajusteCI
+          ciAdjustment: dashboardData.totalReajusteCI
         }
       };
 
@@ -565,11 +423,10 @@ export default function DashboardPage() {
     if (isLoading) {
       return (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-[108px]" />
-            <Skeleton className="h-[108px]" />
-            <Skeleton className="h-[108px] hidden lg:block" />
-            <Skeleton className="h-[108px] hidden lg:block" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-[124px]" />
+            <Skeleton className="h-[124px]" />
+            <Skeleton className="h-[124px] hidden lg:block" />
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <Skeleton className="h-[600px]" />
@@ -609,8 +466,9 @@ export default function DashboardPage() {
     return (
       <>
         <SummaryCards 
-            totalRevenue={overallTotalRevenue} 
-            totalTransactions={overallTotalTransactions} 
+            totalRevenue={dashboardData.overallTotalRevenue} 
+            totalTransactions={dashboardData.overallTotalTransactions}
+            ticketMedio={ticketMedio}
         />
         <Card>
           <CardHeader>
@@ -641,25 +499,24 @@ export default function DashboardPage() {
           )}
         </Card>
         <div className="grid gap-6 md:grid-cols-2">
-            <DailyTotalsTable dailyTotals={dailyTotals} />
+            <DailyTotalsTable dailyTotals={dashboardData.dailyTotals} />
             <div className="space-y-6">
-            <MonthlyAccumulatedTable data={acumulativoMensalData} />
+            <MonthlyAccumulatedTable data={dashboardData.acumulativoMensalData} />
             <InternalConsumptionTable 
-                ciAlmoco={totalCIAlmoco}
-                ciJantar={totalCIJantar}
-                totalConsumoInternoGeral={totalConsumoInternoGeral}
+                ciAlmoco={dashboardData.totalCIAlmoco}
+                ciJantar={dashboardData.totalCIJantar}
+                totalConsumoInternoGeral={dashboardData.totalConsumoInternoGeral}
             />
             <GeneralTotalsTable
-                overallTotalTransactions={overallTotalTransactions}
-                overallTotalRevenue={overallTotalRevenue}
-                overallTotalReajusteCI={overallTotalReajusteCI}
-                totalGeralSemCI={totalGeralSemCI}
+                overallTotalTransactions={dashboardData.overallTotalTransactions}
+                overallTotalRevenue={dashboardData.overallTotalRevenue}
+                overallTotalReajusteCI={dashboardData.totalReajusteCI}
+                totalGeralSemCI={dashboardData.totalGeralSemCI}
             />
             </div>
         </div>
         <MonthlyEvolutionChart 
-            data={monthlyEvolutionData} 
-            chartConfig={evolutionChartConfig} 
+            data={dashboardData.monthlyEvolutionData} 
             isLoading={isLoading}
         />
       </>
