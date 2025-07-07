@@ -98,7 +98,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rwIndianoJantar ? totals.indianoJantar.valor : 0);
     
     const totalFitaQtd =
-      (config.rsMadrugada ? totals.rsMadrugada.qtd : 0) +
+      (config.rsMadrugada ? totals.rsMadrugada.qtdPedidos : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.qtd : 0) +
       (config.breakfast ? totals.breakfast.qtd : 0) +
       (config.almoco ? totals.almoco.qtd : 0) +
@@ -108,6 +108,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
       (config.rwIndianoAlmoco ? totals.indianoAlmoco.qtd : 0) +
       (config.rwIndianoJantar ? totals.indianoJantar.qtd : 0);
+
+    const totalFitaItens = config.rsMadrugada ? totals.rsMadrugada.qtdPratos : 0;
 
     return {
       dateToDisplay: dailyData.date,
@@ -125,7 +127,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       frigobar: totals.frigobar,
 
       // Total Fita subtotal for display
-      totalFita: { qtd: totalFitaQtd, valor: totalFitaValor },
+      totalFita: { qtd: totalFitaQtd, itens: totalFitaItens, valor: totalFitaValor },
 
       // "Outros Serviços" items for display
       cafeHospedes: totals.cafeHospedes,
@@ -138,6 +140,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       grandTotalComCI: totals.grandTotal.comCI,
       grandTotalSemCI: totals.grandTotal.semCI,
       totalCI: totals.totalCI,
+      totalReajusteCI: totals.reajusteCI.total,
     };
   }, [dailyData, summaryConfig]);
 
@@ -196,8 +199,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             {summaryConfig.rsMadrugada && (
               <TableRow>
                 <TableCell>RS MADRUGADA</TableCell>
-                <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
-                <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+                <TableCell className="text-right">{summary.rsMadrugada.qtdPedidos || '0'}</TableCell>
+                <TableCell className="text-right">{summary.rsMadrugada.qtdPratos || '0'}</TableCell>
                 <TableCell className="text-right">{formatCurrency(summary.rsMadrugada.valor)}</TableCell>
               </TableRow>
             )}
@@ -284,7 +287,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             <TableRow className="font-semibold">
               <TableCell>TOTAL FITA</TableCell>
               <TableCell className="text-right">{summary.totalFita.qtd || '0'}</TableCell>
-               <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell> 
+               <TableCell className="text-right">{summary.totalFita.itens || '0'}</TableCell> 
               <TableCell className="text-right">{formatCurrency(summary.totalFita.valor)}</TableCell>
             </TableRow>
 
@@ -334,8 +337,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
 
             <TableRow className="font-semibold border-t-2 border-foreground">
               <TableCell>TOTAL GERAL COM CI</TableCell>
-              <TableCell className="text-right">{summary.grandTotalComCI.qtd || '0'}</TableCell>
-              <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{summary.grandTotalComCI.qtd || 0}</TableCell>
+              <TableCell className="text-right">{summary.rsMadrugada.qtdPratos || '0'}</TableCell>
               <TableCell className="text-right">{formatCurrency(summary.grandTotalComCI.valor)}</TableCell>
             </TableRow>
             <TableRow className="font-medium text-muted-foreground">
@@ -343,10 +346,15 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
                 <TableCell colSpan={2}></TableCell>
                 <TableCell className="text-right">-{formatCurrency(summary.totalCI.valor)}</TableCell>
             </TableRow>
+            <TableRow className="font-medium text-muted-foreground">
+                <TableCell className="pl-6">(-) Reajuste C.I.</TableCell>
+                <TableCell colSpan={2}></TableCell>
+                <TableCell className="text-right">-{formatCurrency(summary.totalReajusteCI)}</TableCell>
+            </TableRow>
             <TableRow className="font-semibold">
               <TableCell>TOTAL GERAL SEM CI</TableCell>
-              <TableCell className="text-right">{summary.grandTotalSemCI.qtd || '0'}</TableCell>
-              <TableCell className="text-right">{summary.rsMadrugada.qtd || '0'}</TableCell>
+              <TableCell className="text-right">{summary.grandTotalSemCI.qtd || 0}</TableCell>
+              <TableCell className="text-right">{summary.rsMadrugada.qtdPratos || '0'}</TableCell>
               <TableCell className="text-right">{formatCurrency(summary.grandTotalSemCI.valor)}</TableCell>
             </TableRow>
           </TableBody>

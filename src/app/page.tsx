@@ -189,8 +189,9 @@ export default function DashboardPage() {
           monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
 
           // Accumulate for monthly table
-          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtd;
-          accAcumulativo.roomService.valor += entryTotals.rsMadrugada.valor;
+          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtdPedidos || 0;
+          accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
+          accAcumulativo.roomService.valor += entryTotals.rsMadrugada.valor || 0;
           accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
           accAcumulativo.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
           accAcumulativo.breakfast.qtd += entryTotals.breakfast.qtd;

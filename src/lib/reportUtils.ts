@@ -70,7 +70,11 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     };
 
     // --- 1. DECOMPOSITION: Calculate all individual, non-overlapping components ---
-    const rsMadrugada = calculatePeriodGrandTotal(entry.madrugada);
+    const rsMadrugada = {
+        valor: getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServicePagDireto.vtotal') + getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceValorServico.vtotal'),
+        qtdPedidos: getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPedidos.qtd'),
+        qtdPratos: getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPratos.qtd'),
+    };
     const breakfast = calculatePeriodGrandTotal(entry.breakfast);
     const italianoAlmoco = calculatePeriodGrandTotal(entry.italianoAlmoco);
     const italianoJantar = calculatePeriodGrandTotal(entry.italianoJantar);
@@ -132,16 +136,16 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // Line items for the summary card
     const almocoDisplayTotal = {
         qtd: almocoServicos.qtd + almocoFaturado.qtd,
-        valor: almocoServicos.valor + almocoFaturado.valor + almocoCI.reajuste,
+        valor: almocoServicos.valor + almocoFaturado.valor,
     };
     const jantarDisplayTotal = {
         qtd: jantarServicos.qtd + jantarFaturado.qtd,
-        valor: jantarServicos.valor + jantarFaturado.valor + jantarCI.reajuste,
+        valor: jantarServicos.valor + jantarFaturado.valor,
     };
 
     // Grand totals are built from the sum of the non-overlapping decomposed components
     const grandTotalComCI = {
-        qtd: rsMadrugada.qtd + cafeHospedes.qtd + cafeAvulsos.qtd + breakfast.qtd +
+        qtd: rsMadrugada.qtdPedidos + cafeHospedes.qtd + cafeAvulsos.qtd + breakfast.qtd +
              almocoServicos.qtd + almocoFaturado.qtd + almocoCI.qtd +
              jantarServicos.qtd + jantarFaturado.qtd + jantarCI.qtd +
              italianoAlmoco.qtd + italianoJantar.qtd + indianoAlmoco.qtd + indianoJantar.qtd +
@@ -164,13 +168,14 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
 
     const grandTotalSemCI = {
         qtd: grandTotalComCI.qtd - totalCI.qtd,
-        valor: grandTotalComCI.valor - totalCI.valor - totalReajusteCI,
+        valor: grandTotalComCI.valor - totalCI.valor,
     };
 
     // --- 3. RETURN: Provide all the calculated parts for consumers ---
     return {
         // Return all individual components for detailed reports
-        rsMadrugada, cafeHospedes, cafeAvulsos, breakfast,
+        rsMadrugada,
+        cafeHospedes, cafeAvulsos, breakfast,
         almocoServicos, almocoFaturado, almocoCI,
         jantarServicos, jantarFaturado, jantarCI,
         italianoAlmoco, italianoJantar, indianoAlmoco, indianoJantar,
