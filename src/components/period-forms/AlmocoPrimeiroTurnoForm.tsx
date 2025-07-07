@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
+import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -50,20 +51,6 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
   const watchedData = form.watch();
-  const watchedSubTabs = form.watch(`${periodId}.subTabs`);
-
-  useEffect(() => {
-    if (!watchedSubTabs?.ciEFaturados?.channels) return;
-    const hotelValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosValorHotel.vtotal', 0);
-    const funcionarioValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosValorFuncionario.vtotal', 0);
-    const calculatedTotal = hotelValue + funcionarioValue;
-    
-    const currentTotal = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.aptCiEFaturadosTotalFaturado.vtotal');
-
-    if (calculatedTotal !== currentTotal) {
-      form.setValue(`${periodId}.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalFaturado.vtotal`, calculatedTotal, { shouldDirty: true });
-    }
-  }, [watchedSubTabs, form, periodId]);
 
   const periodTotal = useMemo(() => {
     const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
@@ -71,27 +58,25 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
     const madrugadaTotal = getVtotal('madrugada.channels.madrugadaRoomServicePagDireto.vtotal') +
                          getVtotal('madrugada.channels.madrugadaRoomServiceValorServico.vtotal');
 
-    const cafeDiretoTotal = getVtotal('cafeDaManha.channels.cdmDiretoCartao.vtotal');
-    const cafeAssinadoTotal = getVtotal('cafeDaManha.channels.cdmCafeAssinado.vtotal');
+    const cafeAvulsosTotal = getVtotal('cafeDaManha.channels.cdmDiretoCartao.vtotal') +
+                           getVtotal('cafeDaManha.channels.cdmCafeAssinado.vtotal');
     
     let almocoPTSubTabsTotal = 0;
     const almocoPTData = watchedData.almocoPrimeiroTurno;
     if (almocoPTData?.subTabs) {
-        for (const subTabKey in almocoPTData.subTabs) {
-            if (subTabKey === 'frigobar') continue; // Exclude frigobar, it will be added separately
-            const subTab = almocoPTData.subTabs[subTabKey];
-            if (subTab?.channels) {
-                for (const channelKey in subTab.channels) {
-                    const channel = subTab.channels[channelKey as keyof typeof subTab.channels];
-                    almocoPTSubTabsTotal += getSafeNumericValue(channel, 'vtotal', 0);
-                }
-            }
-        }
+        const { frigobar, ...restOfSubTabs } = almocoPTData.subTabs;
+        const almocoPTDataWithoutFrigobar = { ...almocoPTData, subTabs: restOfSubTabs };
+        let { valor } = calculatePeriodGrandTotal(almocoPTDataWithoutFrigobar as PeriodData);
+        
+        const totalCIValue = getSafeNumericValue(almocoPTData, 'subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal');
+        valor -= totalCIValue;
+        
+        almocoPTSubTabsTotal = valor;
     }
     
     const frigobarPTTotal = getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagHotel.vtotal');
 
-    return madrugadaTotal + cafeDiretoTotal + cafeAssinadoTotal + almocoPTSubTabsTotal + frigobarPTTotal;
+    return madrugadaTotal + cafeAvulsosTotal + almocoPTSubTabsTotal + frigobarPTTotal;
   }, [watchedData]);
 
   useEffect(() => {
@@ -104,7 +89,6 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
   }, [periodId, periodConfig, activeSubTabs, setActiveSubTabs]);
 
   if (!activeSubTabs || !setActiveSubTabs || !calculateSubTabTotal) {
-     // This case should ideally not happen if props are passed correctly for tabbed components
     return <p>Erro de configuração: Props para sub-abas ausentes.</p>;
   }
 
@@ -118,7 +102,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Café Assinado + Almoço 1º Turno + Frigobar 1º Turno)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Almoço 1º Turno + Frigobar 1º Turno)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>

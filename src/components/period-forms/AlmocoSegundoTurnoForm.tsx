@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
+import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -50,37 +51,26 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
   const watchedData = form.watch();
-  const watchedSubTabs = form.watch(`${periodId}.subTabs`);
-
-  useEffect(() => {
-    if (!watchedSubTabs?.ciEFaturados?.channels) return;
-    const hotelValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.astCiEFaturadosValorHotel.vtotal', 0);
-    const funcionarioValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.astCiEFaturadosValorFuncionario.vtotal', 0);
-    const calculatedTotal = hotelValue + funcionarioValue;
-    
-    const currentTotal = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.astCiEFaturadosTotalFaturado.vtotal');
-
-    if (calculatedTotal !== currentTotal) {
-      form.setValue(`${periodId}.subTabs.ciEFaturados.channels.astCiEFaturadosTotalFaturado.vtotal`, calculatedTotal, { shouldDirty: true });
-    }
-  }, [watchedSubTabs, form, periodId]);
 
   const periodTotal = useMemo(() => {
-    let almocoSTTotal = 0;
+    const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
+
+    let almocoSTSubTabsTotal = 0;
     const almocoSTData = watchedData.almocoSegundoTurno;
     if (almocoSTData?.subTabs) {
-        for (const subTabKey in almocoSTData.subTabs) {
-            const subTab = almocoSTData.subTabs[subTabKey];
-            if (subTab?.channels) {
-                for (const channelKey in subTab.channels) {
-                    const channel = subTab.channels[channelKey as keyof typeof subTab.channels];
-                    almocoSTTotal += getSafeNumericValue(channel, 'vtotal', 0);
-                }
-            }
-        }
+        const { frigobar, ...restOfSubTabs } = almocoSTData.subTabs;
+        const almocoSTDataWithoutFrigobar = { ...almocoSTData, subTabs: restOfSubTabs };
+        let { valor } = calculatePeriodGrandTotal(almocoSTDataWithoutFrigobar as PeriodData);
+        
+        const totalCIValue = getSafeNumericValue(almocoSTData, 'subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
+        valor -= totalCIValue;
+        
+        almocoSTSubTabsTotal = valor;
     }
 
-    return almocoSTTotal;
+    const frigobarSTTotal = getVtotal('almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getVtotal('almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagHotel.vtotal');
+
+    return almocoSTSubTabsTotal + frigobarSTTotal;
   }, [watchedData]);
 
 
@@ -107,7 +97,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno + Frigobar 2º Turno)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>

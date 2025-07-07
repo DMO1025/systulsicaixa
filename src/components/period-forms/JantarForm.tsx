@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
 import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
 import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
+import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -50,37 +51,26 @@ const JantarForm: React.FC<PeriodFormProps> = ({
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
   const watchedData = form.watch();
-  const watchedSubTabs = form.watch(`${periodId}.subTabs`);
-
-  useEffect(() => {
-    if (!watchedSubTabs?.ciEFaturados?.channels) return;
-    const hotelValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosValorHotel.vtotal', 0);
-    const funcionarioValue = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosValorFuncionario.vtotal', 0);
-    const calculatedTotal = hotelValue + funcionarioValue;
-    
-    const currentTotal = getSafeNumericValue(watchedSubTabs, 'ciEFaturados.channels.jntCiEFaturadosTotalFaturado.vtotal');
-    
-    if (calculatedTotal !== currentTotal) {
-      form.setValue(`${periodId}.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalFaturado.vtotal`, calculatedTotal, { shouldDirty: true });
-    }
-  }, [watchedSubTabs, form, periodId]);
 
   const periodTotal = useMemo(() => {
-    let jantarTotal = 0;
+    const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
+
+    let jantarSubTabsTotal = 0;
     const jantarData = watchedData.jantar;
     if (jantarData?.subTabs) {
-        for (const subTabKey in jantarData.subTabs) {
-            const subTab = jantarData.subTabs[subTabKey];
-            if (subTab?.channels) {
-                for (const channelKey in subTab.channels) {
-                    const channel = subTab.channels[channelKey as keyof typeof subTab.channels];
-                    jantarTotal += getSafeNumericValue(channel, 'vtotal', 0);
-                }
-            }
-        }
+        const { frigobar, ...restOfSubTabs } = jantarData.subTabs;
+        const jantarDataWithoutFrigobar = { ...jantarData, subTabs: restOfSubTabs };
+        let { valor } = calculatePeriodGrandTotal(jantarDataWithoutFrigobar as PeriodData);
+        
+        const totalCIValue = getSafeNumericValue(jantarData, 'subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
+        valor -= totalCIValue;
+        
+        jantarSubTabsTotal = valor;
     }
 
-    return jantarTotal;
+    const frigobarJantarTotal = getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
+
+    return jantarSubTabsTotal + frigobarJantarTotal;
   }, [watchedData]);
 
   useEffect(() => {
@@ -106,7 +96,7 @@ const JantarForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Jantar)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Jantar + Frigobar Jantar)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>
