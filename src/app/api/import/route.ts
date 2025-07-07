@@ -2,16 +2,22 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
-import type { PeriodId, DailyLogEntry, PeriodData, EventItemData, SubEventItem, EventLocationKey, EventServiceTypeKey } from '@/lib/types';
+import type { PeriodId, DailyLogEntry, PeriodData, EventItemData, SubEventItem, EventLocationKey, EventServiceTypeKey, EventosPeriodData } from '@/lib/types';
 import { getDailyEntry, saveDailyEntry } from '@/services/dailyEntryService';
 import { SALES_CHANNELS, PERIOD_FORM_CONFIG, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS, PERIOD_DEFINITIONS } from '@/lib/constants';
 import { format, parse, isValid } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
-// Schemas for validation
 const PeriodIdSchema = z.enum(PERIOD_DEFINITIONS.map(p => p.id) as [PeriodId, ...PeriodId[]]);
 
-// Helper to create a reverse map for easier lookup
+type ErrorDetail = {
+    sheetName: string;
+    rowIndex: number;
+    rowData: any[];
+    headers: string[];
+    message: string;
+};
+
 const createReverseMap = (obj: Record<string, string>) => {
     const map = new Map<string, string>();
     for (const [key, value] of Object.entries(obj)) {
@@ -21,15 +27,16 @@ const createReverseMap = (obj: Record<string, string>) => {
 };
 
 const channelLabelToIdMap = createReverseMap(SALES_CHANNELS);
-const locationLabelToKeyMap = createReverseMap(Object.fromEntries(EVENT_LOCATION_OPTIONS.map(opt => [opt.value, opt.label])));
-const serviceLabelToKeyMap = createReverseMap(Object.fromEntries(EVENT_SERVICE_TYPE_OPTIONS.map(opt => [opt.value, opt.label])));
+const locationLabelToKeyMap = new Map(EVENT_LOCATION_OPTIONS.map(opt => [opt.label, opt.value]));
+const serviceLabelToKeyMap = new Map(EVENT_SERVICE_TYPE_OPTIONS.map(opt => [opt.label, opt.value]));
 
 
-async function processSimplePeriod(sheet: XLSX.WorkSheet, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: string[] }> {
+async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
     const data = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+    if (data.length < 2) return { processed: 0, errors: [] };
     const headers = data[0] as string[];
     const rows = data.slice(1);
-    const errors: string[] = [];
+    const errors: ErrorDetail[] = [];
 
     const headerMap = headers.map(header => {
         const match = header.match(/^(.*) \((Qtd|Valor)\)$/);
@@ -46,19 +53,20 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, periodId: PeriodId, ex
         const rowIndex = index + 2;
         const dateValue = row[0];
         
-        // Handle Excel's numeric date format
         let dateObj: Date;
-        if (typeof dateValue === 'number') {
+        if (dateValue instanceof Date) {
+            dateObj = dateValue;
+        } else if (typeof dateValue === 'number') {
             dateObj = XLSX.SSF.parse_date_code(dateValue);
         } else if (typeof dateValue === 'string') {
             dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
         } else {
-            errors.push(`Linha ${rowIndex}: Formato de data inválido ou ausente.`);
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: 'Data ausente ou em formato inválido na primeira coluna. Use AAAA-MM-DD ou formato de data padrão do Excel.' });
             continue;
         }
 
         if (!dateObj || !isValid(dateObj)) {
-            errors.push(`Linha ${rowIndex}: Data inválida: ${row[0]}`);
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Data inválida: "${row[0]}". Use o formato AAAA-MM-DD ou um formato de data padrão do Excel.` });
             continue;
         }
 
@@ -68,15 +76,29 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, periodId: PeriodId, ex
         let periodData = (entry[periodId] || { channels: {} }) as PeriodData;
         if (!periodData.channels) periodData.channels = {};
 
-        headerMap.slice(1).forEach((col, i) => {
-            const cellValue = row[i + 1];
-            if (col.channelId && col.type && cellValue !== undefined && cellValue !== null) {
+        let rowHasError = false;
+        for (let i = 1; i < headers.length; i++) {
+            const col = headerMap[i];
+            const cellValue = row[i];
+            
+            if (col.channelId && col.type && cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '') {
+                const numericValue = Number(String(cellValue).replace(',', '.')); // Handle comma decimal separator
+                if (isNaN(numericValue)) {
+                    errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Valor não numérico "${cellValue}" encontrado na coluna "${col.header}". Use apenas números.` });
+                    rowHasError = true;
+                    break; 
+                }
+
                 if (!periodData.channels![col.channelId]) {
                     periodData.channels![col.channelId] = {};
                 }
-                periodData.channels![col.channelId]![col.type] = Number(cellValue);
+                periodData.channels![col.channelId]![col.type] = numericValue;
             }
-        });
+        }
+
+        if (rowHasError) {
+            continue; 
+        }
         
         entry = { ...entry, [periodId]: periodData };
         existingEntries.set(dateString, entry);
@@ -85,11 +107,11 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, periodId: PeriodId, ex
     return { processed: rows.length, errors };
 }
 
-async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: string[] }> {
-    const errors: string[] = [];
+async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
+    const allErrors: ErrorDetail[] = [];
     let totalProcessed = 0;
     const periodConfig = PERIOD_FORM_CONFIG[periodId];
-    if (!periodConfig || !periodConfig.subTabs) return { processed: 0, errors: ["Configuração de período inválida."]};
+    if (!periodConfig || !periodConfig.subTabs) return { processed: 0, errors: [{ sheetName: 'Geral', rowIndex: 0, rowData: [], headers: [], message: 'Configuração de período inválida.' }]};
 
     const subTabLabelToKeyMap = new Map<string, string>();
     for (const [key, value] of Object.entries(periodConfig.subTabs)) {
@@ -97,14 +119,16 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
     }
 
     for (const sheetName of workbook.SheetNames) {
-        const subTabKey = subTabLabelToKeyMap.get(sheetName.substring(0, 31));
+        const cleanSheetName = sheetName.substring(0, 31);
+        const subTabKey = subTabLabelToKeyMap.get(cleanSheetName);
         if (!subTabKey) {
-            errors.push(`Aba "${sheetName}" não corresponde a nenhuma sub-aba do período.`);
-            continue;
+            continue; 
         }
         
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+        if (data.length < 2) continue;
+
         const headers = data[0] as string[];
         const rows = data.slice(1);
         totalProcessed += rows.length;
@@ -125,17 +149,19 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
             const dateValue = row[0];
             let dateObj: Date;
 
-            if (typeof dateValue === 'number') {
+            if (dateValue instanceof Date) {
+                dateObj = dateValue;
+            } else if (typeof dateValue === 'number') {
                 dateObj = XLSX.SSF.parse_date_code(dateValue);
             } else if (typeof dateValue === 'string') {
                 dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
             } else {
-                errors.push(`Aba ${sheetName}, Linha ${rowIndex}: Formato de data inválido ou ausente.`);
+                allErrors.push({ sheetName: cleanSheetName, rowIndex, rowData: row, headers, message: 'Data ausente ou em formato inválido na primeira coluna. Use AAAA-MM-DD ou formato de data padrão do Excel.' });
                 continue;
             }
 
             if (!dateObj || !isValid(dateObj)) {
-                errors.push(`Aba ${sheetName}, Linha ${rowIndex}: Data inválida: ${row[0]}`);
+                allErrors.push({ sheetName: cleanSheetName, rowIndex, rowData: row, headers, message: `Data inválida: "${row[0]}". Use o formato AAAA-MM-DD ou um formato de data padrão do Excel.` });
                 continue;
             }
             
@@ -147,53 +173,106 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
             if (!periodData.subTabs[subTabKey]) periodData.subTabs[subTabKey] = { channels: {} };
             if (!periodData.subTabs[subTabKey]!.channels) periodData.subTabs[subTabKey]!.channels = {};
 
-            headerMap.slice(1).forEach((col, i) => {
-                const cellValue = row[i + 1];
-                if (col.channelId && col.type && cellValue !== undefined && cellValue !== null) {
+            let rowHasError = false;
+            for (let i = 1; i < headers.length; i++) {
+                const col = headerMap[i];
+                const cellValue = row[i];
+                
+                if (col.channelId && col.type && cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '') {
+                    const numericValue = Number(String(cellValue).replace(',', '.')); // Handle comma decimal separator
+                    if (isNaN(numericValue)) {
+                        allErrors.push({ sheetName: cleanSheetName, rowIndex, rowData: row, headers, message: `Valor não numérico "${cellValue}" encontrado na coluna "${col.header}". Use apenas números.` });
+                        rowHasError = true;
+                        break;
+                    }
                     if (!periodData.subTabs![subTabKey]!.channels![col.channelId]) {
                          periodData.subTabs![subTabKey]!.channels![col.channelId] = {};
                     }
-                    periodData.subTabs![subTabKey]!.channels![col.channelId]![col.type] = Number(cellValue);
+                    periodData.subTabs![subTabKey]!.channels![col.channelId]![col.type] = numericValue;
                 }
-            });
+            }
+
+            if (rowHasError) {
+                continue;
+            }
 
             entry = { ...entry, [periodId]: periodData };
             existingEntries.set(dateString, entry);
         }
     }
-    return { processed: totalProcessed, errors };
+    return { processed: totalProcessed, errors: allErrors };
 }
 
-async function processEventosPeriod(sheet: XLSX.WorkSheet, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: string[] }> {
-    const data = XLSX.utils.sheet_to_json<any>(sheet);
-    const errors: string[] = [];
+async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
+    const data = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+    if (data.length < 2) return { processed: 0, errors: [] };
+    const headers = data[0] as string[];
+    const rows = data.slice(1);
+    const errors: ErrorDetail[] = [];
+    const headerIndexMap = new Map(headers.map((h, i) => [h, i]));
 
-    for (const [index, row] of data.entries()) {
+    for (const [index, row] of rows.entries()) {
         const rowIndex = index + 2;
-        const dateValue = row['Data (AAAA-MM-DD)'];
+        let rowHasError = false;
+        
+        const dateValue = row[headerIndexMap.get('Data (AAAA-MM-DD)')!];
         let dateObj: Date;
 
-        if (typeof dateValue === 'number') {
+        if (dateValue instanceof Date) {
+            dateObj = dateValue;
+        } else if (typeof dateValue === 'number') {
             dateObj = XLSX.SSF.parse_date_code(dateValue);
         } else if (typeof dateValue === 'string') {
             dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
         } else {
-            errors.push(`Linha ${rowIndex}: Formato de data inválido ou ausente.`);
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: 'Data ausente ou em formato inválido. Use AAAA-MM-DD ou formato de data padrão do Excel.' });
             continue;
         }
         
         if (!dateObj || !isValid(dateObj)) {
-            errors.push(`Linha ${rowIndex}: Data inválida: ${row['Data (AAAA-MM-DD)']}`);
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Data inválida: "${dateValue}". Use o formato AAAA-MM-DD ou um formato de data padrão do Excel.` });
             continue;
         }
 
         const dateString = format(dateObj, 'yyyy-MM-dd');
+        
+        const locationValue = row[headerIndexMap.get('Local')!];
+        const locationKey = locationLabelToKeyMap.get(locationValue);
+        if (!locationKey && locationValue) {
+             errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Local "${locationValue}" inválido. Valores válidos são: ${EVENT_LOCATION_OPTIONS.map(o => `'${o.label}'`).join(', ')}.` });
+             rowHasError = true;
+        }
+
+        const serviceValue = row[headerIndexMap.get('Tipo de Serviço')!];
+        const serviceKey = serviceLabelToKeyMap.get(serviceValue);
+         if (!serviceKey && serviceValue) {
+             errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Tipo de Serviço "${serviceValue}" inválido. Valores válidos são: ${EVENT_SERVICE_TYPE_OPTIONS.map(o => `'${o.label}'`).join(', ')}.` });
+             rowHasError = true;
+        }
+
+        const quantityValue = row[headerIndexMap.get('Quantidade')!];
+        const quantityNumber = Number(quantityValue);
+        if (quantityValue && isNaN(quantityNumber)) {
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Valor de Quantidade não é um número: "${quantityValue}".` });
+            rowHasError = true;
+        }
+        
+        const totalValue = row[headerIndexMap.get('Valor Total (R$)')!];
+        const totalValueNumber = Number(String(totalValue).replace(',', '.'));
+        if (totalValue && isNaN(totalValueNumber)) {
+            errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Valor Total não é um número: "${totalValue}".` });
+            rowHasError = true;
+        }
+        
+        if (rowHasError) continue;
+        
+
         let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj) || { id: dateString, date: dateObj } as DailyLogEntry;
         
         let eventosData = (entry.eventos || { items: [], periodObservations: '' }) as EventosPeriodData;
         if (!eventosData.items) eventosData.items = [];
 
-        const eventName = row['Nome do Evento'] || `Evento Sem Nome ${rowIndex}`;
+        const eventName = row[headerIndexMap.get('Nome do Evento')!] || `Evento Sem Nome ${rowIndex}`;
         let eventItem = eventosData.items.find(item => item.eventName === eventName);
         if (!eventItem) {
             eventItem = { id: uuidv4(), eventName, subEvents: [] };
@@ -202,11 +281,11 @@ async function processEventosPeriod(sheet: XLSX.WorkSheet, existingEntries: Map<
         
         const subEvent: SubEventItem = {
             id: uuidv4(),
-            location: locationLabelToKeyMap.get(row['Local']) as EventLocationKey | undefined,
-            serviceType: serviceLabelToKeyMap.get(row['Tipo de Serviço']) as EventServiceTypeKey | undefined,
-            customServiceDescription: row['Descrição (se Outro)'] || '',
-            quantity: Number(row['Quantidade']) || 0,
-            totalValue: Number(row['Valor Total (R$)']) || 0,
+            location: locationKey as EventLocationKey | undefined,
+            serviceType: serviceKey as EventServiceTypeKey | undefined,
+            customServiceDescription: row[headerIndexMap.get('Descrição (se Outro)')!] || '',
+            quantity: quantityNumber || 0,
+            totalValue: totalValueNumber || 0,
         };
         eventItem.subEvents.push(subEvent);
 
@@ -214,7 +293,7 @@ async function processEventosPeriod(sheet: XLSX.WorkSheet, existingEntries: Map<
         existingEntries.set(dateString, entry);
     }
     
-    return { processed: data.length, errors };
+    return { processed: rows.length, errors };
 }
 
 
@@ -236,27 +315,34 @@ export async function POST(request: NextRequest) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
         
-        // Cache for daily entries modified during this import
         const modifiedEntries = new Map<string, DailyLogEntry>();
-        let result: { processed: number, errors: string[] };
+        let result: { processed: number, errors: ErrorDetail[] };
 
         const periodConfig = PERIOD_FORM_CONFIG[periodId];
 
         if (periodId === 'eventos') {
-            result = await processEventosPeriod(workbook.Sheets[workbook.SheetNames[0]], modifiedEntries);
+            const sheetName = workbook.SheetNames[0];
+            result = await processEventosPeriod(workbook.Sheets[sheetName], sheetName, modifiedEntries);
         } else if (periodConfig.subTabs) {
             result = await processComplexPeriod(workbook, periodId, modifiedEntries);
         } else {
-            result = await processSimplePeriod(workbook.Sheets[workbook.SheetNames[0]], periodId, modifiedEntries);
+            const sheetName = workbook.SheetNames[0];
+            result = await processSimplePeriod(workbook.Sheets[sheetName], sheetName, periodId, modifiedEntries);
         }
         
-        // Save all modified entries
-        for (const [dateString, entry] of modifiedEntries.entries()) {
-            try {
-                // The date object inside entry might have been manipulated, so we parse from the key for safety
-                await saveDailyEntry(parse(dateString, 'yyyy-MM-dd', new Date()), entry);
-            } catch (saveError: any) {
-                result.errors.push(`Erro ao salvar lançamento para ${dateString}: ${saveError.message}`);
+        if (result.errors.length === 0) {
+            for (const [dateString, entry] of modifiedEntries.entries()) {
+                try {
+                    await saveDailyEntry(parse(dateString, 'yyyy-MM-dd', new Date()), entry);
+                } catch (saveError: any) {
+                    result.errors.push({ 
+                        sheetName: 'Geral', 
+                        rowIndex: 0, 
+                        rowData: [], 
+                        headers: [],
+                        message: `Erro ao salvar lançamento para ${dateString}: ${saveError.message}`
+                    });
+                }
             }
         }
         

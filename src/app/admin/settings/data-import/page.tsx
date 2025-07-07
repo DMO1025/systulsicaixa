@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,15 +10,23 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileUp, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileUp, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
 import type { PeriodId } from '@/lib/constants';
+
+interface ErrorDetail {
+    sheetName: string;
+    rowIndex: number;
+    rowData: any[];
+    headers: string[];
+    message: string;
+}
 
 interface ImportResult {
     success: boolean;
     message: string;
     processed?: number;
-    errors?: string[];
+    errors?: ErrorDetail[];
 }
 
 export default function DataImportPage() {
@@ -71,6 +80,38 @@ export default function DataImportPage() {
         } finally {
             setIsLoading(false);
         }
+    };
+    
+    const handleDownloadErrorFile = () => {
+        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
+
+        const wb = XLSX.utils.book_new();
+        const errorsBySheet: { [sheetName: string]: ErrorDetail[] } = {};
+
+        // Group errors by sheet name
+        importResult.errors.forEach(err => {
+            if (!errorsBySheet[err.sheetName]) {
+                errorsBySheet[err.sheetName] = [];
+            }
+            errorsBySheet[err.sheetName].push(err);
+        });
+
+        // Create a sheet for each group
+        for (const sheetName in errorsBySheet) {
+            const sheetErrors = errorsBySheet[sheetName];
+            if (sheetErrors.length === 0) continue;
+
+            const headers = [...sheetErrors[0].headers, "Erro"]; // Get headers from first error of the sheet
+            const rows = sheetErrors.map(err => [...(Array.isArray(err.rowData) ? err.rowData : []), err.message]);
+            
+            const dataForSheet = [headers, ...rows];
+            
+            const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
+        
+        const fileName = selectedFile ? `Erros_${selectedFile.name}` : 'Planilha_de_Erros.xlsx';
+        XLSX.writeFile(wb, fileName);
     };
 
   return (
@@ -130,9 +171,13 @@ export default function DataImportPage() {
                          {importResult.errors && importResult.errors.length > 0 && (
                             <div className="mt-2">
                                 <h4 className="font-semibold">Detalhes dos Erros:</h4>
-                                <ul className="list-disc list-inside text-xs">
-                                    {importResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+                                <ul className="list-disc list-inside text-xs max-h-40 overflow-y-auto">
+                                    {importResult.errors.map((err, i) => <li key={i}>{`Aba '${err.sheetName}', Linha ${err.rowIndex}: ${err.message}`}</li>)}
                                 </ul>
+                                <Button variant="outline" size="sm" onClick={handleDownloadErrorFile} className="mt-4">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Baixar Planilha com Erros
+                                </Button>
                             </div>
                         )}
                     </AlertDescription>
