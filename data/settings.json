@@ -1,3 +1,4 @@
+
 {
   "channelUnitPricesConfig": {
     "cdmListaHospedes": 15,
@@ -8,12 +9,12 @@
     "ROOM SERVICE": true,
     "CAFÉ DA MANHÃ": true,
     "BREAKFAST": false,
+    "ALMOÇO": true,
+    "JANTAR": true,
     "RW ITALIANO ALMOÇO": false,
     "RW ITALIANO JANTAR": false,
     "RW INDIANO ALMOÇO": false,
     "RW INDIANO JANTAR": false,
-    "ALMOÇO": true,
-    "JANTAR": true,
     "BALI ALMOÇO": false,
     "BALI HAPPY HOUR": false,
     "FRIGOBAR": true,
@@ -49,7 +50,7 @@
     "rwIndianoJantar": false,
     "frigobar": true,
     "cafeHospedes": true,
-    "almocoCI": false,
+    "almocoCI": true,
     "jantarCI": true,
     "eventosDireto": true,
     "eventosHotel": true
