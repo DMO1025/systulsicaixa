@@ -135,12 +135,12 @@ export async function saveDailyEntryToFile(entryData: DailyLogEntry): Promise<Da
     entries.push({ ...entryToSave, createdAt: new Date().toISOString(), lastModifiedAt: new Date().toISOString() });
   }
   
-  // Sort by date descending before writing
+  // Sort by date ascending before writing
   entries.sort((a, b) => {
     const dateA = a.date instanceof Date ? a.date : parseISO(a.date as string);
     const dateB = b.date instanceof Date ? b.date : parseISO(b.date as string);
     if (!isValid(dateA) || !isValid(dateB)) return 0;
-    return dateB.getTime() - dateA.getTime();
+    return dateA.getTime() - dateB.getTime();
   });
 
   await writeDailyEntriesFile(entries);

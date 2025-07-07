@@ -160,6 +160,7 @@ export default function ReportsPage() {
         { id: 'mesa', label: 'MESA' }, { id: 'hospedes', label: 'HÓSPEDES' }, { id: 'retirada', label: 'RETIRADA' },
         { id: 'ci', label: 'C.I.' }, { id: 'roomService', label: 'ROOM SERVICE' }, { id: 'generic', label: 'DIVERSOS' },
         { id: 'cdmHospedes', label: 'HÓSPEDES (CAFÉ)' }, { id: 'cdmAvulsos', label: 'AVULSOS (CAFÉ)' },
+        { id: 'madrugadaPagDireto', label: 'PAG. DIRETO' }, { id: 'madrugadaValorServico', label: 'VALOR SERVIÇO' },
     ];
     
     const availableCategories = allTabInfo.filter(tab => 
@@ -251,7 +252,7 @@ export default function ReportsPage() {
             PERIOD_DEFINITIONS.forEach(pDef => {
                 const periodData = entry[pDef.id];
                 if (!periodData) return;
-                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData);
+                const { valor: periodTotal } = calculatePeriodGrandTotal(periodData as any);
                 let periodRows: (string|number)[][] = [];
 
                 if (pDef.id === 'eventos') {
@@ -489,7 +490,7 @@ export default function ReportsPage() {
             
             const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
             summaryWs['!cols'] = getColumnWidths(summaryData);
-            XLSX.utils.book_append_sheet(wb, ws, 'Resumo Consolidado');
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumo Consolidado');
 
             tabDefinitions.forEach(tab => {
                 const breakdownData = dailyBreakdowns[tab.id];

@@ -2,19 +2,20 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ArrowRightLeft, Loader2, ArrowLeft } from 'lucide-react'; 
+import { ArrowRightLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react'; 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function MigrationPage() {
   const { userRole, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isMigratingData, setIsMigratingData] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ message: string; log?: string[]; success: boolean } | null>(null);
 
   useEffect(() => {
     if (!authLoading && userRole !== 'administrator') {
@@ -25,23 +26,23 @@ export default function MigrationPage() {
   
   const handleMigrateData = async () => {
     setIsMigratingData(true);
+    setMigrationResult(null);
     try {
       const response = await fetch('/api/db-admin?action=migrate-json-to-mysql', {
         method: 'POST',
       });
       const result = await response.json();
       if (!response.ok) {
-        const defaultMessage = 'Falha ao migrar dados. Verifique a conexão com o banco e se a tabela existe.';
-        let description = result.message || defaultMessage;
-        if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
-            description += ` Detalhes: ${result.errors.join('; ')}`;
-        }
-        toast({ title: "Erro na Migração", description: description, variant: "destructive", duration: 10000 });
+        setMigrationResult({ message: result.message || 'Falha na migração.', log: result.log, success: false });
+        toast({ title: "Erro na Migração", description: result.message, variant: "destructive", duration: 10000 });
       } else {
+        setMigrationResult({ message: result.message, log: result.log, success: true });
         toast({ title: "Migração de Dados", description: result.message, duration: 7000 });
       }
     } catch (error: any) {
-      toast({ title: "Erro na Migração", description: error.message || "Ocorreu um erro inesperado.", variant: "destructive", duration: 10000 });
+      const message = error.message || "Ocorreu um erro inesperado.";
+      setMigrationResult({ message: message, log: [ "Erro de conexão com o servidor:", message], success: false });
+      toast({ title: "Erro na Migração", description: message, variant: "destructive", duration: 10000 });
     } finally {
       setIsMigratingData(false);
     }
@@ -78,6 +79,34 @@ export default function MigrationPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {migrationResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Resultado da Migração</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant={migrationResult.success ? "default" : "destructive"} className={migrationResult.success ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : ""}>
+                {migrationResult.success ? <CheckCircle className="h-4 w-4"/> : <AlertCircle className="h-4 w-4" />}
+                <AlertTitle>{migrationResult.success ? "Sucesso" : "Falha"}</AlertTitle>
+                <AlertDescription>
+                    <p>{migrationResult.message}</p>
+                </AlertDescription>
+            </Alert>
+            
+            {migrationResult.log && migrationResult.log.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold text-sm mb-2">Log de Execução:</h4>
+                <div className="bg-muted p-3 rounded-md text-xs font-mono h-64 overflow-y-auto">
+                  {migrationResult.log.map((line, index) => (
+                    <p key={index} className="whitespace-pre-wrap">{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

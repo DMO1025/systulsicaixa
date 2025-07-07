@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileUp, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { Upload, FileUp, Loader2, CheckCircle2, AlertCircle, Download, Database } from 'lucide-react';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
-import type { PeriodId } from '@/lib/constants';
+import type { PeriodId, DailyLogEntry } from '@/lib/types';
+
 
 interface ErrorDetail {
     sheetName: string;
@@ -22,39 +23,46 @@ interface ErrorDetail {
     message: string;
 }
 
-interface ImportResult {
+interface AnalyzeResult {
     success: boolean;
     message: string;
     processed?: number;
     errors?: ErrorDetail[];
+    data?: Record<string, DailyLogEntry>;
 }
 
 export default function DataImportPage() {
     const { toast } = useToast();
     const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | ''>('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [importResult, setImportResult] = useState<ImportResult | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<AnalyzeResult | null>(null);
+    const [dataToSync, setDataToSync] = useState<Record<string, DailyLogEntry> | null>(null);
+
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             setSelectedFile(event.target.files[0]);
-            setImportResult(null); // Clear previous results
+            setAnalysisResult(null); 
+            setDataToSync(null);
         }
     };
     
-    const handleUpload = async () => {
+    const handleAnalyzeFile = async () => {
         if (!selectedPeriod) {
             toast({ title: "Período não selecionado", description: "Por favor, selecione o período para qual o arquivo se refere.", variant: "destructive" });
             return;
         }
         if (!selectedFile) {
-            toast({ title: "Nenhum arquivo selecionado", description: "Por favor, selecione um arquivo Excel (.xlsx) para importar.", variant: "destructive" });
+            toast({ title: "Nenhum arquivo selecionado", description: "Por favor, selecione um arquivo Excel (.xlsx) para analisar.", variant: "destructive" });
             return;
         }
 
-        setIsLoading(true);
-        setImportResult(null);
+        setIsAnalyzing(true);
+        setAnalysisResult(null);
+        setDataToSync(null);
+
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('periodId', selectedPeriod);
@@ -65,31 +73,65 @@ export default function DataImportPage() {
                 body: formData,
             });
             
-            const resultData: ImportResult = await response.json();
-            setImportResult(resultData);
+            const resultData: AnalyzeResult = await response.json();
+            setAnalysisResult(resultData);
 
             if (!response.ok) {
-                 toast({ title: "Erro na Importação", description: resultData.message, variant: "destructive", duration: 7000 });
+                 toast({ title: "Erro na Análise", description: resultData.message, variant: "destructive", duration: 7000 });
             } else {
-                 toast({ title: "Importação Concluída", description: resultData.message, duration: 7000 });
+                 if (resultData.success && resultData.data) {
+                    setDataToSync(resultData.data);
+                    toast({ title: "Análise Concluída", description: "Dados prontos para sincronização. Verifique a prévia abaixo.", duration: 7000 });
+                 } else {
+                    toast({ title: "Análise Concluída com Erros", description: resultData.message, variant: "destructive", duration: 7000 });
+                 }
             }
         } catch (error) {
             const errorMessage = (error instanceof Error) ? error.message : "Um erro inesperado ocorreu.";
-            setImportResult({ success: false, message: errorMessage });
+            setAnalysisResult({ success: false, message: errorMessage });
             toast({ title: "Erro Inesperado", description: errorMessage, variant: "destructive" });
         } finally {
-            setIsLoading(false);
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleSyncData = async () => {
+        if (!dataToSync) {
+            toast({ title: "Nenhum dado para sincronizar", description: "Analise um arquivo primeiro.", variant: "destructive" });
+            return;
+        }
+
+        setIsSyncing(true);
+        try {
+            const response = await fetch('/api/batch-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entries: dataToSync }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.message || 'Falha ao sincronizar dados.');
+            }
+            toast({ title: "Sucesso!", description: result.message });
+            // Clear data after successful sync
+            setDataToSync(null);
+            setAnalysisResult(null);
+        } catch (error: any) {
+            toast({ title: "Erro na Sincronização", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSyncing(false);
         }
     };
     
     const handleDownloadErrorFile = () => {
-        if (!importResult || !importResult.errors || importResult.errors.length === 0) return;
+        if (!analysisResult || !analysisResult.errors || analysisResult.errors.length === 0) return;
 
         const wb = XLSX.utils.book_new();
         const errorsBySheet: { [sheetName: string]: ErrorDetail[] } = {};
 
         // Group errors by sheet name
-        importResult.errors.forEach(err => {
+        analysisResult.errors.forEach(err => {
             if (!errorsBySheet[err.sheetName]) {
                 errorsBySheet[err.sheetName] = [];
             }
@@ -125,8 +167,8 @@ export default function DataImportPage() {
         <CardHeader>
           <CardTitle>Enviar Arquivo de Lançamentos</CardTitle>
           <CardDescription>
-            Selecione o período, escolha o arquivo Excel (.xlsx) preenchido e clique em 'Enviar Arquivo'.
-            Os dados serão mesclados com os lançamentos existentes.
+            Selecione o período, escolha o arquivo Excel (.xlsx) e clique em 'Analisar Arquivo'.
+            Se a análise for bem-sucedida, você poderá visualizar e sincronizar os dados.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -149,30 +191,29 @@ export default function DataImportPage() {
                     <Input id="file-upload" type="file" accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChange} />
                 </div>
             </div>
-            <Button onClick={handleUpload} disabled={isLoading || !selectedFile || !selectedPeriod} className="mt-4 w-full sm:w-auto">
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                Enviar Arquivo
+            <Button onClick={handleAnalyzeFile} disabled={isAnalyzing || !selectedFile || !selectedPeriod} className="mt-4 w-full sm:w-auto">
+                {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                Analisar Arquivo
             </Button>
         </CardContent>
       </Card>
       
-      {importResult && (
+      {analysisResult && !dataToSync && (
         <Card>
             <CardHeader>
-                <CardTitle>Resultado da Importação</CardTitle>
+                <CardTitle>Resultado da Análise</CardTitle>
             </CardHeader>
             <CardContent>
-                <Alert variant={importResult.success ? "default" : "destructive"} className={importResult.success ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : ""}>
-                    {importResult.success ? <CheckCircle2 className="h-4 w-4"/> : <AlertCircle className="h-4 w-4" />}
-                    <AlertTitle>{importResult.success ? "Sucesso" : "Falha"}</AlertTitle>
+                <Alert variant={analysisResult.success ? "default" : "destructive"} className={analysisResult.success ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : ""}>
+                    {analysisResult.success ? <CheckCircle2 className="h-4 w-4"/> : <AlertCircle className="h-4 w-4" />}
+                    <AlertTitle>{analysisResult.success ? "Sucesso" : "Falha na Análise"}</AlertTitle>
                     <AlertDescription>
-                        <p>{importResult.message}</p>
-                        {typeof importResult.processed === 'number' && <p>Linhas processadas: {importResult.processed}</p>}
-                         {importResult.errors && importResult.errors.length > 0 && (
+                        <p>{analysisResult.message}</p>
+                         {analysisResult.errors && analysisResult.errors.length > 0 && (
                             <div className="mt-2">
                                 <h4 className="font-semibold">Detalhes dos Erros:</h4>
                                 <ul className="list-disc list-inside text-xs max-h-40 overflow-y-auto">
-                                    {importResult.errors.map((err, i) => <li key={i}>{`Aba '${err.sheetName}', Linha ${err.rowIndex}: ${err.message}`}</li>)}
+                                    {analysisResult.errors.map((err, i) => <li key={i}>{`Aba '${err.sheetName}', Linha ${err.rowIndex}: ${err.message}`}</li>)}
                                 </ul>
                                 <Button variant="outline" size="sm" onClick={handleDownloadErrorFile} className="mt-4">
                                     <Download className="mr-2 h-4 w-4" />
@@ -186,6 +227,25 @@ export default function DataImportPage() {
         </Card>
       )}
 
+      {dataToSync && (
+        <Card>
+            <CardHeader>
+                <CardTitle>Dados Prontos para Sincronização</CardTitle>
+                <CardDescription>
+                    A análise foi bem-sucedida. Verifique os dados processados abaixo. Se estiverem corretos, clique em 'Sincronizar'.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="h-72 w-full rounded-md border p-4 font-mono text-xs overflow-auto bg-muted/50">
+                    <pre><code>{JSON.stringify(dataToSync, null, 2)}</code></pre>
+                </div>
+                 <Button onClick={handleSyncData} disabled={isSyncing} className="w-full sm:w-auto">
+                    {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                    Sincronizar com Arquivo Local
+                </Button>
+            </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

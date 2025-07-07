@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDbPool, DATABASE_INIT_SCHEMA, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME } from '@/lib/mysql';
 import { getAllEntriesFromFile, getUsersFromFile, readSettingsFile } from '@/lib/fileDb';
-import type { MysqlConnectionConfig, DailyLogEntry, Settings, User } from '@/lib/types';
+import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/constants';
 import mysql, { type PoolOptions } from 'mysql2/promise';
 import { format, isValid, parseISO } from 'date-fns';
@@ -65,107 +65,131 @@ async function ensureTables(): Promise<NextResponse> {
 }
 
 async function migrateDataToMysql(): Promise<NextResponse> {
+    const log: string[] = [];
     const pool = await getDbPool();
     if (!pool || !(await isMysqlConnected(pool))) {
-      return NextResponse.json({ message: 'MySQL não está conectado. Configure e salve as credenciais do MySQL primeiro.' }, { status: 400 });
+      log.push('ERRO: MySQL não está conectado. Configure e salve as credenciais do MySQL primeiro.');
+      return NextResponse.json({ message: 'MySQL não está conectado.', log }, { status: 400 });
     }
 
-    const results = {
-        settings: { migrated: 0, errors: 0, errorDetails: [] as string[] },
-        users: { migrated: 0, errors: 0, errorDetails: [] as string[] },
-        entries: { migrated: 0, errors: 0, errorDetails: [] as string[] },
-    };
+    const connection = await pool.getConnection();
+    log.push('Conexão com o banco de dados estabelecida.');
 
-    // Migrate Settings
     try {
+        await connection.beginTransaction();
+        log.push('Transação iniciada.');
+
+        const results = {
+            settings: { migrated: 0 },
+            users: { migrated: 0 },
+            entries: { migrated: 0 },
+        };
+
+        // Migrate Settings
+        log.push('--- Iniciando migração de Configurações ---');
         const settings = await readSettingsFile();
         for (const [key, value] of Object.entries(settings)) {
-            const sql = `INSERT INTO ${SETTINGS_TABLE_NAME} (configId, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`;
-            await pool.query(sql, [key, JSON.stringify(value)]);
+            const settingsSql = `INSERT INTO \`${SETTINGS_TABLE_NAME}\` (configId, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`;
+            await connection.query(settingsSql, [key, JSON.stringify(value)]);
             results.settings.migrated++;
+            log.push(`  - Configuração '${key}' salva.`);
         }
-    } catch (error: any) {
-        results.settings.errors++;
-        results.settings.errorDetails.push(`Erro ao migrar configurações: ${error.message}`);
-    }
+        log.push(`> ${results.settings.migrated} configurações migradas com sucesso.`);
 
-    // Migrate Users
-    try {
+        // Migrate Users
+        log.push('--- Iniciando migração de Usuários ---');
         const users = await getUsersFromFile();
         for (const user of users) {
-            const sql = `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), role=VALUES(role), shifts=VALUES(shifts), allowedPages=VALUES(allowedPages)`;
-            await pool.query(sql, [user.id, user.username, user.password, user.role, JSON.stringify(user.shifts || []), JSON.stringify(user.allowedPages || []), user.createdAt || new Date()]);
+            const usersSql = `INSERT INTO \`${USERS_TABLE_NAME}\` (id, username, password, role, shifts, allowedPages, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), role=VALUES(role), shifts=VALUES(shifts), allowedPages=VALUES(allowedPages)`;
+            await connection.query(usersSql, [user.id, user.username, user.password, user.role, JSON.stringify(user.shifts || []), JSON.stringify(user.allowedPages || []), user.createdAt || new Date()]);
             results.users.migrated++;
+            log.push(`  - Usuário '${user.username}' salvo.`);
         }
-    } catch (error: any) {
-        results.users.errors++;
-        results.users.errorDetails.push(`Erro ao migrar usuários: ${error.message}`);
-    }
+        log.push(`> ${results.users.migrated} usuários migrados com sucesso.`);
 
-    // Migrate Daily Entries
-    try {
+        // Migrate Daily Entries
+        log.push('--- Iniciando migração de Lançamentos Diários ---');
         const jsonEntries = await getAllEntriesFromFile();
-        for (const entry of jsonEntries) {
-            try {
-                const entryId = entry.id;
-                let entryDateStr: string;
+        log.push(`Encontrados ${jsonEntries.length} lançamentos no arquivo JSON para processar.`);
 
-                if (entry.date instanceof Date && isValid(entry.date)) {
-                    entryDateStr = format(entry.date, 'yyyy-MM-dd');
-                } else if (typeof entry.date === 'string') {
-                    const parsedDate = parseISO(entry.date);
-                    if (isValid(parsedDate)) {
-                        entryDateStr = format(parsedDate, 'yyyy-MM-dd');
-                    } else { throw new Error(`Formato de data inválido para o ID ${entryId}`); }
-                } else { throw new Error(`Data ausente ou inválida para o ID ${entryId}`); }
-
-                const columns: string[] = ['id', 'date', 'generalObservations'];
-                const values: (string | null)[] = [entryId, entryDateStr, entry.generalObservations || null];
-                const updatePlaceholders: string[] = ['date = VALUES(date)', 'generalObservations = VALUES(generalObservations)'];
-
-                PERIOD_DEFINITIONS.forEach(pDef => {
-                    columns.push(`\`${pDef.id}\``);
-                    const periodValue = entry[pDef.id as keyof DailyLogEntry];
-                    values.push(safeStringify(periodValue));
-                    updatePlaceholders.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
-                });
-
-                const [existingRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT id FROM ${DAILY_ENTRIES_TABLE_NAME} WHERE id = ?`, [entryId]);
-                if (existingRows.length === 0) {
-                    columns.push('createdAt');
-                    let createdAtDate = new Date();
-                    if (entry.createdAt) {
-                        const parsedCreatedAt = entry.createdAt instanceof Date ? entry.createdAt : parseISO(String(entry.createdAt));
-                        if (isValid(parsedCreatedAt)) createdAtDate = parsedCreatedAt;
-                    }
-                    values.push(format(createdAtDate, 'yyyy-MM-dd HH:mm:ss'));
-                }
-                
-                const sql = `INSERT INTO ${DAILY_ENTRIES_TABLE_NAME} (${columns.join(', ')}) VALUES (${values.map(() => '?').join(', ')}) ON DUPLICATE KEY UPDATE ${updatePlaceholders.join(', ')}, lastModifiedAt = VALUES(lastModifiedAt)`;
-                await pool.query(sql, values);
-                results.entries.migrated++;
-            } catch (migrationError: any) {
-                results.entries.errors++;
-                results.entries.errorDetails.push(`ID do Lançamento ${entry.id || 'desconhecido'}: ${migrationError.message}`);
-                console.error(`Erro ao migrar lançamento ${entry.id || 'desconhecido'}:`, migrationError);
+        for (const rawEntry of jsonEntries) {
+            const entry = JSON.parse(JSON.stringify(rawEntry));
+            let oldFrigobarData: PeriodData | undefined;
+            if (entry.frigobar) {
+                if (typeof entry.frigobar === 'string') { try { oldFrigobarData = JSON.parse(entry.frigobar); } catch(e) { /* ignore */ } } 
+                else if (typeof entry.frigobar === 'object') { oldFrigobarData = entry.frigobar; }
             }
+            if (oldFrigobarData?.subTabs) {
+                log.push(`  - [${entry.id}] Dados antigos do Frigobar encontrados e migrados para a nova estrutura.`);
+                if (!entry.almocoPrimeiroTurno) entry.almocoPrimeiroTurno = { subTabs: {} };
+                if (!(entry.almocoPrimeiroTurno as PeriodData).subTabs) (entry.almocoPrimeiroTurno as PeriodData).subTabs = {};
+                if (!entry.almocoSegundoTurno) entry.almocoSegundoTurno = { subTabs: {} };
+                if (!(entry.almocoSegundoTurno as PeriodData).subTabs) (entry.almocoSegundoTurno as PeriodData).subTabs = {};
+                if (!entry.jantar) entry.jantar = { subTabs: {} };
+                if (!(entry.jantar as PeriodData).subTabs) (entry.jantar as PeriodData).subTabs = {};
+                if (oldFrigobarData.subTabs.primeiroTurno) { (entry.almocoPrimeiroTurno as PeriodData).subTabs!.frigobar = oldFrigobarData.subTabs.primeiroTurno; }
+                if (oldFrigobarData.subTabs.segundoTurno) { (entry.almocoSegundoTurno as PeriodData).subTabs!.frigobar = oldFrigobarData.subTabs.segundoTurno; }
+                if ((oldFrigobarData.subTabs as any).jantar) { (entry.jantar as PeriodData).subTabs!.frigobar = (oldFrigobarData.subTabs as any).jantar; }
+                delete entry.frigobar;
+            }
+
+            const entryId = entry.id;
+            let entryDateStr: string;
+            if (entry.date instanceof Date && isValid(entry.date)) { entryDateStr = format(entry.date, 'yyyy-MM-dd'); } 
+            else if (typeof entry.date === 'string') { const parsedDate = parseISO(entry.date); if (isValid(parsedDate)) { entryDateStr = format(parsedDate, 'yyyy-MM-dd'); } else { throw new Error(`Formato de data inválido para o ID ${entryId}`); } } 
+            else { throw new Error(`Data ausente ou inválida para o ID ${entryId}`); }
+
+            const columns: string[] = ['id', 'date', 'generalObservations'];
+            const values: (string | null | Date)[] = [entryId, entryDateStr, entry.generalObservations || null];
+            const updatePlaceholders: string[] = ['`date` = VALUES(`date`)', '`generalObservations` = VALUES(`generalObservations`)'];
+            PERIOD_DEFINITIONS.forEach(pDef => {
+                columns.push(pDef.id);
+                const periodValue = entry[pDef.id as keyof DailyLogEntry];
+                values.push(safeStringify(periodValue));
+                updatePlaceholders.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
+            });
+
+            const [existingRows] = await connection.query<mysql.RowDataPacket[]>(`SELECT id, createdAt FROM \`${DAILY_ENTRIES_TABLE_NAME}\` WHERE id = ?`, [entryId]);
+            if (existingRows.length === 0) {
+                columns.push('createdAt');
+                let createdAtDate = new Date();
+                if (entry.createdAt) { const parsedCreatedAt = entry.createdAt instanceof Date ? entry.createdAt : parseISO(String(entry.createdAt)); if (isValid(parsedCreatedAt)) createdAtDate = parsedCreatedAt; }
+                values.push(createdAtDate); 
+            }
+            const columnsSqlString = columns.map(c => `\`${c}\``).join(', ');
+            const valuePlaceholdersSqlString = values.map(() => '?').join(', ');
+            const onUpdateSqlString = updatePlaceholders.join(', ');
+            const sql = `INSERT INTO \`${DAILY_ENTRIES_TABLE_NAME}\` (${columnsSqlString}) VALUES (${valuePlaceholdersSqlString}) ON DUPLICATE KEY UPDATE ${onUpdateSqlString}`;
+            await connection.query(sql, values);
+            results.entries.migrated++;
         }
+        log.push(`> ${results.entries.migrated} lançamentos diários migrados com sucesso.`);
+        
+        await connection.commit();
+        log.push('--- Transação confirmada (COMMIT) com sucesso! ---');
+
+        revalidateTag('settings');
+        revalidateTag('users');
+        revalidateTag('entries');
+        
+        const successMessage = `Migração completa! Configurações: ${results.settings.migrated}, Usuários: ${results.users.migrated}, Lançamentos: ${results.entries.migrated}.`;
+        log.push(`\n${successMessage}`);
+
+        return NextResponse.json({ message: successMessage, log });
+
     } catch (error: any) {
-        results.entries.errors++;
-        results.entries.errorDetails.push(`Erro geral ao migrar lançamentos: ${error.message}`);
-    }
-
-    const totalErrors = results.settings.errors + results.users.errors + results.entries.errors;
-    if (totalErrors > 0) {
-        revalidateTag('settings'); revalidateTag('users'); revalidateTag('entries');
+        await connection.rollback();
+        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---');
+        log.push(`  - Causa do erro: ${error.message}`);
+        console.error('Erro na migração do banco de dados (transação revertida):', error);
         return NextResponse.json({
-            message: `Migração concluída com ${totalErrors} erro(s). Settings: ${results.settings.migrated}, Users: ${results.users.migrated}, Entries: ${results.entries.migrated}.`,
-            errors: { ...results }
-        }, { status: 207 });
+            message: `Erro na migração: ${error.message}. Todas as alterações foram revertidas.`,
+            log
+        }, { status: 500 });
+    } finally {
+        connection.release();
+        log.push('Conexão com o banco de dados liberada.');
     }
-
-    revalidateTag('settings'); revalidateTag('users'); revalidateTag('entries');
-    return NextResponse.json({ message: `Migração completa bem-sucedida! Settings: ${results.settings.migrated}, Users: ${results.users.migrated}, Entries: ${results.entries.migrated}.` });
 }
 
 export async function POST(request: NextRequest) {

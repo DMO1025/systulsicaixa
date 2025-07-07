@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-    ListChecks, Truck, Utensils, Building, Package, FileCheck2, UtensilsCrossed, HelpCircle
+    ListChecks, Truck, Utensils, Building, Package, FileCheck2, UtensilsCrossed, HelpCircle, DollarSign
 } from "lucide-react";
 
 interface PeriodSpecificReportViewProps {
@@ -39,6 +40,9 @@ const tabDefinitions = [
       cols: [ {key: 'date', label: 'DATA'}, {key: 'listaQtd', label: 'LISTA QTD', isNum: true}, {key: 'listaValor', label: 'LISTA VLR', isCurrency: true}, {key: 'noShowQtd', label: 'NO-SHOW QTD', isNum: true}, {key: 'noShowValor', label: 'NO-SHOW VLR', isCurrency: true}, {key: 'semCheckInQtd', label: 'S/ CHECK-IN QTD', isNum: true}, {key: 'semCheckInValor', label: 'S/ CHECK-IN VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
     { id: 'cdmAvulsos', label: 'AVULSOS (CAFÉ)', IconComp: Utensils,
       cols: [ {key: 'date', label: 'DATA'}, {key: 'assinadoQtd', label: 'ASSINADO QTD', isNum: true}, {key: 'assinadoValor', label: 'ASSINADO VLR', isCurrency: true}, {key: 'diretoQtd', label: 'DIRETO QTD', isNum: true}, {key: 'diretoValor', label: 'DIRETO VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
+    // Unified tab for Madrugada
+    { id: 'madrugadaResumo', label: 'RESUMO MADRUGADA', IconComp: UtensilsCrossed,
+      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtdPedidos', label: 'QTD PEDIDOS', isNum: true}, {key: 'qtdPratos', label: 'QTD PRATOS', isNum: true}, {key: 'pagDireto', label: 'PAG. DIRETO (R$)', isCurrency: true}, {key: 'valorServico', label: 'VALOR SERVIÇO (R$)', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true}] },
 ];
 
 const summaryTableItems = [
@@ -58,13 +62,18 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
     const [activeDetailTab, setActiveDetailTab] = useState<string>('');
 
     const availableTabs = useMemo(() => {
+        if (periodId === 'madrugada') {
+            return tabDefinitions.filter(tab => 
+                tab.id === 'madrugadaResumo' && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+            );
+        }
         if (periodId === 'cafeDaManha') {
             return tabDefinitions.filter(tab => 
                 (tab.id === 'cdmHospedes' || tab.id === 'cdmAvulsos') && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
             );
         }
         return tabDefinitions.filter(tab => 
-            !(tab.id === 'cdmHospedes' || tab.id === 'cdmAvulsos') && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+            !(tab.id.startsWith('cdm')) && !(tab.id.startsWith('madrugada')) && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
         );
     }, [data.dailyBreakdowns, periodId]);
 
@@ -84,9 +93,11 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
         [periodId]
     );
 
-    const ticketMedio = data.subtotalGeralSemCI.qtd > 0 
-        ? data.subtotalGeralSemCI.total / data.subtotalGeralSemCI.qtd
-        : 0;
+    const ticketMedio = (periodId === 'madrugada' && (data.summary.madrugadaResumo?.qtdPedidos ?? 0) > 0)
+        ? ((data.summary.madrugadaResumo?.totalPagDireto ?? 0) + (data.summary.madrugadaResumo?.totalValorServico ?? 0)) / (data.summary.madrugadaResumo?.qtdPedidos ?? 1)
+        : (data.subtotalGeralSemCI.qtd > 0 
+            ? data.subtotalGeralSemCI.total / data.subtotalGeralSemCI.qtd
+            : 0);
 
     return (
         <div className="space-y-6">
@@ -100,7 +111,7 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                         <CardContent>
                             {availableTabs.length > 0 ? (
                                 <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-9 mb-4">
+                                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-4">
                                     {availableTabs.map(tab => (
                                         <TabsTrigger key={tab.id} value={tab.id} className="text-xs px-1"><tab.IconComp className="h-3.5 w-3.5 mr-1 hidden sm:inline"/>{tab.label}</TabsTrigger>
                                     ))}
@@ -109,7 +120,7 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                                         const breakdownData = data.dailyBreakdowns[tab.id] || [];
                                         return (
                                             <TabsContent key={tab.id} value={tab.id}>
-                                                <div className="max-h-[300px] overflow-y-auto">
+                                                <div>
                                                     <Table>
                                                     <TableHeader><TableRow>{tab.cols.map(col => <TableHead key={col.key} className={cn("text-xs", col.isNum || col.isCurrency ? "text-right" : "")}>{col.label}</TableHead>)}</TableRow></TableHeader>
                                                     <TableBody>
@@ -146,15 +157,44 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                         <Table>
                             <TableHeader><TableRow><TableHead className="text-xs">ITEM</TableHead><TableHead className="text-xs text-right">QTD</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
                             <TableBody>
-                            {summaryTableItems.map(sItem => (
-                                (data.summary[sItem.dataKey] && (data.summary[sItem.dataKey].qtd > 0 || data.summary[sItem.dataKey].total > 0 || (sItem.dataKey === 'consumoInterno' && data.summary[sItem.dataKey].reajuste != 0 ))) ?
-                                <TableRow key={sItem.dataKey}>
-                                <TableCell className="font-medium text-xs py-1.5 px-2">{sItem.item}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 px-2">{(data.summary[sItem.dataKey])?.qtd.toLocaleString('pt-BR') ?? '0'}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency((data.summary[sItem.dataKey])?.total ?? 0)}</TableCell>
-                                </TableRow>
-                                : null
-                            ))}
+                            {periodId === 'madrugada' ? (
+                                <>
+                                    <TableRow>
+                                        <TableCell className="font-medium text-xs py-1.5 px-2">PAGAMENTO DIRETO</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.summary.madrugadaResumo?.totalPagDireto || 0)}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium text-xs py-1.5 px-2">VALOR SERVIÇO</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.summary.madrugadaResumo?.totalValorServico || 0)}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium text-xs py-1.5 px-2">QTD PEDIDOS</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">{(data.summary.madrugadaResumo?.qtdPedidos || 0).toLocaleString('pt-BR')}</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium text-xs py-1.5 px-2">QTD PRATOS</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">{(data.summary.madrugadaResumo?.qtdPratos || 0).toLocaleString('pt-BR')}</TableCell>
+                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
+                                    </TableRow>
+                                </>
+                            ) : summaryTableItems.map(sItem => {
+                                const itemData = data.summary[sItem.dataKey];
+                                if (itemData && (itemData.qtd > 0 || itemData.total > 0 || (sItem.dataKey === 'consumoInterno' && (itemData.reajuste ?? 0) !== 0 ))) {
+                                    const isMadrugadaValueItem = periodId === 'madrugada' && (sItem.dataKey === 'madrugadaPagDireto' || sItem.dataKey === 'madrugadaValorServico');
+                                    
+                                    return (
+                                        <TableRow key={sItem.dataKey}>
+                                            <TableCell className="font-medium text-xs py-1.5 px-2">{sItem.item}</TableCell>
+                                            <TableCell className="text-right text-xs py-1.5 px-2">{isMadrugadaValueItem ? '-' : (itemData.qtd.toLocaleString('pt-BR') ?? '0')}</TableCell>
+                                            <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(itemData.total ?? 0)}</TableCell>
+                                        </TableRow>
+                                    );
+                                }
+                                return null;
+                            })}
                             {showCISubtotals ? (
                                 <>
                                     <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL COM CI</TableCell>

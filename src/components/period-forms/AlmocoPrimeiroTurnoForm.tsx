@@ -5,7 +5,6 @@ import React, { useMemo, useEffect } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
@@ -110,19 +109,17 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
       <CardContent className="space-y-6">
         {periodConfig.subTabs ? (
           <Tabs value={activeSubTabs[periodId]} onValueChange={(value) => setActiveSubTabs(prev => ({...prev, [periodId]: value}))} className="w-full">
-            <ScrollArea className="pb-2">
-              <TabsList className="mb-4">
-                {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
-                  const SubIcon = subTabKey === 'frigobar' ? Refrigerator : getSubTabIcon(periodId, subTabKey);
-                  return (
-                    <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
-                      <SubIcon className="h-4 w-4" />
-                      {subTabConfig.label}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </ScrollArea>
+            <TabsList className="mb-4 h-auto flex-wrap justify-start">
+              {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
+                const SubIcon = subTabKey === 'frigobar' ? Refrigerator : getSubTabIcon(periodId, subTabKey);
+                return (
+                  <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
+                    <SubIcon className="h-4 w-4" />
+                    {subTabConfig.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
             {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
               const subTabTotal = calculateSubTabTotal(periodId, subTabKey);
               return (

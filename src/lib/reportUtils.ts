@@ -210,6 +210,10 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     cdmSemCheckInQtd: 0, cdmSemCheckInValor: 0,
     cdmCafeAssinadoQtd: 0, cdmCafeAssinadoValor: 0,
     cdmDiretoCartaoQtd: 0, cdmDiretoCartaoValor: 0,
+    madrugadaPagDiretoValor: 0,
+    madrugadaValorServicoValor: 0,
+    madrugadaQtdPedidos: 0,
+    madrugadaQtdPratos: 0,
   };
 
   const periodEntryData = entry[periodId] as PeriodData | EventosPeriodData | undefined;
@@ -265,8 +269,10 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     });
   } else if (periodId === 'madrugada') {
     const pData = periodEntryData as PeriodData;
-    data.roomServiceQtd += getSafeNumericValue(pData, 'channels.madrugadaRoomServiceQtdPedidos.qtd');
-    data.roomServiceValor += getSafeNumericValue(pData, 'channels.madrugadaRoomServicePagDireto.vtotal') + getSafeNumericValue(pData, 'channels.madrugadaRoomServiceValorServico.vtotal');
+    data.madrugadaPagDiretoValor = getSafeNumericValue(pData, 'channels.madrugadaRoomServicePagDireto.vtotal');
+    data.madrugadaValorServicoValor = getSafeNumericValue(pData, 'channels.madrugadaRoomServiceValorServico.vtotal');
+    data.madrugadaQtdPedidos = getSafeNumericValue(pData, 'channels.madrugadaRoomServiceQtdPedidos.qtd');
+    data.madrugadaQtdPratos = getSafeNumericValue(pData, 'channels.madrugadaRoomServiceQtdPratos.qtd');
   } else if (periodId === 'cafeDaManha') {
     const pData = periodEntryData as PeriodData;
     data.cdmListaHospedesQtd += getSafeNumericValue(pData, 'channels.cdmListaHospedes.qtd');
@@ -393,20 +399,39 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
       
       const dailyResults: Record<string, DailyCategoryDataItem[]> = {
         faturados: [], ifood: [], rappi: [], mesa: [], hospedes: [], retirada: [], ci: [], roomService: [], generic: [],
-        cdmHospedes: [], cdmAvulsos: [],
+        cdmHospedes: [], cdmAvulsos: [], 
+        madrugadaPagDireto: [], madrugadaValorServico: [], madrugadaResumo: [],
       };
-      const summaryAcc: Record<string, { qtd: number; total: number; reajuste?: number }> = {
+      const summaryAcc: Record<string, { qtd: number; total: number; reajuste?: number; qtdPedidos?: number, qtdPratos?: number, totalPagDireto?: number, totalValorServico?: number }> = {
         faturados: { qtd: 0, total: 0 }, ifood: { qtd: 0, total: 0 }, rappi: { qtd: 0, total: 0 },
         mesa: { qtd: 0, total: 0 }, hospedes: { qtd: 0, total: 0 }, retirada: { qtd: 0, total: 0 },
         consumoInterno: { qtd: 0, total: 0, reajuste: 0 }, roomService: { qtd: 0, total: 0 }, generic: {qtd: 0, total: 0},
         cdmHospedes: { qtd: 0, total: 0 }, cdmAvulsos: { qtd: 0, total: 0 },
+        madrugadaResumo: { qtd: 0, total: 0, qtdPedidos: 0, qtdPratos: 0, totalPagDireto: 0, totalValorServico: 0 },
       };
 
       filteredEntries.forEach(entry => {
         const entryDateStr = entry.id ? `${entry.id.substring(8, 10)}/${entry.id.substring(5, 7)}/${entry.id.substring(0, 4)}` : "Inválida";
         const dailyData = extractDetailedCategoryDataForPeriod(entry, selectedPeriod);
         
-        if (selectedPeriod === 'cafeDaManha') {
+        if (selectedPeriod === 'madrugada') {
+            const pagDireto = dailyData.madrugadaPagDiretoValor || 0;
+            const valorServico = dailyData.madrugadaValorServicoValor || 0;
+            const qtdPedidos = dailyData.madrugadaQtdPedidos || 0;
+            const qtdPratos = dailyData.madrugadaQtdPratos || 0;
+
+            if (pagDireto > 0 || valorServico > 0 || qtdPedidos > 0 || qtdPratos > 0) {
+                dailyResults.madrugadaResumo.push({ date: entryDateStr, qtdPedidos, qtdPratos, pagDireto, valorServico, total: pagDireto + valorServico });
+                if (pagDireto > 0) dailyResults.madrugadaPagDireto.push({ date: entryDateStr, valor: pagDireto });
+                if (valorServico > 0) dailyResults.madrugadaValorServico.push({ date: entryDateStr, valor: valorServico });
+            }
+            
+            (summaryAcc.madrugadaResumo.qtdPedidos as number) += qtdPedidos;
+            (summaryAcc.madrugadaResumo.qtdPratos as number) += qtdPratos;
+            (summaryAcc.madrugadaResumo.totalPagDireto as number) += pagDireto;
+            (summaryAcc.madrugadaResumo.totalValorServico as number) += valorServico;
+
+        } else if (selectedPeriod === 'cafeDaManha') {
             const hospedesTotalValor = dailyData.cdmListaHospedesValor + dailyData.cdmNoShowValor + dailyData.cdmSemCheckInValor;
             const hospedesTotalQtd = dailyData.cdmListaHospedesQtd + dailyData.cdmNoShowQtd + dailyData.cdmSemCheckInQtd;
             if (hospedesTotalValor > 0 || hospedesTotalQtd > 0) {
@@ -456,11 +481,16 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
         }
       });
       
-      const subtotalGeralComCI_TOTAL = Object.values(summaryAcc).reduce((sum, cat) => sum + cat.total, 0);
-      const subtotalGeralComCI_QTD = Object.values(summaryAcc).reduce((sum, cat) => sum + cat.qtd, 0);
+      const subtotalGeralComCI_TOTAL = (selectedPeriod === 'madrugada')
+            ? (summaryAcc.madrugadaResumo.totalPagDireto || 0) + (summaryAcc.madrugadaResumo.totalValorServico || 0)
+            : Object.values(summaryAcc).reduce((sum, cat) => sum + cat.total, 0);
+
+      const subtotalGeralComCI_QTD = (selectedPeriod === 'madrugada')
+            ? (summaryAcc.madrugadaResumo.qtdPedidos || 0)
+            : Object.values(summaryAcc).reduce((sum, cat) => sum + cat.qtd, 0);
       
-      const subtotalGeralSemCI_TOTAL = subtotalGeralComCI_TOTAL - summaryAcc.consumoInterno.total;
-      const subtotalGeralSemCI_QTD = subtotalGeralComCI_QTD - summaryAcc.consumoInterno.qtd;
+      const subtotalGeralSemCI_TOTAL = subtotalGeralComCI_TOTAL - (summaryAcc.consumoInterno?.total || 0);
+      const subtotalGeralSemCI_QTD = subtotalGeralComCI_QTD - (summaryAcc.consumoInterno?.qtd || 0);
 
       const data: PeriodReportViewData = {
         dailyBreakdowns: dailyResults,

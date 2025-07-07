@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Legend, Bar as RechartsBar, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, LineChart, XAxis, YAxis, Legend, Line, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { MonthlyEvolutionDataItem } from '@/lib/types';
 
@@ -29,7 +29,7 @@ const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, isL
       <CardContent>
         {data.length > 0 ? (
           <ChartContainer config={chartConfig} className="h-[400px] w-full">
-            <RechartsBarChart data={data} margin={{ top: 5, right: 40, left: 20, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 40, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis 
                 dataKey="month" 
@@ -61,10 +61,10 @@ const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ data, isL
                           />} 
               />
               <Legend />
-              <RechartsBar dataKey="valorSemCI" stackId="a" fill="var(--color-valorSemCI)" name={chartConfig.valorSemCI.label as string} />
-              <RechartsBar dataKey="valorCI" stackId="a" fill="var(--color-valorCI)" name={chartConfig.valorCI.label as string} />
-              <RechartsBar dataKey="reajusteCIValor" stackId="a" fill="var(--color-reajusteCIValor)" radius={[4, 4, 0, 0]} name={chartConfig.reajusteCIValor.label as string} />
-            </RechartsBarChart>
+              <Line type="monotone" dataKey="valorSemCI" stroke="var(--color-valorSemCI)" name={chartConfig.valorSemCI.label as string} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="valorCI" stroke="var(--color-valorCI)" name={chartConfig.valorCI.label as string} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="reajusteCIValor" stroke="var(--color-reajusteCIValor)" name={chartConfig.reajusteCIValor.label as string} strokeWidth={2} dot={false} />
+            </LineChart>
           </ChartContainer>
         ) : (
            <p className="text-muted-foreground text-center py-4">

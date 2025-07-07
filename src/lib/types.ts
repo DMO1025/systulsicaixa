@@ -62,18 +62,18 @@ export interface DailyLogEntry extends Omit<DailyEntryFormData, 'date'> {
   date: Date | string; 
   madrugada?: PeriodData | string;
   cafeDaManha?: PeriodData | string;
+  breakfast?: PeriodData | string;
   almocoPrimeiroTurno?: PeriodData | string;
   almocoSegundoTurno?: PeriodData | string;
+  italianoAlmoco?: PeriodData | string;
+  italianoJantar?: PeriodData | string;
+  indianoAlmoco?: PeriodData | string;
+  indianoJantar?: PeriodData | string;
   jantar?: PeriodData | string;
   baliAlmoco?: PeriodData | string;
   baliHappy?: PeriodData | string;
   eventos?: EventosPeriodData | string;
   frigobar?: PeriodData | string;
-  italianoAlmoco?: PeriodData | string;
-  italianoJantar?: PeriodData | string;
-  indianoAlmoco?: PeriodData | string;
-  indianoJantar?: PeriodData | string;
-  breakfast?: PeriodData | string;
   calculatedTotals?: {
     byPeriod: Partial<Record<import('./constants').PeriodId, number>>;
     byPaymentMethod: PaymentBreakdown;
@@ -188,3 +188,21 @@ export interface GeneralReportViewData {
 export type ReportData = { type: 'period'; data: PeriodReportViewData } | { type: 'general'; data: GeneralReportViewData };
 
 export type { DateRange };
+
+// AI Related Types
+export interface DashboardAnalysisInput {
+  month: string;
+  totalRevenue: number;
+  totalTransactions: number;
+  totalCIRecords: {
+    almoco: { qtd: number; valor: number };
+    jantar: { qtd: number; valor: number };
+    total: { qtd: number; valor: number };
+  };
+  accumulatedItems: { name: string; quantity: string; totalValue: number }[];
+  generalTotals: {
+    withCI: { quantity: number; value: number };
+    withoutCI: { quantity: number; value: number };
+    ciAdjustment: number;
+  };
+}

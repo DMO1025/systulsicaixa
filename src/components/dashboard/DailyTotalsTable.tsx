@@ -18,7 +18,7 @@ const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
         <CardTitle className="text-base font-semibold">TOTAIS DIÁRIOS</CardTitle>
         <ListChecks className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
-      <CardContent className="p-0 max-h-[600px] overflow-y-auto">
+      <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>

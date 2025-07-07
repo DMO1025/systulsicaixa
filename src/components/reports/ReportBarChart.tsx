@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -24,7 +25,7 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
     valorSemCI: item.totalSemCI,
     valorCI: item.totalComCI - item.totalSemCI - item.totalReajusteCI,
     reajusteCIValor: item.totalReajusteCI,
-  })).reverse(); // Reverse to show chronologically
+  }));
 
   return (
     <Card className="mt-6">

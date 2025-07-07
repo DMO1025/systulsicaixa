@@ -69,7 +69,7 @@ async function getEntries(startDateStr?: string, endDateStr?: string): Promise<D
         query += ' WHERE date BETWEEN ? AND ?';
         params.push(startDateStr, endDateStr);
       }
-      query += ' ORDER BY date DESC';
+      query += ' ORDER BY date ASC';
       const [rows] = await pool!.query<mysql.RowDataPacket[]>(query, params);
       return rows.map(row => parseAndProcessEntry(row, 'mysql'));
     } catch (error: any) {

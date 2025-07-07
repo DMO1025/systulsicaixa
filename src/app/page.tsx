@@ -239,12 +239,12 @@ export default function DashboardPage() {
                 const dateA = parseISO(a.id); 
                 const dateB = parseISO(b.id);
                 if (isValid(dateA) && isValid(dateB)) {
-                    return dateB.getTime() - dateA.getTime();
+                    return dateA.getTime() - dateB.getTime();
                 }
             } else if (dateAValid) {
-                return -1; 
+                return 1; 
             } else if (dateBValid) {
-                return 1;  
+                return -1;  
             }
             return 0; 
         });
