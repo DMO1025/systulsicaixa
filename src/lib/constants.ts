@@ -223,7 +223,7 @@ const commonAlmocoJantarStructure = (
           [CH_IDS.CLIENTE_MESA_PIX]: { vtotal: true },
           [CH_IDS.CLIENTE_MESA_TICKET_REFEICAO]: { vtotal: true },
           [CH_IDS.CLIENTE_MESA_RETIRADA_QTD]: { qtd: true },
-          [CH_IDS.CLIENTE_MESA_RETIRada_valor]: { vtotal: true },
+          [CH_IDS.CLIENTE_MESA_RETIRADA_VALOR]: { vtotal: true },
         }
       },
       delivery: {
@@ -425,15 +425,17 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
   { item: "ROOM SERVICE", periodId: "madrugada" },
   { item: "CAFÉ DA MANHÃ", periodId: "cafeDaManha" },
   { item: "BREAKFAST", periodId: "breakfast" },
+  { item: "ALMOÇO", periodId: "almocoPrimeiroTurno" },
+  { item: "ALMOÇO C.I." },
+  { item: "JANTAR", periodId: "jantar" },
+  { item: "JANTAR C.I." },
   { item: "RW ITALIANO ALMOÇO", periodId: "italianoAlmoco" },
   { item: "RW ITALIANO JANTAR", periodId: "italianoJantar" },
   { item: "RW INDIANO ALMOÇO", periodId: "indianoAlmoco" },
   { item: "RW INDIANO JANTAR", periodId: "indianoJantar" },
-  { item: "ALMOÇO", periodId: "almocoPrimeiroTurno" }, // Link will go to first turn, but report aggregates both
-  { item: "JANTAR", periodId: "jantar" },
   { item: "BALI ALMOÇO", periodId: "baliAlmoco" },
   { item: "BALI HAPPY HOUR", periodId: "baliHappy" },
-  { item: "FRIGOBAR" }, // No periodId as it's an aggregate now
+  { item: "FRIGOBAR" },
   { item: "EVENTOS DIRETO", periodId: "eventos" },
   { item: "EVENTOS HOTEL", periodId: "eventos" },
 ] as const;
@@ -451,8 +453,8 @@ export const SUMMARY_CARD_CONFIGURABLE_ITEMS = [
   { id: 'rwIndianoJantar', label: 'RW Indiano Jantar' },
   { id: 'frigobar', label: 'Frigobar' },
   { id: 'cafeHospedes', label: 'Café Hóspedes' },
-  { id: 'almocoCI', label: 'Almoço C.I' },
-  { id: 'jantarCI', label: 'Jantar C.I' },
+  { id: 'almocoCI', label: 'Almoço C.I.' },
+  { id: 'jantarCI', label: 'Jantar C.I.' },
   { id: 'eventosDireto', label: 'Eventos Direto' },
   { id: 'eventosHotel', label: 'Eventos Hotel' },
 ] as const;

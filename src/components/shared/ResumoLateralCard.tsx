@@ -81,16 +81,24 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
 
   const summary = useMemo(() => {
     const config = summaryConfig;
-    // This is now the single source of truth for all calculations.
     const totals = processEntryForTotals(dailyData as DailyLogEntry);
 
-    // This is just for displaying the "Total Fita" subtotal value, based on visibility config.
+    // Add CI adjustment directly to the display value for Almoço and Jantar
+    const almocoDisplay = {
+      qtd: totals.almoco.qtd,
+      valor: totals.almoco.valor + totals.reajusteCI.almoco,
+    };
+    const jantarDisplay = {
+      qtd: totals.jantar.qtd,
+      valor: totals.jantar.valor + totals.reajusteCI.jantar,
+    };
+    
     const totalFitaValor =
       (config.rsMadrugada ? totals.rsMadrugada.valor : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.valor : 0) +
       (config.breakfast ? totals.breakfast.valor : 0) +
-      (config.almoco ? totals.almoco.valor : 0) +
-      (config.jantar ? totals.jantar.valor : 0) +
+      (config.almoco ? almocoDisplay.valor : 0) +
+      (config.jantar ? jantarDisplay.valor : 0) +
       (config.frigobar ? totals.frigobar.valor : 0) +
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.valor : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.valor : 0) +
@@ -101,8 +109,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rsMadrugada ? totals.rsMadrugada.qtdPedidos : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.qtd : 0) +
       (config.breakfast ? totals.breakfast.qtd : 0) +
-      (config.almoco ? totals.almoco.qtd : 0) +
-      (config.jantar ? totals.jantar.qtd : 0) +
+      (config.almoco ? almocoDisplay.qtd : 0) +
+      (config.jantar ? jantarDisplay.qtd : 0) +
       (config.frigobar ? totals.frigobar.qtd : 0) +
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.qtd : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
@@ -118,8 +126,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       rsMadrugada: totals.rsMadrugada,
       cafeAvulsos: totals.cafeAvulsos,
       breakfast: totals.breakfast,
-      almoco: totals.almoco,
-      jantar: totals.jantar,
+      almoco: almocoDisplay, // Use the adjusted value
+      jantar: jantarDisplay, // Use the adjusted value
       italianoAlmoco: totals.italianoAlmoco,
       italianoJantar: totals.italianoJantar,
       indianoAlmoco: totals.indianoAlmoco,
@@ -304,7 +312,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             )}
             {summaryConfig.almocoCI && (
               <TableRow>
-                <TableCell>ALMOÇO C.I</TableCell>
+                <TableCell>ALMOÇO C.I.</TableCell>
                 <TableCell className="text-right">{summary.almocoCI.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
                 <TableCell className="text-right">{formatCurrency(summary.almocoCI.valor)}</TableCell>
@@ -312,7 +320,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
             )}
             {summaryConfig.jantarCI && (
               <TableRow>
-                <TableCell>JANTAR C.I</TableCell>
+                <TableCell>JANTAR C.I.</TableCell>
                 <TableCell className="text-right">{summary.jantarCI.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
                 <TableCell className="text-right">{formatCurrency(summary.jantarCI.valor)}</TableCell>

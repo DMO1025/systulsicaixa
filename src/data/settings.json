@@ -1,3 +1,4 @@
+
 {
   "channelUnitPricesConfig": {
     "cdmListaHospedes": 15,
@@ -8,18 +9,19 @@
     "ROOM SERVICE": true,
     "CAFÉ DA MANHÃ": true,
     "BREAKFAST": false,
+    "ALMOÇO": true,
+    "ALMOÇO C.I.": true,
+    "JANTAR": true,
+    "JANTAR C.I.": true,
     "RW ITALIANO ALMOÇO": false,
     "RW ITALIANO JANTAR": false,
     "RW INDIANO ALMOÇO": false,
     "RW INDIANO JANTAR": false,
-    "ALMOÇO": true,
-    "JANTAR": true,
     "BALI ALMOÇO": false,
     "BALI HAPPY HOUR": false,
     "FRIGOBAR": true,
     "EVENTOS DIRETO": true,
-    "EVENTOS HOTEL": true,
-    "OUTROS": false
+    "EVENTOS HOTEL": true
   },
   "cardVisibilityConfig": {
     "madrugada": true,
@@ -29,11 +31,8 @@
     "jantar": true,
     "baliAlmoco": false,
     "baliHappy": false,
-    "deliverysEventos": false,
     "eventos": true,
     "frigobar": true,
-    "extras": false,
-    "cafeJasmin": false,
     "breakfast": false,
     "italianoAlmoco": false,
     "italianoJantar": false,
@@ -53,10 +52,16 @@
     "rwIndianoJantar": false,
     "frigobar": true,
     "cafeHospedes": true,
-    "almocoCI": false,
+    "almocoCI": true,
     "jantarCI": true,
     "eventosDireto": true,
     "eventosHotel": true
   },
-  "mysqlConnectionConfig": {}
+  "mysqlConnectionConfig": {
+    "host": "186.202.152.74",
+    "port": 3306,
+    "user": "vercel",
+    "password": "Tulsi@123",
+    "database": "vercel"
+  }
 }

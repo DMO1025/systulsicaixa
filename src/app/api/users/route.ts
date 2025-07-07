@@ -1,73 +1,8 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
-import { getUsersFromFile, saveUsersToFile } from '@/lib/fileDb';
-import { getDbPool, isMysqlConnected, USERS_TABLE_NAME } from '@/lib/mysql';
 import type { User } from '@/lib/types';
-import type mysql from 'mysql2/promise';
-import { v4 as uuidv4 } from 'uuid';
+import { getAllUsers, createUser } from '@/lib/data/users';
 import { revalidateTag } from 'next/cache';
-
-
-async function getAllUsers(): Promise<User[]> {
-    const pool = await getDbPool();
-    if (await isMysqlConnected(pool)) {
-        try {
-            const [rows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT * FROM ${USERS_TABLE_NAME}`);
-            // mysql2 with JSON support enabled will automatically parse JSON fields.
-            return rows as User[];
-        } catch (dbError) {
-            console.error('Erro no DB ao buscar usuários:', dbError);
-            throw new Error('Falha ao buscar usuários do banco de dados.');
-        }
-    } else {
-        return await getUsersFromFile();
-    }
-}
-
-async function createUser(userData: Partial<User>): Promise<User> {
-    const pool = await getDbPool();
-    
-    const userToCreate: User = {
-        id: userData.id || uuidv4(),
-        username: userData.username!,
-        password: userData.password!,
-        role: userData.role!,
-        shifts: userData.role === 'administrator' ? [] : (userData.shifts || []),
-        allowedPages: userData.role === 'administrator' ? ['dashboard', 'entry', 'reports'] : (userData.allowedPages || []),
-    };
-
-    if (await isMysqlConnected(pool)) {
-        try {
-            const [existing] = await pool!.query<mysql.RowDataPacket[]>('SELECT id FROM users WHERE username = ?', [userToCreate.username]);
-            if (existing.length > 0) {
-                throw new Error('Nome de usuário já existe.');
-            }
-            
-            const sql = `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages) VALUES (?, ?, ?, ?, ?, ?)`;
-            await pool!.query(sql, [
-                userToCreate.id, userToCreate.username, userToCreate.password, userToCreate.role,
-                JSON.stringify(userToCreate.shifts), JSON.stringify(userToCreate.allowedPages)
-            ]);
-            revalidateTag('users');
-            return userToCreate;
-        } catch(dbError: any) {
-            if (dbError.code === 'ER_DUP_ENTRY') {
-                throw new Error('Nome de usuário já existe.');
-            }
-            throw new Error(dbError.message || 'Falha ao criar usuário no banco de dados.');
-        }
-    } else {
-        // Fallback
-        const allUsers = await getUsersFromFile();
-        if (allUsers.some(u => u.username.toLowerCase() === userToCreate.username.toLowerCase())) {
-            throw new Error('Nome de usuário já existe.');
-        }
-        allUsers.push(userToCreate);
-        await saveUsersToFile(allUsers);
-        revalidateTag('users');
-        return userToCreate;
-    }
-}
 
 export async function GET(request: NextRequest) {
     try {
@@ -92,6 +27,8 @@ export async function POST(request: NextRequest) {
         }
         
         const createdUser = await createUser(newUser);
+        revalidateTag('users');
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userToReturn } = createdUser;
         return NextResponse.json(userToReturn, { status: 201 });

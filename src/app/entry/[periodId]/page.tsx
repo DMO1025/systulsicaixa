@@ -19,14 +19,13 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import { CalendarIcon, Loader2, List as ListIcon, DollarSign } from 'lucide-react';
 import { PERIOD_DEFINITIONS, SALES_CHANNELS, PeriodId, PERIOD_FORM_CONFIG, getPeriodIcon, type PeriodDefinition, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId, EVENT_SERVICE_TYPES, type EventServiceTypeKey, EVENT_LOCATION_OPTIONS, type EventLocationKey } from '@/lib/constants';
 import type { DailyEntryFormData, SalesItem, PeriodData, SubTabData, ChannelUnitPricesConfig, EventosPeriodData, DailyLogEntry, SubEventItem, EventItemData, OperatorShift } from '@/lib/types';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useRouter, useParams as useNextParams } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
-import { getDailyEntry, saveDailyEntry, getAllDailyEntries } from '@/services/dailyEntryService';
+import { getDailyEntry, saveDailyEntry, getAllEntryDates } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -254,10 +253,10 @@ export default function PeriodEntryPage() {
   useEffect(() => {
     async function fetchDatesWithEntries() {
       try {
-        const allEntries = await getAllDailyEntries();
-        const dates = allEntries
+        const allEntryDates = await getAllEntryDates();
+        const dates = allEntryDates
           .map(entry => {
-            const date = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+            const date = parseISO(entry.id);
             return isValid(date) ? date : null;
           })
           .filter((date): date is Date => date !== null);

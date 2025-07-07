@@ -11,6 +11,9 @@ interface DailyTotalsTableProps {
   dailyTotals: ProcessedDailyTotal[];
 }
 
+const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const formatQty = (value: number) => (value || 0).toLocaleString('pt-BR');
+
 const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
   return (
     <Card>
@@ -22,17 +25,17 @@ const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="px-4 py-2 text-xs sticky top-0 bg-card z-10">DATA</TableHead>
-              <TableHead className="px-4 py-2 text-xs text-right sticky top-0 bg-card z-10">QTD TOTAL</TableHead>
-              <TableHead className="px-4 py-2 text-xs text-right sticky top-0 bg-card z-10">VALOR TOTAL</TableHead>
+              <TableHead className="w-[120px] px-4 py-2 text-xs">DATA</TableHead>
+              <TableHead className="px-4 py-2 text-xs text-right">QTD</TableHead>
+              <TableHead className="px-4 py-2 text-xs text-right">VALOR TOTAL</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {dailyTotals.length > 0 ? dailyTotals.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="px-4 py-2 text-xs">{row.date}</TableCell>
-                <TableCell className="text-right px-4 py-2 text-xs">{row.totalQtd.toLocaleString('pt-BR')}</TableCell>
-                <TableCell className="text-right px-4 py-2 text-xs">R$ {row.totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                <TableCell className="font-medium text-sm px-4">{row.date}</TableCell>
+                <TableCell className="text-right px-4">{formatQty(row.totalQtd)}</TableCell>
+                <TableCell className="text-right font-medium px-4">{formatCurrency(row.totalValor)}</TableCell>
               </TableRow>
             )) : (
               <TableRow>

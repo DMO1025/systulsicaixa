@@ -76,7 +76,7 @@ export async function getDailyEntry(date: Date, baseUrl?: string): Promise<Daily
   const finalUrl = `${baseUrl || ''}${API_BASE_URL}/${formattedDate}`;
 
   try {
-    const response = await fetch(finalUrl);
+    const response = await fetch(finalUrl, { cache: 'no-store' });
     if (response.status === 404) {
       return null;
     }
@@ -157,7 +157,7 @@ export async function getAllDailyEntries(startDate?: string, endDate?: string, b
     const queryString = params.toString();
     const url = `${baseUrl || ''}${API_BASE_URL}${queryString ? `?${queryString}` : ''}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       let errorMessage = 'Falha ao buscar todos os lançamentos';
        try {
@@ -172,6 +172,27 @@ export async function getAllDailyEntries(startDate?: string, endDate?: string, b
     return entriesFromApi.map(processEntryFromSource);
   } catch (error) {
     console.error('Erro ao buscar todos os lançamentos:', error);
+    throw error;
+  }
+}
+
+export async function getAllEntryDates(baseUrl?: string): Promise<{ id: string }[]> {
+  try {
+    const url = `${baseUrl || ''}${API_BASE_URL}?fields=id`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+      let errorMessage = 'Falha ao buscar datas dos lançamentos';
+      try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+          errorMessage = response.statusText || `Erro HTTP ${response.status}`;
+      }
+      throw new Error(errorMessage);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Erro ao buscar datas dos lançamentos:', error);
     throw error;
   }
 }

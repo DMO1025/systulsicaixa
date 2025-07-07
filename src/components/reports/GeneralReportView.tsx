@@ -15,10 +15,6 @@ interface GeneralReportViewProps {
 const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number) => (value || 0).toLocaleString('pt-BR');
 
-const formatQtyAndCurrency = (qty: number | undefined, value: number | undefined) => {
-    return `${formatQty(qty || 0)} / ${formatCurrency(value || 0)}`;
-};
-
 const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ data, visiblePeriods }, ref) => {
     const ticketMedio = (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd > 0)
         ? data.summary.grandTotalSemCI / (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)
@@ -67,7 +63,7 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">Tabela de Detalhamento (Qtd / Valor)</CardTitle>
+                    <CardTitle className="text-lg">Tabela de Detalhamento Diário</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                     <Table>
@@ -82,30 +78,52 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                         </TableHeader>
                         <TableBody>
                             {data.dailyBreakdowns.map((row, idx) => (
-                                <TableRow key={idx}>
-                                    <TableCell>{row.date}</TableCell>
-                                    {visiblePeriods.map(p => (
-                                        <TableCell key={p.id} className="text-right">
-                                            {formatQtyAndCurrency(row.periodTotals[p.id]?.qtd, row.periodTotals[p.id]?.valor)}
-                                        </TableCell>
-                                    ))}
-                                    <TableCell className="text-right font-bold">{formatQtyAndCurrency(row.totalQtd, row.totalComCI)}</TableCell>
-                                    <TableCell className="text-right font-bold">- / {formatCurrency(row.totalReajusteCI)}</TableCell>
-                                    <TableCell className="text-right font-bold">{formatQtyAndCurrency(row.totalQtd - row.totalCIQtd, row.totalSemCI)}</TableCell>
-                                </TableRow>
+                                <React.Fragment key={idx}>
+                                    <TableRow className={idx > 0 ? "border-t-2 border-border" : ""}>
+                                        <TableCell rowSpan={2} className="align-middle border-r font-medium text-sm">{row.date}</TableCell>
+                                        {visiblePeriods.map(p => (
+                                            <TableCell key={`${p.id}-qtd`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
+                                                {formatQty(row.periodTotals[p.id]?.qtd)}
+                                            </TableCell>
+                                        ))}
+                                        <TableCell className="text-right font-bold text-xs text-muted-foreground pt-2 pb-0">{formatQty(row.totalQtd)}</TableCell>
+                                        <TableCell className="text-right font-bold text-xs text-muted-foreground pt-2 pb-0">-</TableCell>
+                                        <TableCell className="text-right font-bold text-xs text-muted-foreground pt-2 pb-0">{formatQty(row.totalQtd - row.totalCIQtd)}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        {visiblePeriods.map(p => (
+                                            <TableCell key={`${p.id}-valor`} className="text-right font-medium text-sm pb-2 pt-0">
+                                                {formatCurrency(row.periodTotals[p.id]?.valor)}
+                                            </TableCell>
+                                        ))}
+                                        <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(row.totalComCI)}</TableCell>
+                                        <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(row.totalReajusteCI)}</TableCell>
+                                        <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(row.totalSemCI)}</TableCell>
+                                    </TableRow>
+                                </React.Fragment>
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="bg-muted/50 font-bold">
-                                <TableCell>TOTAL</TableCell>
+                            <TableRow className="bg-muted/50 font-bold border-t-4 border-double border-foreground/50">
+                                <TableCell rowSpan={2} className="align-middle border-r text-base">TOTAL</TableCell>
                                 {visiblePeriods.map(p => (
-                                    <TableCell key={p.id} className="text-right">
-                                        {formatQtyAndCurrency(data.summary.periodTotals[p.id]?.qtd, data.summary.periodTotals[p.id]?.valor)}
+                                    <TableCell key={`${p.id}-qtd-total`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
+                                        {formatQty(data.summary.periodTotals[p.id]?.qtd)}
                                     </TableCell>
                                 ))}
-                                <TableCell className="text-right">{formatQtyAndCurrency(data.summary.grandTotalQtd, data.summary.grandTotalComCI)}</TableCell>
-                                <TableCell className="text-right">- / {formatCurrency(data.summary.grandTotalReajusteCI)}</TableCell>
-                                <TableCell className="text-right">{formatQtyAndCurrency(data.summary.grandTotalQtd - data.summary.grandTotalCIQtd, data.summary.grandTotalSemCI)}</TableCell>
+                                <TableCell className="text-right text-xs font-bold text-muted-foreground pt-2 pb-0">{formatQty(data.summary.grandTotalQtd)}</TableCell>
+                                <TableCell className="text-right text-xs font-bold text-muted-foreground pt-2 pb-0">-</TableCell>
+                                <TableCell className="text-right text-xs font-bold text-muted-foreground pt-2 pb-0">{formatQty(data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)}</TableCell>
+                            </TableRow>
+                            <TableRow className="bg-muted/50 font-bold">
+                                {visiblePeriods.map(p => (
+                                    <TableCell key={`${p.id}-valor-total`} className="text-right font-semibold text-sm pb-2 pt-0">
+                                        {formatCurrency(data.summary.periodTotals[p.id]?.valor)}
+                                    </TableCell>
+                                ))}
+                                <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(data.summary.grandTotalComCI)}</TableCell>
+                                <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(data.summary.grandTotalReajusteCI)}</TableCell>
+                                <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(data.summary.grandTotalSemCI)}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>

@@ -126,22 +126,19 @@ export default function DashboardPage() {
       setAnalysis('');
 
       try {
-        const endDate = endOfMonth(selectedMonth);
-        const startDate = startOfMonth(subMonths(selectedMonth, 2));
-
-        const entriesForPeriod = await getAllDailyEntries(
-            format(startDate, 'yyyy-MM-dd'),
-            format(endDate, 'yyyy-MM-dd')
-        );
-
+        const allEntries = await getAllDailyEntries(undefined, undefined, window.location.origin);
         const visibilityConfig = await getSetting('dashboardItemVisibilityConfig');
         
         const targetYear = selectedMonth.getFullYear();
         const targetMonth = selectedMonth.getMonth();
 
-        const entriesForMonth = entriesForPeriod.filter(entry => {
+        const entriesForMonth = allEntries.filter(entry => {
             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-            return isValid(entryDate) && entryDate.getFullYear() === targetYear && entryDate.getMonth() === targetMonth;
+            if (!isValid(entryDate)) return false;
+            // The date from the database is parsed as UTC midnight. We must use UTC methods to get its date parts to avoid timezone-related off-by-one errors for the month.
+            const entryYearUTC = entryDate.getUTCFullYear();
+            const entryMonthUTC = entryDate.getUTCMonth();
+            return entryYearUTC === targetYear && entryMonthUTC === targetMonth;
         });
 
         setHasDataForMonth(entriesForMonth.length > 0);
@@ -166,6 +163,8 @@ export default function DashboardPage() {
           indianoJantar: { qtd: 0, valor: 0 },
           almoco: { qtd: 0, valor: 0 },
           jantar: { qtd: 0, valor: 0 },
+          almocoCI: { qtd: 0, valor: 0 },
+          jantarCI: { qtd: 0, valor: 0 },
           baliAlmoco: { qtd: 0, valor: 0 },
           baliHappy: { qtd: 0, valor: 0 },
           frigobar: { qtd: 0, valor: 0 },
@@ -200,6 +199,10 @@ export default function DashboardPage() {
           accAcumulativo.almoco.valor += entryTotals.almoco.valor;
           accAcumulativo.jantar.qtd += entryTotals.jantar.qtd;
           accAcumulativo.jantar.valor += entryTotals.jantar.valor;
+          accAcumulativo.almocoCI.qtd += entryTotals.almocoCI.qtd;
+          accAcumulativo.almocoCI.valor += entryTotals.almocoCI.valor;
+          accAcumulativo.jantarCI.qtd += entryTotals.jantarCI.qtd;
+          accAcumulativo.jantarCI.valor += entryTotals.jantarCI.valor;
           accAcumulativo.italianoAlmoco.qtd += entryTotals.italianoAlmoco.qtd;
           accAcumulativo.italianoAlmoco.valor += entryTotals.italianoAlmoco.valor;
           accAcumulativo.italianoJantar.qtd += entryTotals.italianoJantar.qtd;
@@ -265,8 +268,14 @@ export default function DashboardPage() {
                 monthLabel, valorComCI: 0, qtdComCI: 0, valorCI: 0, qtdCI: 0, reajusteCIValor: 0,
             };
         }
+        
+        const threeMonthsAgo = startOfMonth(subMonths(selectedMonth, 2));
+        const entriesForChart = allEntries.filter(entry => {
+             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+             return isValid(entryDate) && entryDate >= threeMonthsAgo && entryDate <= endOfMonth(selectedMonth);
+        });
 
-        entriesForPeriod.forEach(entry => {
+        entriesForChart.forEach(entry => {
           const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
           if (isValid(entryDateObj)) {
               const entryMonthKey = format(entryDateObj, "yyyy-MM");
@@ -318,6 +327,8 @@ export default function DashboardPage() {
                 case "BREAKFAST": return { ...item, qtdDisplay: accAcumulativo.breakfast.qtd.toString(), valorTotal: accAcumulativo.breakfast.valor };
                 case "ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.almoco.qtd.toString(), valorTotal: accAcumulativo.almoco.valor };
                 case "JANTAR": return { ...item, qtdDisplay: accAcumulativo.jantar.qtd.toString(), valorTotal: accAcumulativo.jantar.valor };
+                case "ALMOÇO C.I.": return { ...item, qtdDisplay: accAcumulativo.almocoCI.qtd.toString(), valorTotal: accAcumulativo.almocoCI.valor };
+                case "JANTAR C.I.": return { ...item, qtdDisplay: accAcumulativo.jantarCI.qtd.toString(), valorTotal: accAcumulativo.jantarCI.valor };
                 case "RW ITALIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.italianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.italianoAlmoco.valor };
                 case "RW ITALIANO JANTAR": return { ...item, qtdDisplay: accAcumulativo.italianoJantar.qtd.toString(), valorTotal: accAcumulativo.italianoJantar.valor };
                 case "RW INDIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.indianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.indianoAlmoco.valor };
@@ -469,6 +480,7 @@ export default function DashboardPage() {
         <SummaryCards 
             totalRevenue={dashboardData.overallTotalRevenue} 
             totalTransactions={dashboardData.overallTotalTransactions}
+            netTransactions={dashboardData.totalGeralSemCI.qtd}
             ticketMedio={ticketMedio}
         />
         <Card>
