@@ -67,15 +67,16 @@ function processEntryFromSource(entry: any): DailyLogEntry {
   return processedEntry as DailyLogEntry;
 }
 
-export async function getDailyEntry(date: Date): Promise<DailyLogEntry | null> {
+export async function getDailyEntry(date: Date, baseUrl?: string): Promise<DailyLogEntry | null> {
   if (!(date instanceof Date) || !isValid(date)) {
     console.error('Serviço getDailyEntry chamado com data inválida:', date);
     throw new Error('Tentativa de buscar lançamento com data inválida.');
   }
   const formattedDate = format(date, 'yyyy-MM-dd');
+  const finalUrl = `${baseUrl || ''}${API_BASE_URL}/${formattedDate}`;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/${formattedDate}`);
+    const response = await fetch(finalUrl);
     if (response.status === 404) {
       return null;
     }
@@ -97,12 +98,13 @@ export async function getDailyEntry(date: Date): Promise<DailyLogEntry | null> {
   }
 }
 
-export async function saveDailyEntry(date: Date, data: DailyEntryFormData): Promise<DailyLogEntry> {
+export async function saveDailyEntry(date: Date, data: DailyEntryFormData, baseUrl?: string): Promise<DailyLogEntry> {
   if (!(date instanceof Date) || !isValid(date)) {
     console.error('Serviço saveDailyEntry chamado com data inválida:', date);
     throw new Error('Tentativa de salvar lançamento com data inválida.');
   }
   const formattedDate = format(date, 'yyyy-MM-dd');
+  const finalUrl = `${baseUrl || ''}${API_BASE_URL}/${formattedDate}`;
   
   const payloadForApi = { ...data } as any;
   if (payloadForApi.date instanceof Date && isValid(payloadForApi.date)) {
@@ -118,7 +120,7 @@ export async function saveDailyEntry(date: Date, data: DailyEntryFormData): Prom
   });
 
   try {
-    const response = await fetch(`${API_BASE_URL}/${formattedDate}`, {
+    const response = await fetch(finalUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -146,14 +148,14 @@ export async function saveDailyEntry(date: Date, data: DailyEntryFormData): Prom
   }
 }
 
-export async function getAllDailyEntries(startDate?: string, endDate?: string): Promise<DailyLogEntry[]> {
+export async function getAllDailyEntries(startDate?: string, endDate?: string, baseUrl?: string): Promise<DailyLogEntry[]> {
   try {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
     const queryString = params.toString();
-    const url = queryString ? `${API_BASE_URL}?${queryString}` : API_BASE_URL;
+    const url = `${baseUrl || ''}${API_BASE_URL}${queryString ? `?${queryString}` : ''}`;
 
     const response = await fetch(url);
     if (!response.ok) {

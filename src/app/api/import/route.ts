@@ -31,7 +31,7 @@ const locationLabelToKeyMap = new Map(EVENT_LOCATION_OPTIONS.map(opt => [opt.lab
 const serviceLabelToKeyMap = new Map(EVENT_SERVICE_TYPE_OPTIONS.map(opt => [opt.label, opt.value]));
 
 
-async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
+async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>, baseUrl: string): Promise<{ processed: number, errors: ErrorDetail[] }> {
     const data = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
     if (data.length < 2) return { processed: 0, errors: [] };
     const headers = data[0] as string[];
@@ -57,7 +57,8 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, per
         if (dateValue instanceof Date) {
             dateObj = dateValue;
         } else if (typeof dateValue === 'number') {
-            dateObj = XLSX.SSF.parse_date_code(dateValue);
+            const excelDate = new Date(1899, 11, 30 + dateValue);
+            dateObj = excelDate;
         } else if (typeof dateValue === 'string') {
             dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
         } else {
@@ -71,7 +72,7 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, per
         }
 
         const dateString = format(dateObj, 'yyyy-MM-dd');
-        let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj) || { id: dateString, date: dateObj } as DailyLogEntry;
+        let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj, baseUrl) || { id: dateString, date: dateObj } as DailyLogEntry;
         
         let periodData = (entry[periodId] || { channels: {} }) as PeriodData;
         if (!periodData.channels) periodData.channels = {};
@@ -107,7 +108,7 @@ async function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, per
     return { processed: rows.length, errors };
 }
 
-async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
+async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, existingEntries: Map<string, DailyLogEntry>, baseUrl: string): Promise<{ processed: number, errors: ErrorDetail[] }> {
     const allErrors: ErrorDetail[] = [];
     let totalProcessed = 0;
     const periodConfig = PERIOD_FORM_CONFIG[periodId];
@@ -115,7 +116,7 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
 
     const subTabLabelToKeyMap = new Map<string, string>();
     for (const [key, value] of Object.entries(periodConfig.subTabs)) {
-        subTabLabelToKeyMap.set(value.label, key);
+        subTabLabelToKeyMap.set(value.label.substring(0, 31), key);
     }
 
     for (const sheetName of workbook.SheetNames) {
@@ -152,7 +153,8 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
             if (dateValue instanceof Date) {
                 dateObj = dateValue;
             } else if (typeof dateValue === 'number') {
-                dateObj = XLSX.SSF.parse_date_code(dateValue);
+                const excelDate = new Date(1899, 11, 30 + dateValue);
+                dateObj = excelDate;
             } else if (typeof dateValue === 'string') {
                 dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
             } else {
@@ -166,7 +168,7 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
             }
             
             const dateString = format(dateObj, 'yyyy-MM-dd');
-            let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj) || { id: dateString, date: dateObj } as DailyLogEntry;
+            let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj, baseUrl) || { id: dateString, date: dateObj } as DailyLogEntry;
             
             let periodData = (entry[periodId] || { subTabs: {} }) as PeriodData;
             if (!periodData.subTabs) periodData.subTabs = {};
@@ -203,7 +205,7 @@ async function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId,
     return { processed: totalProcessed, errors: allErrors };
 }
 
-async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, existingEntries: Map<string, DailyLogEntry>): Promise<{ processed: number, errors: ErrorDetail[] }> {
+async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, existingEntries: Map<string, DailyLogEntry>, baseUrl: string): Promise<{ processed: number, errors: ErrorDetail[] }> {
     const data = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
     if (data.length < 2) return { processed: 0, errors: [] };
     const headers = data[0] as string[];
@@ -221,7 +223,8 @@ async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, ex
         if (dateValue instanceof Date) {
             dateObj = dateValue;
         } else if (typeof dateValue === 'number') {
-            dateObj = XLSX.SSF.parse_date_code(dateValue);
+            const excelDate = new Date(1899, 11, 30 + dateValue);
+            dateObj = excelDate;
         } else if (typeof dateValue === 'string') {
             dateObj = parse(dateValue, 'yyyy-MM-dd', new Date());
         } else {
@@ -267,7 +270,7 @@ async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, ex
         if (rowHasError) continue;
         
 
-        let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj) || { id: dateString, date: dateObj } as DailyLogEntry;
+        let entry = existingEntries.get(dateString) || await getDailyEntry(dateObj, baseUrl) || { id: dateString, date: dateObj } as DailyLogEntry;
         
         let eventosData = (entry.eventos || { items: [], periodObservations: '' }) as EventosPeriodData;
         if (!eventosData.items) eventosData.items = [];
@@ -299,6 +302,7 @@ async function processEventosPeriod(sheet: XLSX.WorkSheet, sheetName: string, ex
 
 export async function POST(request: NextRequest) {
     try {
+        const baseUrl = new URL(request.url).origin;
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const periodIdValue = formData.get('periodId') as string | null;
@@ -322,18 +326,18 @@ export async function POST(request: NextRequest) {
 
         if (periodId === 'eventos') {
             const sheetName = workbook.SheetNames[0];
-            result = await processEventosPeriod(workbook.Sheets[sheetName], sheetName, modifiedEntries);
+            result = await processEventosPeriod(workbook.Sheets[sheetName], sheetName, modifiedEntries, baseUrl);
         } else if (periodConfig.subTabs) {
-            result = await processComplexPeriod(workbook, periodId, modifiedEntries);
+            result = await processComplexPeriod(workbook, periodId, modifiedEntries, baseUrl);
         } else {
             const sheetName = workbook.SheetNames[0];
-            result = await processSimplePeriod(workbook.Sheets[sheetName], sheetName, periodId, modifiedEntries);
+            result = await processSimplePeriod(workbook.Sheets[sheetName], sheetName, periodId, modifiedEntries, baseUrl);
         }
         
         if (result.errors.length === 0) {
             for (const [dateString, entry] of modifiedEntries.entries()) {
                 try {
-                    await saveDailyEntry(parse(dateString, 'yyyy-MM-dd', new Date()), entry);
+                    await saveDailyEntry(parse(dateString, 'yyyy-MM-dd', new Date()), entry, baseUrl);
                 } catch (saveError: any) {
                     result.errors.push({ 
                         sheetName: 'Geral', 
