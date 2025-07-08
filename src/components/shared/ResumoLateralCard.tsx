@@ -41,21 +41,23 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
   const handleCopy = async () => {
     if (!cardRef.current) return;
     setIsCopying(true);
+
+    const captureHeader = cardRef.current.querySelector('.capture-header') as HTMLElement | null;
+    const interactiveHeader = cardRef.current.querySelector('.interactive-header') as HTMLElement | null;
+
     try {
-      // Temporarily make hidden header visible for capture
-      const headerElement = cardRef.current.querySelector('.capture-header') as HTMLElement;
-      if (headerElement) headerElement.style.display = 'block';
+      // Prepare for capture: show the clean header, hide the interactive one
+      if (captureHeader) captureHeader.style.display = 'block';
+      if (interactiveHeader) interactiveHeader.style.display = 'none';
 
       const blob = await toBlob(cardRef.current, {
         backgroundColor: 'hsl(var(--card))',
         pixelRatio: 2,
         style: {
-            boxShadow: 'none', // Remove shadow from capture
+            boxShadow: 'none',
         }
       });
       
-      if (headerElement) headerElement.style.display = 'none'; // Hide it again
-
       if (!blob) {
         throw new Error('Falha ao gerar a imagem.');
       }
@@ -74,6 +76,9 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
         variant: "destructive",
       });
     } finally {
+        // Revert changes after capture
+        if (captureHeader) captureHeader.style.display = 'none';
+        if (interactiveHeader) interactiveHeader.style.display = 'flex';
         setIsCopying(false);
     }
   };
@@ -186,7 +191,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
         <CardTitle className="text-lg font-semibold">SysTulsi Caixa</CardTitle>
         <CardDescription>{displayDate}</CardDescription>
       </div>
-      <CardHeader className="text-center">
+      <CardHeader className="text-center interactive-header">
         <CardTitle className="text-lg font-semibold">SysTulsi Caixa</CardTitle>
         <CardDescription>{displayDate}</CardDescription>
         <div className="pt-2">

@@ -148,22 +148,6 @@ const EventosForm: React.FC<PeriodFormProps> = ({
             </CardContent>
           </Card>
         ))}
-
-        {periodConfig.observations && (
-          <FormField
-            control={form.control}
-            name="eventos.periodObservations"
-            render={({ field }) => (
-              <FormItem className="mt-6 pt-4 border-t">
-                <FormLabel className="text-base">Observações Gerais do Período de Eventos</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Notas gerais sobre todos os eventos do dia..." {...field} value={field.value ?? ''} onFocus={(e) => e.target.select()} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
       </CardContent>
     </Card>
   );

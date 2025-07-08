@@ -16,15 +16,17 @@ type ValidConfigId = z.infer<typeof validConfigIds>;
 
 
 export async function GET(request: NextRequest, { params }: { params: { configId: string } }) {
-  const parsedConfigId = validConfigIds.safeParse(params.configId);
+  const { configId } = params;
+  const parsedConfigId = validConfigIds.safeParse(configId);
 
   if (!parsedConfigId.success) {
-    return NextResponse.json({ message: `ConfigId inválido: ${params.configId}.` }, { status: 400 });
+    return NextResponse.json({ message: `ConfigId inválido: ${configId}.` }, { status: 400 });
   }
-  const configId = parsedConfigId.data as ValidConfigId;
+  
+  const validatedConfigId = parsedConfigId.data as ValidConfigId;
 
   try {
-    const configValue = await getSetting(configId);
+    const configValue = await getSetting(validatedConfigId);
     if (configValue === null || configValue === undefined) {
       return NextResponse.json({ config: {} });
     }
@@ -35,12 +37,14 @@ export async function GET(request: NextRequest, { params }: { params: { configId
 }
 
 export async function POST(request: NextRequest, { params }: { params: { configId: string } }) {
-  const parsedConfigId = validConfigIds.safeParse(params.configId);
+  const { configId } = params;
+  const parsedConfigId = validConfigIds.safeParse(configId);
 
   if (!parsedConfigId.success) {
-    return NextResponse.json({ message: `ConfigId inválido: ${params.configId}.` }, { status: 400 });
+    return NextResponse.json({ message: `ConfigId inválido: ${configId}.` }, { status: 400 });
   }
-  const configId = parsedConfigId.data as ValidConfigId;
+  
+  const validatedConfigId = parsedConfigId.data as ValidConfigId;
 
   let requestBody;
   try {
@@ -56,14 +60,14 @@ export async function POST(request: NextRequest, { params }: { params: { configI
   const configValue = requestBody.config as Settings[ValidConfigId];
 
   try {
-    await saveSetting(configId, configValue);
+    await saveSetting(validatedConfigId, configValue);
     
     revalidateTag('settings');
-    revalidateTag(`setting-${configId}`);
+    revalidateTag(`setting-${validatedConfigId}`);
 
-    return NextResponse.json({ message: `Configuração ${configId} salva com sucesso.` });
+    return NextResponse.json({ message: `Configuração ${validatedConfigId} salva com sucesso.` });
   } catch (error: any) {
-    console.error(`API POST Setting Erro para ${configId}:`, error);
-    return NextResponse.json({ message: `Erro ao salvar configuração ${configId}.`, details: error.message }, { status: 500 });
+    console.error(`API POST Setting Erro para ${validatedConfigId}:`, error);
+    return NextResponse.json({ message: `Erro ao salvar configuração ${validatedConfigId}.`, details: error.message }, { status: 500 });
   }
 }

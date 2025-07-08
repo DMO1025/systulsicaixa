@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -11,7 +10,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input'; 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, parseISO, isValid } from 'date-fns';
@@ -98,7 +96,7 @@ const dailyEntryFormFields = PERIOD_DEFINITIONS.reduce((acc, periodDef) => {
     acc[periodDef.id] = eventosPeriodSchema.optional();
   } else {
     const config = PERIOD_FORM_CONFIG[periodDef.id];
-    let specificPeriodSchema = z.object({...basePeriodDataFields});
+    let specificPeriodSchema = z.object({ ...basePeriodDataFields });
 
     if (config.subTabs) {
       specificPeriodSchema = specificPeriodSchema.merge(subTabsContainerSchema);
@@ -482,125 +480,147 @@ export default function PeriodEntryPage() {
   ) => {
     return (
       <div className="border rounded-md overflow-hidden">
-        <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between font-semibold text-sm text-muted-foreground bg-muted/50 px-3 py-2 border-b">
-          <span className="w-full xs:w-3/5 mb-1 xs:mb-0">OPERAÇÃO</span>
-          <span className="w-full xs:w-2/5 text-left xs:text-right">QTD / R$ TOTAL</span>
+        <div className="flex items-center justify-between font-semibold text-sm text-muted-foreground bg-muted/50 px-3 py-2 border-b">
+          <span className="w-[50%] pr-2">OPERAÇÃO</span>
+          <div className="flex w-[50%]">
+            <span className="w-1/2 text-right pr-2">QTD</span>
+            <span className="w-1/2 text-right pr-2">R$ TOTAL</span>
+          </div>
         </div>
         <div className="divide-y divide-border">
           {Object.entries(channelsConfig).map(([channelId, channelCfg]) => {
              if (channelCfg.text) { 
                 return null; 
              }
-            const isPureQtyField = channelCfg.qtd && !channelCfg.vtotal;
-            const isPureVtotalField = channelCfg.vtotal && !channelCfg.qtd;
-            const isBothQtyAndVtotal = channelCfg.qtd && channelCfg.vtotal;
-
-            const CurrentIcon = isPureQtyField || isBothQtyAndVtotal ? ListIcon : null;
-            const VTotalIcon = isPureVtotalField || isBothQtyAndVtotal ? DollarSign : null;
             
             const unitPriceForChannel = currentUnitPrices[channelId as SalesChannelId];
             const isVtotalDisabledByUnitPrice = typeof unitPriceForChannel === 'number' && !isNaN(unitPriceForChannel);
 
             return (
-              <div key={channelId} className="flex flex-col xs:flex-row items-start xs:items-center justify-between px-3 py-3 hover:bg-muted/20 transition-colors">
-                <span className="w-full xs:w-3/5 font-medium text-sm mb-2 xs:mb-0">
-                  {SALES_CHANNELS[channelId as SalesChannelId]}
-                </span>
-                <div className="w-full xs:w-2/5 flex items-center justify-end space-x-2">
-                  <div className={cn("flex-grow flex gap-2", isBothQtyAndVtotal ? "sm:max-w-[200px]" : "sm:max-w-[120px]")}>
-                    {channelCfg.qtd && (
-                      <FormField
-                        control={currentForm.control}
-                        name={`${basePath}.${channelId}.qtd` as any}
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormControl>
-                              <div className="relative">
-                                {CurrentIcon && <CurrentIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />}
-                                <Input 
-                                  type="number" 
-                                  placeholder="0" 
-                                  {...field} 
-                                  value={field.value ?? ''}
-                                  onFocus={(e) => e.target.select()}
-                                  onChange={e => {
-                                    const rawValue = e.target.value;
-                                    const newQty = rawValue === '' ? undefined : parseFloat(rawValue);
-                                    field.onChange(newQty);
+              <div key={channelId} className="flex items-center justify-between px-3 py-3 hover:bg-muted/20 transition-colors min-h-[60px]">
+                <div className="w-[50%] pr-2">
+                  {(() => {
+                    const labelText = SALES_CHANNELS[channelId as SalesChannelId] || '';
+                    const parentheticalMatch = labelText.match(/^(.*?)\s*\((.*)\)\s*$/);
 
-                                    if (isVtotalDisabledByUnitPrice) {
-                                      const calculatedVtotal = (Number(newQty) || 0) * unitPriceForChannel;
-                                      currentForm.setValue(`${basePath}.${channelId}.vtotal` as any, calculatedVtotal, { shouldValidate: true, shouldDirty: true });
-                                    }
-                                  }} 
-                                  className="h-8 text-sm text-right w-full pl-7" 
-                                  />
-                              </div>
-                            </FormControl>
-                            <FormMessage className="text-xs mt-1 text-right" />
-                          </FormItem>
+                    if (parentheticalMatch) {
+                      const mainText = parentheticalMatch[1].trim();
+                      const subText = parentheticalMatch[2].trim();
+                      return (
+                        <>
+                          <span className="text-base font-bold">{mainText}</span>
+                          <span className="block text-xs italic text-muted-foreground mt-0.5">
+                            ({subText})
+                          </span>
+                        </>
+                      );
+                    }
+                    return (
+                      <span className="text-base font-bold">{labelText}</span>
+                    );
+                  })()}
+                </div>
+                <div className="flex w-[50%] items-start gap-2">
+                    <div className="w-1/2">
+                        {channelCfg.qtd && (
+                        <FormField
+                            control={currentForm.control}
+                            name={`${basePath}.${channelId}.qtd` as any}
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                <div className="relative">
+                                    <ListIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    {...field} 
+                                    value={field.value ?? ''}
+                                    onFocus={(e) => e.target.select()}
+                                    onChange={e => {
+                                        const rawValue = e.target.value;
+                                        const newQty = rawValue === '' ? undefined : parseFloat(rawValue);
+                                        field.onChange(newQty);
+
+                                        if (isVtotalDisabledByUnitPrice) {
+                                        const calculatedVtotal = (Number(newQty) || 0) * unitPriceForChannel;
+                                        currentForm.setValue(`${basePath}.${channelId}.vtotal` as any, calculatedVtotal, { shouldValidate: true, shouldDirty: true });
+                                        }
+                                    }} 
+                                    className="h-8 text-sm text-right w-full pl-7" 
+                                    />
+                                </div>
+                                </FormControl>
+                                <FormMessage className="text-xs mt-1 text-right" />
+                            </FormItem>
+                            )}
+                        />
                         )}
-                      />
-                    )}
-                    {channelCfg.vtotal && (
-                      <FormField
-                          control={currentForm.control}
-                          name={`${basePath}.${channelId}.vtotal` as any}
-                          render={({ field }) => {
-                              const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                                  const rawValue = e.target.value;
-                                  const digitsOnly = rawValue.replace(/\D/g, '');
-                                  if (digitsOnly === '') {
-                                      field.onChange(undefined);
-                                  } else {
-                                      const numberValue = parseInt(digitsOnly, 10);
-                                      field.onChange(numberValue / 100);
-                                  }
-                              };
+                    </div>
+                     <div className="w-1/2">
+                        {channelCfg.vtotal && (
+                        <FormField
+                            control={currentForm.control}
+                            name={`${basePath}.${channelId}.vtotal` as any}
+                            render={({ field }) => {
+                                const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                    const rawValue = e.target.value;
+                                    const digitsOnly = rawValue.replace(/\D/g, '');
+                                    if (digitsOnly === '') {
+                                        field.onChange(undefined);
+                                    } else {
+                                        const numberValue = parseInt(digitsOnly, 10);
+                                        field.onChange(numberValue / 100);
+                                    }
+                                };
 
-                              const formatCurrencyForDisplay = (val: number | undefined) => {
-                                  if (val === undefined || val === null) return '';
-                                  return val.toLocaleString('pt-BR', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                  });
-                              };
+                                const formatCurrencyForDisplay = (val: number | undefined) => {
+                                    if (val === undefined || val === null) return '';
+                                    return val.toLocaleString('pt-BR', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    });
+                                };
 
-                              return (
-                                <FormItem className="flex-1">
-                                    <FormControl>
-                                      <div className="relative">
-                                        {VTotalIcon && <VTotalIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />}
-                                        <Input
-                                          type="text"
-                                          placeholder="0,00"
-                                          value={formatCurrencyForDisplay(field.value)}
-                                          onChange={handleCurrencyChange}
-                                          onFocus={(e) => e.target.select()}
-                                          className="h-8 text-sm text-right w-full pl-7"
-                                          disabled={isVtotalDisabledByUnitPrice}
-                                        />
-                                      </div>
-                                    </FormControl>
-                                  <FormMessage className="text-xs mt-1 text-right" />
-                                </FormItem>
-                              )
-                          }}
-                      />
-                    )}
-                  </div>
+                                return (
+                                    <FormItem>
+                                        <FormControl>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                            type="text"
+                                            placeholder="0,00"
+                                            value={formatCurrencyForDisplay(field.value)}
+                                            onChange={handleCurrencyChange}
+                                            onFocus={(e) => e.target.select()}
+                                            className="h-8 text-sm text-right w-full pl-7"
+                                            disabled={isVtotalDisabledByUnitPrice}
+                                            />
+                                        </div>
+                                        </FormControl>
+                                    <FormMessage className="text-xs mt-1 text-right" />
+                                    </FormItem>
+                                )
+                            }}
+                        />
+                        )}
+                     </div>
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between px-3 py-3 bg-muted/50 border-t">
-          <span className="w-full xs:w-3/5 font-semibold text-sm text-foreground mb-1 xs:mb-0">
+        <div className="flex items-center justify-between px-3 py-3 bg-muted/50 border-t">
+          <span className="w-[50%] font-semibold text-sm text-foreground pr-2">
             TOTAL ACUMULADO
           </span>
-          <div className="w-full xs:w-2/5 flex items-center justify-start xs:justify-end space-x-1 font-semibold text-sm text-foreground">
-            <span className="text-muted-foreground">R$</span>
-            <span>{totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          <div className="flex w-[50%]">
+              <div className="w-1/2"></div>
+              <div className="w-1/2 text-right pr-2">
+                <span className="font-semibold text-sm text-foreground">
+                    R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
           </div>
         </div>
       </div>
@@ -642,8 +662,15 @@ export default function PeriodEntryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Lançamento Diário: {activePeriodDefinition.label}</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Lançamento Diário: {activePeriodDefinition.label}</h1>
+          {userRole === 'operator' ? (
+              <p className="text-lg text-muted-foreground pt-2">{watchedDate && isValid(watchedDate) ? format(watchedDate, "PPP", { locale: ptBR }) : 'Carregando data...'}</p>
+          ) : (
+            <div className="h-2"></div>
+          )}
+        </div>
         <Button variant="outline" onClick={() => router.push('/entry')}>Voltar para Seleção</Button>
       </div>
 
@@ -651,79 +678,62 @@ export default function PeriodEntryPage() {
         <div className="lg:w-1/2 space-y-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informações Gerais</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Data do Lançamento</FormLabel>
-                        {userRole === 'administrator' ? (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full max-w-xs sm:max-w-[240px] pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value && isValid(field.value) ? format(field.value, "PPP", {locale: ptBR}) : <span>Escolha uma data</span>}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value instanceof Date && isValid(field.value) ? field.value : undefined}
-                                onSelect={(newDate) => {
-                                  if (newDate && isValid(newDate)) {
-                                      field.onChange(newDate);
-                                  }
-                                }}
-                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                initialFocus
-                                locale={ptBR}
-                                modifiers={modifiers}
-                                modifiersClassNames={modifiersClassNames}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <p className="text-base font-medium pt-2">
-                            {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : format(new Date(), "PPP", { locale: ptBR })}
-                          </p>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="generalObservations"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Observações Gerais do Dia</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Notas sobre o dia, eventos especiais, etc." 
-                            {...field} 
-                            value={field.value ?? ''}
-                            onFocus={(e) => e.target.select()}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
+              {userRole === 'administrator' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Data do Lançamento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          {userRole === 'administrator' ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full max-w-xs sm:max-w-[240px] pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value && isValid(field.value) ? format(field.value, "PPP", {locale: ptBR}) : <span>Escolha uma data</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value instanceof Date && isValid(field.value) ? field.value : undefined}
+                                  onSelect={(newDate) => {
+                                    if (newDate && isValid(newDate)) {
+                                        field.onChange(newDate);
+                                    }
+                                  }}
+                                  disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                  initialFocus
+                                  locale={ptBR}
+                                  modifiers={modifiers}
+                                  modifiersClassNames={modifiersClassNames}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            <p className="text-base font-medium pt-2">
+                              {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : format(new Date(), "PPP", { locale: ptBR })}
+                            </p>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              )}
 
               {isDataLoading ? (
                  <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin" /> Carregando dados do período...</div>
@@ -754,3 +764,5 @@ export default function PeriodEntryPage() {
     </div>
   );
 }
+
+    

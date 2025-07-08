@@ -142,22 +142,6 @@ const JantarForm: React.FC<PeriodFormProps> = ({
         ) : (
           <p className="text-sm text-muted-foreground">Configuração de sub-abas ausente.</p>
         )}
-
-        {periodConfig.observations && (
-          <FormField
-            control={form.control}
-            name={`${periodId}.periodObservations`}
-            render={({ field }) => (
-              <FormItem className="mt-6">
-                <FormLabel>Observações do Período ({periodDefinition.label})</FormLabel>
-                <FormControl>
-                  <Textarea placeholder={`Notas específicas para ${periodDefinition.label.toLowerCase()}...`} {...field} value={field.value ?? ''} onFocus={(e) => e.target.select()} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
       </CardContent>
     </Card>
   );
