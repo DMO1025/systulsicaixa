@@ -148,11 +148,12 @@ export async function saveDailyEntry(date: Date, data: DailyEntryFormData, baseU
   }
 }
 
-export async function getAllDailyEntries(startDate?: string, endDate?: string, baseUrl?: string): Promise<DailyLogEntry[]> {
+export async function getAllDailyEntries(startDate?: string, endDate?: string, baseUrl?: string, fields?: string): Promise<Partial<DailyLogEntry>[]> {
   try {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+    if (fields) params.append('fields', fields);
 
     const queryString = params.toString();
     const url = `${baseUrl || ''}${API_BASE_URL}${queryString ? `?${queryString}` : ''}`;
@@ -169,6 +170,9 @@ export async function getAllDailyEntries(startDate?: string, endDate?: string, b
       throw new Error(errorMessage);
     }
     const entriesFromApi: any[] = await response.json();
+    if (fields === 'id') {
+      return entriesFromApi;
+    }
     return entriesFromApi.map(processEntryFromSource);
   } catch (error) {
     console.error('Erro ao buscar todos os lançamentos:', error);

@@ -449,6 +449,8 @@ export const SUMMARY_CARD_CONFIGURABLE_ITEMS = [
   { id: 'rwItalianoJantar', label: 'RW Italiano Jantar' },
   { id: 'rwIndianoAlmoco', label: 'RW Indiano Almoço' },
   { id: 'rwIndianoJantar', label: 'RW Indiano Jantar' },
+  { id: 'baliAlmoco', label: 'Bali Almoço' },
+  { id: 'baliHappy', label: 'Bali Happy Hour' },
   { id: 'frigobar', label: 'Frigobar' },
   { id: 'cafeHospedes', label: 'Café Hóspedes' },
   { id: 'almocoCI', label: 'Almoço C.I.' },

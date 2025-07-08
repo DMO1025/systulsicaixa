@@ -22,8 +22,8 @@ interface UICardConfig { // Renamed from CardConfig to avoid conflict
 }
 
 const operatorShiftCardsConfig: Record<OperatorShift, string[]> = {
-  first: ["madrugada", "cafeDaManha", "almocoPrimeiroTurno", "frigobar"], 
-  second: ["almocoSegundoTurno", "jantar", "frigobar"], 
+  first: ["madrugada", "cafeDaManha", "almocoPrimeiroTurno", "eventos"], 
+  second: ["almocoSegundoTurno", "jantar", "eventos"], 
 };
 
 export default function DailyEntrySelectorPage() {

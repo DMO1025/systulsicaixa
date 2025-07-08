@@ -103,7 +103,9 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.valor : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.valor : 0) +
       (config.rwIndianoAlmoco ? totals.indianoAlmoco.valor : 0) +
-      (config.rwIndianoJantar ? totals.indianoJantar.valor : 0);
+      (config.rwIndianoJantar ? totals.indianoJantar.valor : 0) +
+      (config.baliAlmoco ? totals.baliAlmoco.valor : 0) +
+      (config.baliHappy ? totals.baliHappy.valor : 0);
     
     const totalFitaQtd =
       (config.rsMadrugada ? totals.rsMadrugada.qtdPedidos : 0) +
@@ -115,7 +117,9 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.qtd : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
       (config.rwIndianoAlmoco ? totals.indianoAlmoco.qtd : 0) +
-      (config.rwIndianoJantar ? totals.indianoJantar.qtd : 0);
+      (config.rwIndianoJantar ? totals.indianoJantar.qtd : 0) +
+      (config.baliAlmoco ? totals.baliAlmoco.qtd : 0) +
+      (config.baliHappy ? totals.baliHappy.qtd : 0);
 
     const totalFitaItens = config.rsMadrugada ? totals.rsMadrugada.qtdPratos : 0;
 
@@ -132,6 +136,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       italianoJantar: totals.italianoJantar,
       indianoAlmoco: totals.indianoAlmoco,
       indianoJantar: totals.indianoJantar,
+      baliAlmoco: totals.baliAlmoco,
+      baliHappy: totals.baliHappy,
       frigobar: totals.frigobar,
 
       // Total Fita subtotal for display
@@ -282,6 +288,22 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
                 <TableCell className="text-right">{summary.indianoJantar.qtd || '0'}</TableCell>
                 <TableCell className="text-right">&nbsp;</TableCell>
                 <TableCell className="text-right">{formatCurrency(summary.indianoJantar.valor)}</TableCell>
+              </TableRow>
+            )}
+            {summaryConfig.baliAlmoco && (
+              <TableRow>
+                <TableCell>BALI ALMOÇO</TableCell>
+                <TableCell className="text-right">{summary.baliAlmoco.qtd || '0'}</TableCell>
+                <TableCell className="text-right">&nbsp;</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.baliAlmoco.valor)}</TableCell>
+              </TableRow>
+            )}
+            {summaryConfig.baliHappy && (
+              <TableRow>
+                <TableCell>BALI HAPPY HOUR</TableCell>
+                <TableCell className="text-right">{summary.baliHappy.qtd || '0'}</TableCell>
+                <TableCell className="text-right">&nbsp;</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.baliHappy.valor)}</TableCell>
               </TableRow>
             )}
             {summaryConfig.frigobar && (

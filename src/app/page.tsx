@@ -115,6 +115,12 @@ export default function DashboardPage() {
       overallTotalTransactions: 0,
       totalGeralSemCI: { qtd: 0, valor: 0 },
       totalConsumoInternoGeral: { qtd: 0, valor: 0 },
+      totalRSValor: 0,
+      totalRSQtd: 0,
+      totalAlmocoValor: 0,
+      totalAlmocoQtd: 0,
+      totalJantarValor: 0,
+      totalJantarQtd: 0,
     };
   }, []);
 
@@ -126,13 +132,24 @@ export default function DashboardPage() {
       setAnalysis('');
 
       try {
-        const allEntries = await getAllDailyEntries(undefined, undefined, window.location.origin);
+        // --- PERFORMANCE OPTIMIZATION ---
+        // Fetch only the last 3 months of data relative to the selected month,
+        // which is what's needed for the evolution chart and the current month's tables.
+        const endDateForFetch = endOfMonth(selectedMonth);
+        const startDateForFetch = startOfMonth(subMonths(selectedMonth, 2));
+
+        const entriesInRange = await getAllDailyEntries(
+            format(startDateForFetch, 'yyyy-MM-dd'),
+            format(endDateForFetch, 'yyyy-MM-dd'),
+            window.location.origin
+        ) as DailyLogEntry[];
+        
         const visibilityConfig = await getSetting('dashboardItemVisibilityConfig');
         
         const targetYear = selectedMonth.getFullYear();
         const targetMonth = selectedMonth.getMonth();
 
-        const entriesForMonth = allEntries.filter(entry => {
+        const entriesForMonth = entriesInRange.filter(entry => {
             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
             if (!isValid(entryDate)) return false;
             // The date from the database is parsed as UTC midnight. We must use UTC methods to get its date parts to avoid timezone-related off-by-one errors for the month.
@@ -163,8 +180,6 @@ export default function DashboardPage() {
           indianoJantar: { qtd: 0, valor: 0 },
           almoco: { qtd: 0, valor: 0 },
           jantar: { qtd: 0, valor: 0 },
-          almocoCI: { qtd: 0, valor: 0 },
-          jantarCI: { qtd: 0, valor: 0 },
           baliAlmoco: { qtd: 0, valor: 0 },
           baliHappy: { qtd: 0, valor: 0 },
           frigobar: { qtd: 0, valor: 0 },
@@ -186,7 +201,7 @@ export default function DashboardPage() {
           monthTotalCIAlmoco.valor += entryTotals.almocoCI.valor;
           monthTotalCIJantar.qtd += entryTotals.jantarCI.qtd;
           monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
-
+          
           // Accumulate for monthly table
           accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtdPedidos || 0;
           accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
@@ -199,10 +214,6 @@ export default function DashboardPage() {
           accAcumulativo.almoco.valor += entryTotals.almoco.valor;
           accAcumulativo.jantar.qtd += entryTotals.jantar.qtd;
           accAcumulativo.jantar.valor += entryTotals.jantar.valor;
-          accAcumulativo.almocoCI.qtd += entryTotals.almocoCI.qtd;
-          accAcumulativo.almocoCI.valor += entryTotals.almocoCI.valor;
-          accAcumulativo.jantarCI.qtd += entryTotals.jantarCI.qtd;
-          accAcumulativo.jantarCI.valor += entryTotals.jantarCI.valor;
           accAcumulativo.italianoAlmoco.qtd += entryTotals.italianoAlmoco.qtd;
           accAcumulativo.italianoAlmoco.valor += entryTotals.italianoAlmoco.valor;
           accAcumulativo.italianoJantar.qtd += entryTotals.italianoJantar.qtd;
@@ -260,36 +271,36 @@ export default function DashboardPage() {
             reajusteCIValor: number;
         }> = {};
 
+        // 1. Initialize buckets for the last 3 months based on selected local month
         for (let i = 0; i < 3; i++) { 
-            const targetMonthStartDate = startOfMonth(subMonths(selectedMonth, i)); 
-            const monthKey = format(targetMonthStartDate, "yyyy-MM");
-            const monthLabel = format(targetMonthStartDate, "MMM/yy", { locale: ptBR });
+            const targetMonthDate = subMonths(selectedMonth, i);
+            const monthKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthLabel = format(targetMonthDate, "MMM/yy", { locale: ptBR });
             monthlyAggregates[monthKey] = {
                 monthLabel, valorComCI: 0, qtdComCI: 0, valorCI: 0, qtdCI: 0, reajusteCIValor: 0,
             };
         }
         
-        const threeMonthsAgo = startOfMonth(subMonths(selectedMonth, 2));
-        const entriesForChart = allEntries.filter(entry => {
-             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-             return isValid(entryDate) && entryDate >= threeMonthsAgo && entryDate <= endOfMonth(selectedMonth);
-        });
-
-        entriesForChart.forEach(entry => {
-          const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-          if (isValid(entryDateObj)) {
-              const entryMonthKey = format(entryDateObj, "yyyy-MM");
-              if (monthlyAggregates[entryMonthKey]) {
-                  const entryTotals = processEntryForTotals(entry);
-                  monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
-                  monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
-                  monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
-                  monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
-                  monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.reajusteCI.total;
-              }
-          }
+        // 2. Accumulate totals by iterating through the fetched range of entries
+        entriesInRange.forEach(entry => {
+            const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+            if (isValid(entryDateObj)) {
+                const entryYearUTC = entryDateObj.getUTCFullYear();
+                const entryMonthUTC = entryDateObj.getUTCMonth();
+                const entryMonthKey = `${entryYearUTC}-${String(entryMonthUTC + 1).padStart(2, '0')}`;
+        
+                if (monthlyAggregates[entryMonthKey]) {
+                    const entryTotals = processEntryForTotals(entry);
+                    monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
+                    monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
+                    monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
+                    monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
+                    monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.reajusteCI.total;
+                }
+            }
         });
         
+        // 3. Sort and map data for the chart
         const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
             const dateA = parseISO(keyA + "-01");
             const dateB = parseISO(keyB + "-01");
@@ -310,7 +321,9 @@ export default function DashboardPage() {
         });
           
         const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
-        const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.map(config => ({
+        const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.filter(
+            item => item.item !== 'ALMOÇO C.I.' && item.item !== 'JANTAR C.I.'
+        ).map(config => ({
             item: config.item,
             qtdDisplay: config.item === 'ROOM SERVICE' ? '0 / 0' : '0',
             valorTotal: 0,
@@ -327,8 +340,6 @@ export default function DashboardPage() {
                 case "BREAKFAST": return { ...item, qtdDisplay: accAcumulativo.breakfast.qtd.toString(), valorTotal: accAcumulativo.breakfast.valor };
                 case "ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.almoco.qtd.toString(), valorTotal: accAcumulativo.almoco.valor };
                 case "JANTAR": return { ...item, qtdDisplay: accAcumulativo.jantar.qtd.toString(), valorTotal: accAcumulativo.jantar.valor };
-                case "ALMOÇO C.I.": return { ...item, qtdDisplay: accAcumulativo.almocoCI.qtd.toString(), valorTotal: accAcumulativo.almocoCI.valor };
-                case "JANTAR C.I.": return { ...item, qtdDisplay: accAcumulativo.jantarCI.qtd.toString(), valorTotal: accAcumulativo.jantarCI.valor };
                 case "RW ITALIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.italianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.italianoAlmoco.valor };
                 case "RW ITALIANO JANTAR": return { ...item, qtdDisplay: accAcumulativo.italianoJantar.qtd.toString(), valorTotal: accAcumulativo.italianoJantar.valor };
                 case "RW INDIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.indianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.indianoAlmoco.valor };
@@ -349,7 +360,7 @@ export default function DashboardPage() {
         setDashboardData({
           dailyTotals: processedTotals,
           acumulativoMensalData: finalVisibleData,
-          monthlyEvolutionData: finalMonthlyEvolutionData.reverse(),
+          monthlyEvolutionData: finalMonthlyEvolutionData,
           totalCIAlmoco: monthTotalCIAlmoco,
           totalCIJantar: monthTotalCIJantar,
           totalConsumoInternoGeral: { qtd: monthGrandTotalCIQtd, valor: monthGrandTotalCIValor },
@@ -357,6 +368,12 @@ export default function DashboardPage() {
           overallTotalRevenue: monthGrandTotalValor,
           overallTotalTransactions: monthGrandTotalQtd,
           totalReajusteCI: monthGrandTotalReajusteCI,
+          totalRSValor: accAcumulativo.roomService.valor,
+          totalRSQtd: accAcumulativo.roomService.pedidosQtd,
+          totalAlmocoValor: accAcumulativo.almoco.valor,
+          totalAlmocoQtd: accAcumulativo.almoco.qtd,
+          totalJantarValor: accAcumulativo.jantar.valor,
+          totalJantarQtd: accAcumulativo.jantar.qtd,
         });
 
       } catch (error: any) {
@@ -367,10 +384,6 @@ export default function DashboardPage() {
     }
     fetchDataAndProcess();
   }, [selectedMonth]);
-
-  const ticketMedio = useMemo(() => {
-    return dashboardData.totalGeralSemCI.qtd > 0 ? dashboardData.totalGeralSemCI.valor / dashboardData.totalGeralSemCI.qtd : 0;
-  }, [dashboardData.totalGeralSemCI]);
 
   const handleGenerateAnalysis = async () => {
     setIsAnalyzing(true);
@@ -477,11 +490,17 @@ export default function DashboardPage() {
 
     return (
       <>
-        <SummaryCards 
-            totalRevenue={dashboardData.overallTotalRevenue} 
-            totalTransactions={dashboardData.overallTotalTransactions}
-            netTransactions={dashboardData.totalGeralSemCI.qtd}
-            ticketMedio={ticketMedio}
+        <SummaryCards
+            totalComCI_Qtd={dashboardData.overallTotalTransactions}
+            totalComCI_Valor={dashboardData.overallTotalRevenue}
+            totalSemCI_Qtd={dashboardData.totalGeralSemCI.qtd}
+            totalSemCI_Valor={dashboardData.totalGeralSemCI.valor}
+            totalRSValor={dashboardData.totalRSValor}
+            totalRSQtd={dashboardData.totalRSQtd}
+            totalAlmocoValor={dashboardData.totalAlmocoValor}
+            totalAlmocoQtd={dashboardData.totalAlmocoQtd}
+            totalJantarValor={dashboardData.totalJantarValor}
+            totalJantarQtd={dashboardData.totalJantarQtd}
         />
         <Card>
           <CardHeader>

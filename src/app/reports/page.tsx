@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, parseISO, isValid, startOfMonth } from 'date-fns';
+import { format, parseISO, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -34,7 +34,6 @@ export default function ReportsPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [allEntries, setAllEntries] = useState<DailyLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
   const [filterType, setFilterType] = useState< 'date' | 'period' | 'month' | 'range'>('period');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -46,38 +45,31 @@ export default function ReportsPage() {
   });
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [visibilityConfig, setVisibilityConfig] = useState<DashboardItemVisibilityConfig>({});
+  const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
   const hasSetFromParams = useRef(false);
 
   useEffect(() => {
-    async function fetchInitialData() {
-      setIsLoadingEntries(true);
+    async function fetchInitialMetadata() {
       try {
-        const [entries, visibility] = await Promise.all([
-          getAllDailyEntries(),
+        const [entryDates, visibility] = await Promise.all([
+          getAllDailyEntries(undefined, undefined, undefined, 'id'),
           getSetting<DashboardItemVisibilityConfig>('dashboardItemVisibilityConfig')
         ]);
-        setAllEntries(entries);
+        
+        const dates = entryDates
+          .map(entry => entry.id ? parseISO(String(entry.id)) : null)
+          .filter((date): date is Date => date !== null && isValid(date));
+        
+        setDatesWithEntries(dates);
         setVisibilityConfig(visibility || {});
       } catch (error) {
-        console.error("Falha ao carregar dados para os relatórios:", error);
-        toast({ title: "Erro ao Carregar Dados", description: "Não foi possível carregar os registros.", variant: "destructive" });
-        setAllEntries([]);
-      } finally {
-        setIsLoadingEntries(false);
+        console.error("Falha ao carregar metadados para os relatórios:", error);
+        toast({ title: "Erro ao Carregar Dados", description: "Não foi possível carregar os metadados dos registros.", variant: "destructive" });
       }
     }
-    fetchInitialData();
+    fetchInitialMetadata();
   }, [toast]);
   
-  const datesWithEntries = useMemo(() => {
-    return allEntries
-      .map(entry => {
-        const date = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-        return isValid(date) ? date : null;
-      })
-      .filter((date): date is Date => date !== null);
-  }, [allEntries]);
-
   const visiblePeriodDefinitions = useMemo(() => {
     return PERIOD_DEFINITIONS.filter(pDef => {
         if (pDef.id === 'almocoPrimeiroTurno' || pDef.id === 'almocoSegundoTurno') {
@@ -110,36 +102,45 @@ export default function ReportsPage() {
   }, [searchParams, isLoadingEntries]);
 
   useEffect(() => {
-    let entriesToDisplay: DailyLogEntry[] = [];
-    if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
-      entriesToDisplay = allEntries.filter(entry => entry.id === dateString);
-    } else if (filterType === 'range' && selectedRange?.from) {
-      const fromDateStr = format(selectedRange.from, 'yyyy-MM-dd');
-      const toDateStr = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : fromDateStr;
-      entriesToDisplay = allEntries.filter(entry => {
-        if (entry.id && typeof entry.id === 'string') {
-          return entry.id >= fromDateStr && entry.id <= toDateStr;
+    const fetchDataForFilters = async () => {
+      setIsLoadingEntries(true);
+      setFilteredEntries([]); // Clear previous results
+
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+
+      if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
+        startDate = format(selectedDate, 'yyyy-MM-dd');
+        endDate = startDate;
+      } else if (filterType === 'range' && selectedRange?.from && isValid(selectedRange.from)) {
+        startDate = format(selectedRange.from, 'yyyy-MM-dd');
+        endDate = selectedRange.to && isValid(selectedRange.to) ? format(selectedRange.to, 'yyyy-MM-dd') : startDate;
+      } else if (filterType === 'month' || filterType === 'period') {
+        if (isValid(selectedMonth)) {
+          startDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+          endDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
         }
-        return false;
-      });
-    } else if (filterType === 'month' || filterType === 'period') {
-      if (isValid(selectedMonth)) {
-        const targetYear = selectedMonth.getFullYear();
-        const targetMonth = selectedMonth.getMonth() + 1;
-        entriesToDisplay = allEntries.filter(entry => {
-          if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            const [entryYearStr, entryMonthStr] = entry.id.split('-');
-            return parseInt(entryYearStr, 10) === targetYear && parseInt(entryMonthStr, 10) === targetMonth;
-          }
-          return false;
-        });
-      } else {
-        entriesToDisplay = allEntries;
       }
-    }
-    setFilteredEntries(entriesToDisplay);
-  }, [allEntries, filterType, selectedDate, selectedMonth, selectedRange]);
+      
+      if (!startDate || !endDate) {
+        setIsLoadingEntries(false);
+        return;
+      }
+
+      try {
+        const entries = await getAllDailyEntries(startDate, endDate) as DailyLogEntry[];
+        setFilteredEntries(entries);
+      } catch (error) {
+        console.error("Falha ao carregar dados para os relatórios:", error);
+        toast({ title: "Erro ao Carregar Dados", description: "Não foi possível carregar os registros para os filtros selecionados.", variant: "destructive" });
+      } finally {
+        setIsLoadingEntries(false);
+      }
+    };
+
+    fetchDataForFilters();
+    
+  }, [filterType, selectedDate, selectedMonth, selectedRange, toast]);
 
   const reportData = useMemo((): ReportData | null => {
     const periodForReport = (filterType === 'range' || filterType === 'month') ? 'all' : selectedPeriod;
