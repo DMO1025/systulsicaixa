@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -16,7 +17,7 @@ import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData
 import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
-import { generateReportData, calculatePeriodGrandTotal } from '@/lib/reportUtils';
+import { generateReportData, calculatePeriodGrandTotal, processEntryForTotals } from '@/lib/reportUtils';
 import { getSafeNumericValue } from '@/lib/utils';
 
 
@@ -225,30 +226,27 @@ export default function ReportsPage() {
   const handleExport = async (formatType: 'pdf' | 'excel') => {
     const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
+    
+    const formatLabelForPdf = (label: string): string => {
+        const parentheticalMatch = label.match(/^(.*?)\s*\((.*)\)\s*$/);
+        if (parentheticalMatch) {
+            const mainText = parentheticalMatch[1].trim().toUpperCase();
+            const subText = parentheticalMatch[2].trim();
+            return `${mainText} (${subText})`;
+        }
+        return label.toUpperCase();
+    };
 
-    if (filterType === 'date' && filteredEntries.length > 0) {
+    if (filterType === 'date' && filteredEntries.length > 0 && selectedDate && isValid(selectedDate)) {
         const entry = filteredEntries[0];
-        const reportDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-        const reportDateStr = isValid(reportDate) ? format(reportDate, 'dd/MM/yyyy') : 'Data Inválida';
-        const exportFileName = `Relatorio_Diario_${isValid(reportDate) ? format(reportDate, 'yyyy-MM-dd') : 'data_invalida'}`;
-
-        let totalComCI = 0, totalQtd = 0;
-        PERIOD_DEFINITIONS.forEach(pDef => {
-            const { qtd, valor } = calculatePeriodGrandTotal(entry[pDef.id]);
-            totalQtd += qtd; totalComCI += valor;
-        });
-        const almocoCIValor = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
-        const jantarCIValor = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-        const reajusteCIAlmoco = getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal');
-        const reajusteCIJantar = getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal');
-        const totalCIValor = almocoCIValor + jantarCIValor;
-        const totalReajusteCI = reajusteCIAlmoco + reajusteCIJantar;
-        const totalSemCI = totalComCI - totalCIValor - totalReajusteCI;
-
+        const reportDateStr = format(selectedDate, 'dd/MM/yyyy');
+        const exportFileName = `Relatorio_Diario_${format(selectedDate, 'yyyy-MM-dd')}`;
+        const { grandTotal, almocoCI, jantarCI, reajusteCI } = processEntryForTotals(entry);
+        
         if (formatType === 'excel') {
             const wb = XLSX.utils.book_new();
             let aoa: (string|number)[][] = [];
-            aoa.push([`Relatório Diário - ${reportDateStr}`], [], ["Receita Total (com CI)", totalComCI], ["Receita Total (sem CI)", totalSemCI], ["Total de Itens/Transações", totalQtd], []);
+            aoa.push([`Relatório Diário - ${reportDateStr}`], [], ["Receita Total (com CI)", grandTotal.comCI.valor], ["Receita Total (sem CI)", grandTotal.semCI.valor], ["Total de Itens/Transações", grandTotal.comCI.qtd], []);
 
             PERIOD_DEFINITIONS.forEach(pDef => {
                 const periodData = entry[pDef.id];
@@ -308,31 +306,85 @@ export default function ReportsPage() {
         } else { // PDF
             const doc = new jsPDF();
             let y = 15;
-            const writeText = (text: string, x: number, yPos: number, options = {}) => doc.text(text, x, yPos, options);
-            const checkPageBreak = () => { if (y > 270) { doc.addPage(); y = 20; } };
+            doc.setFontSize(16); doc.text(`Relatório Diário - ${reportDateStr}`, 14, y); y += 10;
+            
+            const getGroupedDataForPdf = (entry: DailyLogEntry, pDef: typeof PERIOD_DEFINITIONS[number]): { section: string; rows: { label: string; qtd?: number; valor?: number; }[] }[] => {
+                const periodData = entry[pDef.id] as PeriodData | undefined;
+                if (!periodData?.subTabs) return [];
+            
+                const sections: { section: string; rows: { label: string; qtd?: number; valor?: number; }[] }[] = [];
+                const prefixes = { almocoPrimeiroTurno: 'apt', almocoSegundoTurno: 'ast', jantar: 'jnt' } as const;
+                const prefix = prefixes[pDef.id as keyof typeof prefixes];
+                if (!prefix) return [];
+            
+                const addSection = (title: string, dataRows: { label: string; qtd?: number; valor?: number; }[]) => {
+                    if (dataRows.length > 0) sections.push({ section: title, rows: dataRows });
+                };
+            
+                addSection("ROOM SERVICE", [{
+                    label: `ROOM SERVICE (${prefix.toUpperCase()})`,
+                    qtd: getSafeNumericValue(periodData, `subTabs.roomService.channels.${prefix}RoomServiceQtdPedidos.qtd`),
+                    valor: getSafeNumericValue(periodData, `subTabs.roomService.channels.${prefix}RoomServicePagDireto.vtotal`) + getSafeNumericValue(periodData, `subTabs.roomService.channels.${prefix}RoomServiceValorServico.vtotal`)
+                }]);
+            
+                addSection("HÓSPEDES", [{
+                    label: `HÓSPEDES (${prefix.toUpperCase()})`,
+                    qtd: getSafeNumericValue(periodData, `subTabs.hospedes.channels.${prefix}HospedesQtdHospedes.qtd`),
+                    valor: getSafeNumericValue(periodData, `subTabs.hospedes.channels.${prefix}HospedesPagamentoHospedes.vtotal`)
+                }]);
 
-            doc.setFontSize(16); writeText(`Relatório Diário - ${reportDateStr}`, 14, y); y += 10;
-            doc.setFontSize(10); writeText(`Receita Total (com CI): ${formatCurrency(totalComCI)}`, 14, y); writeText(`Receita Total (sem CI): ${formatCurrency(totalSemCI)}`, 100, y); y += 7;
-            writeText(`Total de Itens/Transações: ${formatNumber(totalQtd)}`, 14, y); y += 10;
+                const mesaRows = [
+                    { label: `TOTAIS CLIENTE MESA (${prefix.toUpperCase()})`, qtd: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaTotaisQtd.qtd`) },
+                    { label: `DINHEIRO (${prefix.toUpperCase()})`, valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaDinheiro.vtotal`) },
+                    { label: `CRÉDITO (${prefix.toUpperCase()})`, valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaCredito.vtotal`) },
+                    { label: `DÉBITO (${prefix.toUpperCase()})`, valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaDebito.vtotal`) },
+                    { label: `PIX (${prefix.toUpperCase()})`, valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaPix.vtotal`) },
+                    { label: `TICKET REFEIÇÃO (${prefix.toUpperCase()})`, valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaTicketRefeicao.vtotal`) },
+                ];
+                addSection("CLIENTE MESA", mesaRows);
+
+                const deliveryRows = [
+                    { label: `IFOOD (${prefix.toUpperCase()})`, qtd: getSafeNumericValue(periodData, `subTabs.delivery.channels.${prefix}DeliveryIfoodQtd.qtd`), valor: getSafeNumericValue(periodData, `subTabs.delivery.channels.${prefix}DeliveryIfoodValor.vtotal`) },
+                    { label: `RAPPI (${prefix.toUpperCase()})`, qtd: getSafeNumericValue(periodData, `subTabs.delivery.channels.${prefix}DeliveryRappiQtd.qtd`), valor: getSafeNumericValue(periodData, `subTabs.delivery.channels.${prefix}DeliveryRappiValor.vtotal`) },
+                    { label: `RETIRADA (${prefix.toUpperCase()})`, qtd: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaQtd.qtd`), valor: getSafeNumericValue(periodData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaValor.vtotal`) },
+                ];
+                addSection("DELIVERY & RETIRADA", deliveryRows);
+
+                const faturadoRows = [
+                    { label: 'FATURADOS (QTD)', qtd: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosFaturadosQtd.qtd`)},
+                    { label: 'VALOR HOTEL (FATURADO)', valor: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosValorHotel.vtotal`)},
+                    { label: 'VALOR FUNCIONÁRIO (FATURADO)', valor: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosValorFuncionario.vtotal`)}
+                ];
+                addSection("FATURADO", faturadoRows);
+
+                const ciRows = [
+                    { label: '* CONSUMO INTERNO - CI (QTD)', qtd: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosConsumoInternoQtd.qtd`) },
+                    { label: 'REAJUSTE DE C.I', valor: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosReajusteCI.vtotal`) },
+                    { label: 'TOTAL C.I', valor: getSafeNumericValue(periodData, `subTabs.ciEFaturados.channels.${prefix}CiEFaturadosTotalCI.vtotal`) }
+                ];
+                addSection("CONSUMO INTERNO", ciRows);
+
+                return sections;
+            };
 
             PERIOD_DEFINITIONS.forEach(pDef => {
                 const periodData = entry[pDef.id];
                 if (!periodData) return;
                 const { valor: periodTotal } = calculatePeriodGrandTotal(periodData as any);
-                const hasObservations = (periodData as any).periodObservations?.trim().length > 0;
+                const hasObservations = (periodData as any)?.periodObservations?.trim().length > 0;
                 let hasContent = periodTotal > 0 || hasObservations;
                 if (!hasContent && pDef.id === 'eventos') hasContent = (periodData as EventosPeriodData).items?.length > 0;
                 if (!hasContent) return;
 
-                checkPageBreak();
-                doc.setFontSize(12); writeText(`${pDef.label.toUpperCase()} - Total: ${formatCurrency(periodTotal)}`, 14, y); y += 7;
+                if (y > 250) { doc.addPage(); y = 20; }
+                doc.setFontSize(12); doc.text(`${pDef.label.toUpperCase()} - Total: ${formatCurrency(periodTotal)}`, 14, y); y += 7;
 
                 if (pDef.id === 'eventos') {
                     const evData = periodData as EventosPeriodData;
                     if (evData.items?.length > 0) {
                         evData.items.forEach(item => {
-                            checkPageBreak();
-                            doc.setFontSize(10); writeText(item.eventName || 'Evento Sem Nome', 14, y); y+= 5;
+                            if (y > 250) { doc.addPage(); y = 20; }
+                            doc.setFontSize(10); doc.text(item.eventName || 'Evento Sem Nome', 14, y); y+= 5;
                             (doc as any).autoTable({
                                 startY: y, head: [['Serviço', 'Local', 'Qtd', 'Valor']],
                                 body: (item.subEvents || []).map(sub => [EVENT_SERVICE_TYPE_OPTIONS.find(o=>o.value===sub.serviceType)?.label||sub.serviceType, EVENT_LOCATION_OPTIONS.find(o=>o.value===sub.location)?.label||sub.location, formatNumber(sub.quantity), formatCurrency(sub.totalValue)]),
@@ -341,40 +393,41 @@ export default function ReportsPage() {
                             y = (doc as any).lastAutoTable.finalY + 5;
                         });
                     }
-                } else {
-                    let body: any[][] = [];
-                    const processChannels = (channels: any, prefix = "") => {
-                        Object.entries(channels).forEach(([id, val]: [string, any]) => {
-                           if(val?.qtd || val?.vtotal) body.push([prefix + (SALES_CHANNELS[id as SalesChannelId] || id), formatNumber(val.qtd), formatCurrency(val.vtotal)]);
+                } else if ((periodData as PeriodData).subTabs) {
+                    const groupedData = getGroupedDataForPdf(entry, pDef);
+                    if (groupedData.length > 0) {
+                        const body: any[][] = [];
+                        groupedData.forEach(section => {
+                            body.push([{ content: section.section, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
+                            section.rows.forEach(row => {
+                                if (row.qtd !== undefined || row.valor !== undefined) {
+                                    body.push([formatLabelForPdf(row.label), row.qtd !== undefined ? formatNumber(row.qtd) : '-', row.valor !== undefined ? formatCurrency(row.valor) : '-']);
+                                }
+                            });
                         });
-                    };
-                    const pData = periodData as PeriodData;
-                    if (pData.channels) processChannels(pData.channels);
-                    if (pData.subTabs) {
-                        Object.entries(pData.subTabs).forEach(([key, val]) => {
-                            if(val?.channels && Object.values(val.channels).some(ch => ch?.qtd || ch?.vtotal)) {
-                                body.push([{ content: key.toUpperCase(), colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
-                                processChannels(val.channels, '  ');
-                            }
-                        });
-                    }
-                    if(body.length > 0){
-                        (doc as any).autoTable({ startY: y, head: [['Item', 'Qtd', 'Valor']], body, theme: 'grid', styles: {fontSize: 8}, headStyles: {fontSize: 9}});
+                        (doc as any).autoTable({ startY: y, head: [['Item', 'Qtd', 'Valor']], body, theme: 'grid', styles: { fontSize: 8, cellPadding: 1.5, valign: 'middle' }, headStyles: { fontSize: 9 }});
                         y = (doc as any).lastAutoTable.finalY + 5;
                     }
+                } else if ((periodData as PeriodData).channels) {
+                     const body = Object.entries((periodData as PeriodData).channels!).map(([id, val]) => [formatLabelForPdf(SALES_CHANNELS[id as SalesChannelId] || id), formatNumber(val?.qtd), formatCurrency(val?.vtotal)]);
+                     if (body.length > 0) {
+                        (doc as any).autoTable({ startY: y, head: [['Item', 'Qtd', 'Valor']], body, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fontSize: 9 }});
+                        y = (doc as any).lastAutoTable.finalY + 5;
+                     }
                 }
-                 if(hasObservations){
-                    checkPageBreak();
-                    doc.setFontSize(10); writeText('Observações:', 14, y); y += 5;
+
+                if(hasObservations){
+                    if (y > 270) { doc.addPage(); y = 20; }
+                    doc.setFontSize(10); doc.text('Observações:', 14, y); y += 5;
                     doc.setFontSize(9);
                     const splitText = doc.splitTextToSize((periodData as any).periodObservations, 180);
-                    writeText(splitText, 14, y); y += splitText.length * 4 + 5;
+                    doc.text(splitText, 14, y); y += splitText.length * 4 + 5;
                 }
             });
             if(entry.generalObservations) {
-                checkPageBreak();
-                doc.setFontSize(12); writeText('Observações Gerais do Dia', 14, y); y += 7;
-                doc.setFontSize(9); writeText(doc.splitTextToSize(entry.generalObservations, 180), 14, y);
+                if (y > 270) { doc.addPage(); y = 20; }
+                doc.setFontSize(12); doc.text('Observações Gerais do Dia', 14, y); y += 7;
+                doc.setFontSize(9); doc.text(doc.splitTextToSize(entry.generalObservations, 180), 14, y);
             }
             doc.save(`${exportFileName}.pdf`);
         }
@@ -427,8 +480,16 @@ export default function ReportsPage() {
         } else {
             const doc = new jsPDF({ orientation: 'landscape' });
             doc.setFontSize(16); doc.text(reportData.data.reportTitle, 14, 20);
-            doc.setFontSize(9); doc.setTextColor(100); doc.text(`Período de Referência: ${reportData.data.reportTitle}`, 14, 25);
-            let finalY = 30;
+            
+            (doc as any).autoTable({
+                startY: 25,
+                head: [['', 'TOTAL', 'TOTAL COM CI', 'TOTAL SEM CI']],
+                body: [['', formatCurrency(summary.grandTotalComCI), formatCurrency(summary.grandTotalSemCI)]],
+                theme: 'striped'
+            });
+
+            let finalY = (doc as any).lastAutoTable.finalY + 10;
+
 
             const tableHeaders: string[] = ["Data"];
             periodsToExport.forEach(p => tableHeaders.push(`${p.label} (Qtd/Valor)`));
@@ -514,7 +575,7 @@ export default function ReportsPage() {
             const itemsToSummarize = selectedPeriod === 'cafeDaManha' ? cdmSummaryItems : summaryItems;
             const summaryBody = itemsToSummarize.map(item => {
                 const data = summary[item.dataKey as keyof typeof summary];
-                if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && data.reajuste !== 0))) {
+                if (data && (data.qtd > 0 || data.total > 0 || (item.dataKey === 'consumoInterno' && (data.reajuste ?? 0) !== 0 ))) {
                   return [item.item, formatNumber(data.qtd), formatCurrency(data.total)];
                 } return null;
             }).filter(Boolean) as (string|number)[][];

@@ -508,7 +508,7 @@ export default function PeriodEntryPage() {
                       const subText = parentheticalMatch[2].trim();
                       return (
                         <>
-                          <span className="text-base font-bold">{mainText}</span>
+                          <span className="text-base font-bold uppercase">{mainText}</span>
                           <span className="block text-xs italic text-muted-foreground mt-0.5">
                             ({subText})
                           </span>
@@ -516,7 +516,7 @@ export default function PeriodEntryPage() {
                       );
                     }
                     return (
-                      <span className="text-base font-bold">{labelText}</span>
+                      <span className="text-base font-bold uppercase">{labelText}</span>
                     );
                   })()}
                 </div>

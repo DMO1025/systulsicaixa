@@ -73,7 +73,8 @@ export interface DailyLogEntry extends Omit<DailyEntryFormData, 'date'> {
   baliAlmoco?: PeriodData | string;
   baliHappy?: PeriodData | string;
   eventos?: EventosPeriodData | string;
-  frigobar?: PeriodData | string;
+  // frigobar is deprecated and should be migrated, but keep for type safety with old data
+  frigobar?: PeriodData | string; 
   calculatedTotals?: {
     byPeriod: Partial<Record<import('./constants').PeriodId, number>>;
     byPaymentMethod: PaymentBreakdown;

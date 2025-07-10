@@ -24,40 +24,40 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
         <div className="space-y-6" ref={ref}>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-                        <div>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Receita Total (com CI)</CardTitle>
-                            <div className="text-2xl font-bold">{formatCurrency(data.summary.grandTotalComCI)}</div>
-                        </div>
-                        <DollarSign className="h-6 w-6 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Receita Total (com CI)</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{formatCurrency(data.summary.grandTotalComCI)}</div>
+                        <p className="text-xs text-muted-foreground">
+                            {formatQty(data.summary.grandTotalQtd)} Itens
+                        </p>
+                    </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-                        <div>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Receita Total (sem CI)</CardTitle>
-                            <div className="text-2xl font-bold">{formatCurrency(data.summary.grandTotalSemCI)}</div>
-                        </div>
-                        <DollarSign className="h-6 w-6 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Receita Líquida (sem CI)</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{formatCurrency(data.summary.grandTotalSemCI)}</div>
+                        <p className="text-xs text-muted-foreground">
+                            {formatQty(data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)} Itens
+                        </p>
+                    </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-                        <div>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total de Itens/Transações</CardTitle>
-                            <div className="text-2xl font-bold">{data.summary.grandTotalQtd.toLocaleString('pt-BR')}</div>
-                        </div>
-                        <Hash className="h-6 w-6 text-muted-foreground" />
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Ticket Médio (sem CI)</CardTitle>
+                        <ReceiptText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4">
-                        <div>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Ticket Médio (sem CI)</CardTitle>
-                            <div className="text-2xl font-bold">{formatCurrency(ticketMedio)}</div>
-                        </div>
-                        <ReceiptText className="h-6 w-6 text-muted-foreground" />
-                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{formatCurrency(ticketMedio)}</div>
+                        <p className="text-xs text-muted-foreground">
+                            Valor médio por item
+                        </p>
+                    </CardContent>
                 </Card>
             </div>
 
