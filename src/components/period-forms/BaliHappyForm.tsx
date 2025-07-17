@@ -7,9 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import { getPeriodIcon, type PeriodDefinition, type PeriodId } from '@/lib/config/periods';
-import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/config/forms';
-
+import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
+import { getPeriodIcon } from '@/lib/constants';
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;

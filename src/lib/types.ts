@@ -1,21 +1,10 @@
 
-import type { PeriodId as PeriodIdFromConfig } from './config/periods';
-import type { SalesChannelId as SalesChannelIdFromConfig, PaymentMethodId as PaymentMethodIdFromConfig, EventLocationKey as EventLocationKeyFromConfig, EventServiceTypeKey as EventServiceTypeKeyFromConfig } from './config/forms';
-import type { SummaryCardItemId as SummaryCardItemIdFromConfig } from './config/dashboard';
+import type { OperatorShift, UserRole } from './constants';
 import type { ChartConfig as ShadCNChartConfig } from "@/components/ui/chart";
 import type { DateRange } from 'react-day-picker';
 
-export type OperatorShift = 'first' | 'second';
-export type UserRole = 'administrator' | 'operator';
-
 // Re-export from constants to have a single source of truth for types
-export type PeriodId = PeriodIdFromConfig;
-export type SalesChannelId = SalesChannelIdFromConfig;
-export type PaymentMethodId = PaymentMethodIdFromConfig;
-export type EventLocationKey = EventLocationKeyFromConfig;
-export type EventServiceTypeKey = EventServiceTypeKeyFromConfig;
-export type SummaryCardItemId = SummaryCardItemIdFromConfig;
-
+export type { PeriodId, SalesChannelId, PaymentMethodId, EventLocationKey, EventServiceTypeKey, SummaryCardItemId, OperatorShift, UserRole } from './constants';
 export type PageId = 'dashboard' | 'entry' | 'reports';
 export type ChartConfig = ShadCNChartConfig;
 
@@ -24,17 +13,17 @@ export interface SalesItem {
   vtotal?: number;
 }
 
-export type PaymentBreakdown = Partial<Record<PaymentMethodId, number>>;
+export type PaymentBreakdown = Partial<Record<import('./constants').PaymentMethodId, number>>;
 
 export interface SubTabData {
-  channels?: Partial<Record<SalesChannelId, SalesItem>>;
+  channels?: Partial<Record<import('./constants').SalesChannelId, SalesItem>>;
 }
 
 // --- Event Structure for Daily Entry ---
 export interface SubEventItem {
   id: string; 
-  location?: EventLocationKey;
-  serviceType?: EventServiceTypeKey;
+  location?: import('./constants').EventLocationKey;
+  serviceType?: import('./constants').EventServiceTypeKey;
   customServiceDescription?: string; // For "Outro" service type
   quantity?: number;
   totalValue?: number;
@@ -54,7 +43,7 @@ export type EventosPeriodData = {
 
 
 export type PeriodData = {
-  channels?: Partial<Record<SalesChannelId, SalesItem>>; 
+  channels?: Partial<Record<import('./constants').SalesChannelId, SalesItem>>; 
   subTabs?: Partial<Record<string, SubTabData>>; 
   payments?: PaymentBreakdown; 
   periodObservations?: string; 
@@ -63,7 +52,7 @@ export type PeriodData = {
 export type DailyEntryFormData = {
   date: Date;
   generalObservations?: string;
-} & Omit<Partial<Record<PeriodId, PeriodData>>, 'eventos'> & { 
+} & Omit<Partial<Record<import('./constants').PeriodId, PeriodData>>, 'eventos'> & { 
   eventos?: EventosPeriodData; 
 };
 
@@ -84,9 +73,10 @@ export interface DailyLogEntry extends Omit<DailyEntryFormData, 'date'> {
   baliAlmoco?: PeriodData | string;
   baliHappy?: PeriodData | string;
   eventos?: EventosPeriodData | string;
-  frigobar?: PeriodData | string; // Keep this for backward compatibility if needed, but new data is nested
+  // frigobar is deprecated and should be migrated, but keep for type safety with old data
+  frigobar?: PeriodData | string; 
   calculatedTotals?: {
-    byPeriod: Partial<Record<PeriodId, number>>;
+    byPeriod: Partial<Record<import('./constants').PeriodId, number>>;
     byPaymentMethod: PaymentBreakdown;
     grandTotal: number;
   };
@@ -104,7 +94,6 @@ export interface User {
   role: UserRole;
   shifts: OperatorShift[];
   allowedPages?: PageId[];
-  createdAt?: string | Date;
 }
 
 export interface ChannelUnitPricesConfig {
@@ -124,7 +113,7 @@ export interface MysqlConnectionConfig {
 }
 
 export type DashboardItemVisibilityConfig = Record<string, boolean>;
-export type SummaryCardItemsConfig = Partial<Record<SummaryCardItemId, boolean>>;
+export type SummaryCardItemsConfig = Partial<Record<import('./constants').SummaryCardItemId, boolean>>;
 
 export interface Settings {
   cardVisibilityConfig?: CardVisibilityConfig;
@@ -147,7 +136,7 @@ export interface AcumulativoMensalItem {
   qtdDisplay: string;
   valorTotal: number;
   reportLink?: string; // For navigation to reports page
-  periodId?: PeriodId; // To identify the period for filtering reports
+  periodId?: import('./constants').PeriodId; // To identify the period for filtering reports
 }
 
 export interface MonthlyEvolutionDataItem {
@@ -176,7 +165,7 @@ export interface PeriodReportViewData {
 
 export interface GeneralReportDailyItem {
     date: string;
-    periodTotals: Partial<Record<PeriodId, { qtd: number; valor: number }>>;
+    periodTotals: Partial<Record<import('./constants').PeriodId, { qtd: number; valor: number }>>;
     totalComCI: number;
     totalSemCI: number;
     totalReajusteCI: number;
@@ -184,7 +173,7 @@ export interface GeneralReportDailyItem {
     totalCIQtd: number;
 }
 export interface GeneralReportSummary {
-    periodTotals: Partial<Record<PeriodId, { qtd: number; valor: number }>>;
+    periodTotals: Partial<Record<import('./constants').PeriodId, { qtd: number; valor: number }>>;
     grandTotalComCI: number;
     grandTotalSemCI: number;
     grandTotalReajusteCI: number;

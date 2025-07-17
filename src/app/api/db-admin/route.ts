@@ -2,9 +2,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDbPool, DATABASE_INIT_SCHEMA, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME } from '@/lib/mysql';
 import { getAllEntriesFromFile, getUsersFromFile, readSettingsFile } from '@/lib/fileDb';
-import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData, SubTabData } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
-import mysql, { type PoolOptions, type RowDataPacket } from 'mysql2/promise';
+import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData } from '@/lib/types';
+import { PERIOD_DEFINITIONS } from '@/lib/constants';
+import mysql, { type PoolOptions } from 'mysql2/promise';
 import { format, isValid, parseISO } from 'date-fns';
 import { revalidateTag } from 'next/cache';
 
@@ -64,146 +64,6 @@ async function ensureTables(): Promise<NextResponse> {
     }
 }
 
-const applyStructuralTransformations = (rawEntry: any, log: string[]): any => {
-    // Deep copy to avoid modifying the original object during iteration
-    const entry = JSON.parse(JSON.stringify(rawEntry));
-
-    // --- DATA MIGRATION LOGIC ---
-    // This function can now be used for both JSON migration and MySQL updates.
-    const migrateCiEFaturados = (periodData: PeriodData | undefined, prefix: 'apt' | 'ast' | 'jnt') => {
-        if (!periodData || typeof periodData === 'string' || !periodData.subTabs?.ciEFaturados) return;
-
-        log.push(`  - [${entry.id}] Atualizando 'ciEFaturados' para ${prefix.toUpperCase()}...`);
-        const oldCiData = periodData.subTabs.ciEFaturados.channels;
-        
-        if (!periodData.subTabs.faturado) periodData.subTabs.faturado = { channels: {} };
-        if (!periodData.subTabs.consumoInterno) periodData.subTabs.consumoInterno = { channels: {} };
-
-        periodData.subTabs.faturado.channels![`${prefix}FaturadosQtd`] = oldCiData?.[`${prefix}CiEFaturadosFaturadosQtd`];
-        periodData.subTabs.faturado.channels![`${prefix}FaturadosValorHotel`] = oldCiData?.[`${prefix}CiEFaturadosValorHotel`];
-        periodData.subTabs.faturado.channels![`${prefix}FaturadosValorFuncionario`] = oldCiData?.[`${prefix}CiEFaturadosValorFuncionario`];
-        
-        periodData.subTabs.consumoInterno.channels![`${prefix}ConsumoInternoQtd`] = oldCiData?.[`${prefix}CiEFaturadosConsumoInternoQtd`];
-        periodData.subTabs.consumoInterno.channels![`${prefix}ReajusteCI`] = oldCiData?.[`${prefix}CiEFaturadosReajusteCI`];
-        periodData.subTabs.consumoInterno.channels![`${prefix}TotalCI`] = oldCiData?.[`${prefix}CiEFaturadosTotalCI`];
-        
-        delete periodData.subTabs.ciEFaturados;
-    };
-    
-    // Parse period data from JSON strings if they are strings
-    PERIOD_DEFINITIONS.forEach(pDef => {
-        if (entry[pDef.id] && typeof entry[pDef.id] === 'string') {
-            try {
-                entry[pDef.id] = JSON.parse(entry[pDef.id]);
-            } catch (e) {
-                log.push(`  - [${entry.id}] AVISO: Falha ao analisar JSON para o período '${pDef.id}'. Pulando.`);
-                entry[pDef.id] = null;
-            }
-        }
-    });
-
-    migrateCiEFaturados(entry.almocoPrimeiroTurno, 'apt');
-    migrateCiEFaturados(entry.almocoSegundoTurno, 'ast');
-    migrateCiEFaturados(entry.jantar, 'jnt');
-
-    // Migrate old top-level 'frigobar' to new nested structure
-    if (entry.frigobar) {
-        log.push(`  - [${entry.id}] Atualizando estrutura antiga do Frigobar...`);
-        const oldFrigobarData = typeof entry.frigobar === 'string' ? JSON.parse(entry.frigobar) : entry.frigobar;
-        
-        const processTurno = (turnoKey: 'primeiroTurno' | 'segundoTurno' | 'jantar', targetPeriod: 'almocoPrimeiroTurno' | 'almocoSegundoTurno' | 'jantar') => {
-            const turnoData = oldFrigobarData.subTabs?.[turnoKey] as SubTabData | undefined;
-            if (turnoData && Object.keys(turnoData.channels || {}).length > 0) {
-                 if (!entry[targetPeriod]) entry[targetPeriod] = { subTabs: {} };
-                 if (!(entry[targetPeriod] as PeriodData).subTabs) (entry[targetPeriod] as PeriodData).subTabs = {};
-                 (entry[targetPeriod] as PeriodData).subTabs!.frigobar = turnoData;
-            }
-        };
-
-        processTurno('primeiroTurno', 'almocoPrimeiroTurno');
-        processTurno('segundoTurno', 'almocoSegundoTurno');
-        processTurno('jantar' as any, 'jantar'); // Cast as any to handle 'jantar' key
-    }
-    delete entry.frigobar;
-
-    // --- END DATA MIGRATION LOGIC ---
-    return entry;
-};
-
-
-async function updateMysqlStructure(): Promise<NextResponse> {
-    const log: string[] = [];
-    const pool = await getDbPool();
-    if (!pool || !(await isMysqlConnected(pool))) {
-      log.push('ERRO: MySQL não está conectado.');
-      return NextResponse.json({ message: 'MySQL não está conectado.', log }, { status: 400 });
-    }
-
-    const connection = await pool.getConnection();
-    log.push('Conexão com o banco de dados estabelecida.');
-
-    try {
-        await connection.beginTransaction();
-        log.push('Transação iniciada.');
-
-        const [allEntries] = await connection.query<RowDataPacket[]>(`SELECT * FROM \`${DAILY_ENTRIES_TABLE_NAME}\``);
-        log.push(`Encontrados ${allEntries.length} registros no MySQL para verificação.`);
-        let updatedCount = 0;
-
-        for (const rawEntry of allEntries) {
-            const transformedEntry = applyStructuralTransformations(rawEntry, log);
-
-            // Compare original with transformed by stringifying. If they differ, an update is needed.
-            if (JSON.stringify(rawEntry) !== JSON.stringify(transformedEntry)) {
-                updatedCount++;
-                log.push(`  - [${transformedEntry.id}] Modificações detectadas. Preparando para atualizar...`);
-                
-                const updateFragments: string[] = [];
-                const updateValues: (string | null)[] = [];
-
-                PERIOD_DEFINITIONS.forEach(pDef => {
-                    updateFragments.push(`\`${pDef.id}\` = ?`);
-                    updateValues.push(safeStringify(transformedEntry[pDef.id]));
-                });
-                updateFragments.push('`frigobar` = ?');
-                updateValues.push(null); // Explicitly nullify the old frigobar column
-
-                updateValues.push(transformedEntry.id); // For the WHERE clause
-
-                const updateSql = `UPDATE \`${DAILY_ENTRIES_TABLE_NAME}\` SET ${updateFragments.join(', ')} WHERE id = ?`;
-                await connection.query(updateSql, updateValues);
-            }
-        }
-        
-        await connection.commit();
-        log.push(`--- Transação confirmada (COMMIT) com sucesso! ---`);
-        
-        if (updatedCount > 0) {
-            revalidateTag('entries');
-            log.push("Cache de lançamentos ('entries') invalidado.");
-        }
-
-        const successMessage = `Verificação concluída. ${updatedCount} de ${allEntries.length} registros foram atualizados para a nova estrutura.`;
-        log.push(`\n${successMessage}`);
-
-        return NextResponse.json({ message: successMessage, log });
-
-    } catch (error: any) {
-        await connection.rollback();
-        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---');
-        log.push(`  - Causa do erro: ${error.message}`);
-        console.error('Erro na atualização da estrutura do MySQL (transação revertida):', error);
-        return NextResponse.json({
-            message: `Erro na atualização: ${error.message}. Todas as alterações foram revertidas.`,
-            log
-        }, { status: 500 });
-    } finally {
-        connection.release();
-        log.push('Conexão com o banco de dados liberada.');
-    }
-}
-
-
 async function migrateDataToMysql(): Promise<NextResponse> {
     const log: string[] = [];
     const pool = await getDbPool();
@@ -253,8 +113,26 @@ async function migrateDataToMysql(): Promise<NextResponse> {
         log.push(`Encontrados ${jsonEntries.length} lançamentos no arquivo JSON para processar.`);
 
         for (const rawEntry of jsonEntries) {
-            const entry = applyStructuralTransformations(rawEntry, log);
-            
+            const entry = JSON.parse(JSON.stringify(rawEntry));
+            let oldFrigobarData: PeriodData | undefined;
+            if (entry.frigobar) {
+                if (typeof entry.frigobar === 'string') { try { oldFrigobarData = JSON.parse(entry.frigobar); } catch(e) { /* ignore */ } } 
+                else if (typeof entry.frigobar === 'object') { oldFrigobarData = entry.frigobar; }
+            }
+            if (oldFrigobarData?.subTabs) {
+                log.push(`  - [${entry.id}] Dados antigos do Frigobar encontrados e migrados para a nova estrutura.`);
+                if (!entry.almocoPrimeiroTurno) entry.almocoPrimeiroTurno = { subTabs: {} };
+                if (!(entry.almocoPrimeiroTurno as PeriodData).subTabs) (entry.almocoPrimeiroTurno as PeriodData).subTabs = {};
+                if (!entry.almocoSegundoTurno) entry.almocoSegundoTurno = { subTabs: {} };
+                if (!(entry.almocoSegundoTurno as PeriodData).subTabs) (entry.almocoSegundoTurno as PeriodData).subTabs = {};
+                if (!entry.jantar) entry.jantar = { subTabs: {} };
+                if (!(entry.jantar as PeriodData).subTabs) (entry.jantar as PeriodData).subTabs = {};
+                if (oldFrigobarData.subTabs.primeiroTurno) { (entry.almocoPrimeiroTurno as PeriodData).subTabs!.frigobar = oldFrigobarData.subTabs.primeiroTurno; }
+                if (oldFrigobarData.subTabs.segundoTurno) { (entry.almocoSegundoTurno as PeriodData).subTabs!.frigobar = oldFrigobarData.subTabs.segundoTurno; }
+                if ((oldFrigobarData.subTabs as any).jantar) { (entry.jantar as PeriodData).subTabs!.frigobar = (oldFrigobarData.subTabs as any).jantar; }
+                delete entry.frigobar;
+            }
+
             const entryId = entry.id;
             let entryDateStr: string;
             if (entry.date instanceof Date && isValid(entry.date)) { entryDateStr = format(entry.date, 'yyyy-MM-dd'); } 
@@ -267,7 +145,7 @@ async function migrateDataToMysql(): Promise<NextResponse> {
             PERIOD_DEFINITIONS.forEach(pDef => {
                 columns.push(pDef.id);
                 const periodValue = entry[pDef.id as keyof DailyLogEntry];
-                values.push(safeStringify(periodValue)); 
+                values.push(safeStringify(periodValue));
                 updatePlaceholders.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
             });
 
@@ -326,8 +204,6 @@ export async function POST(request: NextRequest) {
         return await ensureTables();
     case 'migrate-json-to-mysql':
         return await migrateDataToMysql();
-    case 'update-mysql-structure':
-        return await updateMysqlStructure();
     default:
         return NextResponse.json({ message: `Ação '${action}' desconhecida ou não implementada.` }, { status: 400 });
   }

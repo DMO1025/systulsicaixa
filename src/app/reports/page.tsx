@@ -14,20 +14,17 @@ import 'jspdf-autotable';
 import type { DateRange } from 'react-day-picker';
 
 import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, GeneralReportViewData, PeriodReportViewData, PeriodData, EventosPeriodData, SalesChannelId, ChartConfig } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
-import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
-import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
-import { generateReportData, calculatePeriodGrandTotal } from '@/lib/reportGenerator';
-import { processEntryForTotals } from '@/lib/reportUtils';
+import { generateReportData, calculatePeriodGrandTotal, processEntryForTotals } from '@/lib/reportUtils';
 import { getSafeNumericValue } from '@/lib/utils';
 
 
 import ReportToolbar from '@/components/reports/ReportToolbar';
 import GeneralReportView from '@/components/reports/GeneralReportView';
-import SingleDayReportView from '@/components/reports/SingleDayReportView';
 import PeriodSpecificReportView from '@/components/reports/PeriodSpecificReportView';
+import SingleDayReportView from '@/components/reports/SingleDayReportView';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 import ReportLineChart from '@/components/reports/ReportBarChart';

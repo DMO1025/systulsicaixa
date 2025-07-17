@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
+import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import { Save, LayoutList, Loader2, ArrowLeft } from 'lucide-react';
 import { getSetting, saveSetting } from '@/services/settingsService';

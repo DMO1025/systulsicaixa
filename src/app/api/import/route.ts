@@ -4,8 +4,7 @@ import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import type { PeriodId, DailyLogEntry, PeriodData, EventItemData, SubEventItem, EventLocationKey, EventServiceTypeKey, EventosPeriodData } from '@/lib/types';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
-import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
-import { SALES_CHANNELS, PERIOD_FORM_CONFIG, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import { SALES_CHANNELS, PERIOD_FORM_CONFIG, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS, PERIOD_DEFINITIONS } from '@/lib/constants';
 import { format, parse, isValid } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -344,7 +343,7 @@ export async function POST(request: NextRequest) {
         }
         
         const entriesMap = new Map<string, DailyLogEntry>(
-            existingEntriesArray.map(e => [format(e.date as Date, 'yyyy-MM-dd'), e])
+            existingEntriesArray.map(e => [format(e.date, 'yyyy-MM-dd'), e])
         );
         // --- END PRE-FETCHING ---
         
@@ -354,7 +353,7 @@ export async function POST(request: NextRequest) {
         if (periodId === 'eventos') {
             const sheetName = workbook.SheetNames[0];
             result = processEventosPeriod(workbook.Sheets[sheetName], sheetName, entriesMap);
-        } else if (periodConfig?.subTabs) {
+        } else if (periodConfig.subTabs) {
             result = processComplexPeriod(workbook, periodId, entriesMap);
         } else {
             const sheetName = workbook.SheetNames[0];

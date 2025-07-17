@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -15,9 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { CalendarIcon, Loader2, List as ListIcon, DollarSign, BrainCircuit } from 'lucide-react';
-import { PERIOD_DEFINITIONS, getPeriodIcon, type PeriodDefinition, type PeriodId } from '@/lib/config/periods';
-import { PERIOD_FORM_CONFIG, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId, EVENT_SERVICE_TYPES, type EventServiceTypeKey, EVENT_LOCATION_OPTIONS, type EventLocationKey, SALES_CHANNELS } from '@/lib/config/forms';
+import { CalendarIcon, Loader2, List as ListIcon, DollarSign } from 'lucide-react';
+import { PERIOD_DEFINITIONS, SALES_CHANNELS, PeriodId, PERIOD_FORM_CONFIG, getPeriodIcon, type PeriodDefinition, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId, EVENT_SERVICE_TYPES, type EventServiceTypeKey, EVENT_LOCATION_OPTIONS, type EventLocationKey } from '@/lib/constants';
 import type { DailyEntryFormData, SalesItem, PeriodData, SubTabData, ChannelUnitPricesConfig, EventosPeriodData, DailyLogEntry, SubEventItem, EventItemData, OperatorShift } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,7 +26,6 @@ import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
 import { getDailyEntry, saveDailyEntry, getAllEntryDates } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { v4 as uuidv4 } from 'uuid';
-import { Textarea } from '@/components/ui/textarea';
 
 // Import period form components
 import MadrugadaForm from '@/components/period-forms/MadrugadaForm';
@@ -93,13 +90,12 @@ const eventosPeriodSchema = z.object({
 });
 
 
-const dailyEntryFormFields = PERIOD_DEFINITIONS.reduce((acc, periodDef) => {
-  const config = PERIOD_FORM_CONFIG[periodDef.id];
-  if (!config) return acc; 
 
+const dailyEntryFormFields = PERIOD_DEFINITIONS.reduce((acc, periodDef) => {
   if (periodDef.id === 'eventos') {
     acc[periodDef.id] = eventosPeriodSchema.optional();
   } else {
+    const config = PERIOD_FORM_CONFIG[periodDef.id];
     let specificPeriodSchema = z.object({ ...basePeriodDataFields });
 
     if (config.subTabs) {
@@ -124,15 +120,13 @@ const initialDefaultValuesForAllPeriods: DailyEntryFormData = {
   generalObservations: '',
   ...PERIOD_DEFINITIONS.reduce((acc, period) => {
     const periodId = period.id;
-    const config = PERIOD_FORM_CONFIG[periodId];
-    if (!config) return acc;
-
     if (periodId === 'eventos') {
       acc[periodId] = { 
         items: [], 
         periodObservations: '',
       } as EventosPeriodData;
     } else {
+      const config = PERIOD_FORM_CONFIG[periodId];
       const currentPeriodData: Partial<PeriodData> = {
         periodObservations: '',
       };
@@ -172,7 +166,7 @@ const PERIOD_FORM_COMPONENTS: Record<PeriodId, React.FC<GenericPeriodFormProps |
   italianoAlmoco: ItalianoAlmocoForm,
   italianoJantar: ItalianoJantarForm,
   indianoAlmoco: IndianoAlmocoForm,
-  indianoJantarForm: IndianoJantarForm,
+  indianoJantar: IndianoJantarForm,
   breakfast: BreakfastForm,
 };
 
@@ -290,7 +284,7 @@ export default function PeriodEntryPage() {
           
           PERIOD_DEFINITIONS.forEach(pDef => {
             const periodId = pDef.id;
-            let existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
+            const existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
 
             if (existingPeriodData) {
               if (periodId === 'eventos') {
@@ -337,30 +331,26 @@ export default function PeriodEntryPage() {
             }
           });
           
-            const oldFrigobarData = entryForDate.frigobar as PeriodData | undefined;
-            if (oldFrigobarData?.subTabs) {
-                const frigobarPT = oldFrigobarData.subTabs.primeiroTurno;
-                const frigobarST = oldFrigobarData.subTabs.segundoTurno;
-                
-                if (frigobarPT?.channels && dataToResetWith.almocoPrimeiroTurno?.subTabs) {
-                    dataToResetWith.almocoPrimeiroTurno.subTabs.frigobar = {
-                        channels: {
-                            frgPTTotalQuartos: frigobarPT.channels.frgPTTotalQuartos,
-                            frgPTPagRestaurante: frigobarPT.channels.frgPTPagRestaurante,
-                            frgPTPagHotel: frigobarPT.channels.frgPTPagHotel,
-                        }
-                    };
-                }
-                if (frigobarST?.channels && dataToResetWith.almocoSegundoTurno?.subTabs) {
-                    dataToResetWith.almocoSegundoTurno.subTabs.frigobar = {
-                         channels: {
-                            frgSTTotalQuartos: frigobarST.channels.frgSTTotalQuartos,
-                            frgSTPagRestaurante: frigobarST.channels.frgSTPagRestaurante,
-                            frgSTPagHotel: frigobarST.channels.frgSTPagHotel,
-                        }
-                    };
-                }
+          // --- On-the-fly data migration from old frigobar structure ---
+          const oldFrigobarData = (entryForDate as any).frigobar as PeriodData | undefined;
+          if (oldFrigobarData?.subTabs) {
+            // Migrate 1st shift to Almoço PT
+            if (oldFrigobarData.subTabs.primeiroTurno) {
+              if (!dataToResetWith.almocoPrimeiroTurno!.subTabs) dataToResetWith.almocoPrimeiroTurno!.subTabs = {};
+              dataToResetWith.almocoPrimeiroTurno!.subTabs.frigobar = oldFrigobarData.subTabs.primeiroTurno;
             }
+            // Migrate 2nd shift to Almoço ST
+             if (oldFrigobarData.subTabs.segundoTurno) {
+              if (!dataToResetWith.almocoSegundoTurno!.subTabs) dataToResetWith.almocoSegundoTurno!.subTabs = {};
+              dataToResetWith.almocoSegundoTurno!.subTabs.frigobar = oldFrigobarData.subTabs.segundoTurno;
+            }
+            // Migrate Jantar to Jantar
+            if (oldFrigobarData.subTabs.jantar) {
+              if (!dataToResetWith.jantar!.subTabs) dataToResetWith.jantar!.subTabs = {};
+              dataToResetWith.jantar!.subTabs.frigobar = oldFrigobarData.subTabs.jantar;
+            }
+          }
+
 
         }
       } catch (error) {
@@ -414,13 +404,13 @@ export default function PeriodEntryPage() {
     }
     
     const standardPeriodData = periodData as PeriodData | undefined; 
-    if (config?.subTabs && standardPeriodData?.subTabs) {
+    if (config.subTabs && standardPeriodData?.subTabs) {
       for (const subTabKey in config.subTabs) {
         if(standardPeriodData.subTabs[subTabKey]){
             total += calculateSubTabTotal(periodIdToCalc, subTabKey);
         }
       }
-    } else if (config?.channels && standardPeriodData?.channels) { 
+    } else if (standardPeriodData?.channels) { 
       for (const channelKey in standardPeriodData.channels) {
         const channel = standardPeriodData.channels[channelKey as SalesChannelId];
         if (channel?.vtotal) {
@@ -456,6 +446,7 @@ export default function PeriodEntryPage() {
       }));
     }
     
+    // Explicitly remove the old top-level `frigobar` property if it exists
     if ((dataToSubmit as any).frigobar) {
       delete (dataToSubmit as any).frigobar;
     }
@@ -744,37 +735,6 @@ export default function PeriodEntryPage() {
                 </Card>
               )}
 
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <BrainCircuit className="h-6 w-6 text-primary" />
-                    <CardTitle>Observações Gerais</CardTitle>
-                  </div>
-                   <CardDescription>
-                      Adicione notas sobre o dia que não pertençam a um período específico (ex: feriados, eventos na cidade, etc.).
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="generalObservations"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Descreva aqui as observações gerais do dia..."
-                            className="resize-y min-h-[100px]"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
               {isDataLoading ? (
                  <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin" /> Carregando dados do período...</div>
               ) : PeriodSpecificFormComponent ? (
@@ -804,3 +764,5 @@ export default function PeriodEntryPage() {
     </div>
   );
 }
+
+    

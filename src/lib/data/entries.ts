@@ -4,9 +4,34 @@
 import { getDbPool, isMysqlConnected, DAILY_ENTRIES_TABLE_NAME, safeParse, safeStringify } from '@/lib/mysql';
 import { getDailyEntryFromFile, saveDailyEntryToFile, getAllEntriesFromFile } from '@/lib/fileDb';
 import type { DailyLogEntry, PeriodData, EventosPeriodData } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { PERIOD_DEFINITIONS } from '@/lib/constants';
 import type mysql from 'mysql2/promise';
 import { format, parseISO, isValid } from 'date-fns';
+
+function parsePeriodDataFromDbRow(row: any): Partial<DailyLogEntry> {
+  const entry: Partial<DailyLogEntry> = {
+    id: row.id,
+    date: row.date, 
+    generalObservations: row.generalObservations,
+    createdAt: row.createdAt,
+    lastModifiedAt: row.lastModifiedAt,
+  };
+
+  PERIOD_DEFINITIONS.forEach(pDef => {
+    const columnValue = row[pDef.id];
+    if (columnValue !== undefined && columnValue !== null) {
+       if (typeof columnValue === 'string') {
+          const parsedPeriodData = safeParse<PeriodData | EventosPeriodData>(columnValue);
+          if (parsedPeriodData) {
+            entry[pDef.id as keyof DailyLogEntry] = parsedPeriodData;
+          }
+       } else if (typeof columnValue === 'object') {
+           entry[pDef.id as keyof DailyLogEntry] = columnValue;
+       }
+    }
+  });
+  return entry;
+}
 
 function processRawEntry(entry: any): DailyLogEntry {
   const processedEntry = { ...entry };
@@ -22,11 +47,8 @@ function processRawEntry(entry: any): DailyLogEntry {
     const periodKey = pDef.id as keyof DailyLogEntry;
     if (processedEntry[periodKey] && typeof processedEntry[periodKey] === 'string') {
       try {
-        const parsedData = JSON.parse(processedEntry[periodKey] as string);
-        processedEntry[periodKey] = parsedData;
-      } catch (e) {
-        console.error(`Error parsing JSON for period ${pDef.id} in entry ${processedEntry.id}:`, e);
-      }
+        processedEntry[periodKey] = JSON.parse(processedEntry[periodKey] as string);
+      } catch (e) { /* ignore */ }
     }
     if (pDef.id === 'eventos' && processedEntry.eventos && typeof processedEntry.eventos === 'object') {
         const eventosData = processedEntry.eventos as EventosPeriodData;
@@ -82,6 +104,7 @@ export async function getAllEntries(
             return rows.map(processRawEntry);
         } catch (error: any) {
             console.error('Data Layer (MySQL) Erro, usando JSON:', error);
+            // Fallback to file on any DB error
             return getAllEntriesFromFile();
         }
     } else {

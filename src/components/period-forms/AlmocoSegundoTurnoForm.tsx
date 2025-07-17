@@ -8,10 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
-import { getPeriodIcon, type PeriodDefinition, type PeriodId } from '@/lib/config/periods';
-import { getSubTabIcon, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId } from '@/lib/config/forms';
+import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
+import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import { getSafeNumericValue } from '@/lib/utils';
-import { calculatePeriodGrandTotal } from '@/lib/reportGenerator';
+import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -61,13 +61,13 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
         const almocoSTDataWithoutFrigobar = { ...almocoSTData, subTabs: restOfSubTabs };
         let { valor } = calculatePeriodGrandTotal(almocoSTDataWithoutFrigobar as PeriodData);
         
-        const totalCIValue = getSafeNumericValue(almocoSTData, 'subTabs.consumoInterno.channels.astTotalCI.vtotal');
+        const totalCIValue = getSafeNumericValue(almocoSTData, 'subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
         valor -= totalCIValue;
         
         almocoSTSubTabsTotal = valor;
     }
 
-    const frigobarSTTotal = getSafeNumericValue(watchedData, 'almocoSegundoTurno.subTabs.frigobar.channels.frigobarPagRestaurante.vtotal') + getSafeNumericValue(watchedData, 'almocoSegundoTurno.subTabs.frigobar.channels.frigobarPagHotel.vtotal');
+    const frigobarSTTotal = getVtotal('almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getVtotal('almocoSegundoTurno.subTabs.frigobar.channels.frgSTPagHotel.vtotal');
 
     return almocoSTSubTabsTotal + frigobarSTTotal;
   }, [watchedData]);

@@ -8,10 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import type { PeriodId, PeriodDefinition } from '@/lib/config/periods';
-import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/config/forms';
-import { getPeriodIcon } from '@/lib/config/periods';
-import { getSubTabIcon } from '@/lib/config/forms';
+import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/constants';
+import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
 import type { PeriodFormProps } from './MadrugadaForm';
 
 const FrigobarForm: React.FC<PeriodFormProps> = ({

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileUp, Loader2, CheckCircle2, AlertCircle, Download, Database } from 'lucide-react';
-import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { PERIOD_DEFINITIONS } from '@/lib/constants';
 import type { PeriodId, DailyLogEntry } from '@/lib/types';
 
 

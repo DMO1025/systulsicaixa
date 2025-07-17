@@ -8,7 +8,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import type { DailyEntryFormData, SummaryCardItemsConfig, DailyLogEntry } from '@/lib/types';
 import { getSetting } from '@/services/settingsService';
-import { SUMMARY_CARD_CONFIGURABLE_ITEMS } from '@/lib/config/dashboard';
+import { SUMMARY_CARD_CONFIGURABLE_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { ClipboardCopy, Loader2 } from 'lucide-react';
 import { toBlob } from 'html-to-image';
@@ -48,7 +48,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
     try {
       // Prepare for capture: show the clean header, hide the interactive one
       if (captureHeader) captureHeader.style.display = 'block';
-      if (interactiveHeader) interactiveHeader.style.display = 'flex';
+      if (interactiveHeader) interactiveHeader.style.display = 'none';
 
       const blob = await toBlob(cardRef.current, {
         backgroundColor: 'hsl(var(--card))',

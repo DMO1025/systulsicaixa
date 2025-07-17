@@ -12,9 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Trash2, Building, Briefcase, DollarSign, Hash, Info, Loader2, Save } from 'lucide-react';
 import type { DailyEntryFormData, EventServiceTypeKey, EventItemData, SubEventItem } from '@/lib/types';
-import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
-import type { PeriodId } from '@/lib/config/periods';
-import { EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS, type EventLocationKey, type IndividualPeriodConfig as PeriodConfig } from '@/lib/config/forms';
+import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig } from '@/lib/constants';
+import { getPeriodIcon, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS, type EventLocationKey } from '@/lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 
