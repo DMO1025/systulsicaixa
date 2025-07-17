@@ -58,11 +58,11 @@
     "eventosDireto": true,
     "eventosHotel": true
   },
-  "mysqlConnectionConfig": {
-    "host": "127.0.0.1",
+   "mysqlConnectionConfig": {
+    "host": "186.202.152.74",
     "port": 3306,
-    "user": "root",
-    "password": "",
+    "user": "vercel",
+    "password": "Tulsi@123",
     "database": "vercel"
   }
 }
