@@ -11,7 +11,7 @@ import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/
 import { getPeriodIcon, type PeriodDefinition, type PeriodId } from '@/lib/config/periods';
 import { getSubTabIcon, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
-import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
+import { calculatePeriodGrandTotal } from '@/lib/reportGenerator';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -61,7 +61,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
         const almocoSTDataWithoutFrigobar = { ...almocoSTData, subTabs: restOfSubTabs };
         let { valor } = calculatePeriodGrandTotal(almocoSTDataWithoutFrigobar as PeriodData);
         
-        const totalCIValue = getSafeNumericValue(almocoSTData, 'subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal');
+        const totalCIValue = getSafeNumericValue(almocoSTData, 'subTabs.consumoInterno.channels.astTotalCI.vtotal');
         valor -= totalCIValue;
         
         almocoSTSubTabsTotal = valor;

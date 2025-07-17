@@ -84,6 +84,7 @@ export interface DailyLogEntry extends Omit<DailyEntryFormData, 'date'> {
   baliAlmoco?: PeriodData | string;
   baliHappy?: PeriodData | string;
   eventos?: EventosPeriodData | string;
+  frigobar?: PeriodData | string; // Keep this for backward compatibility if needed, but new data is nested
   calculatedTotals?: {
     byPeriod: Partial<Record<PeriodId, number>>;
     byPaymentMethod: PaymentBreakdown;

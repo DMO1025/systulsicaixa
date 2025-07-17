@@ -19,7 +19,8 @@ import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
-import { generateReportData, calculatePeriodGrandTotal, processEntryForTotals } from '@/lib/reportUtils';
+import { generateReportData, calculatePeriodGrandTotal } from '@/lib/reportGenerator';
+import { processEntryForTotals } from '@/lib/reportUtils';
 import { getSafeNumericValue } from '@/lib/utils';
 
 

@@ -292,47 +292,6 @@ export default function PeriodEntryPage() {
             const periodId = pDef.id;
             let existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
 
-            // --- DATA MIGRATION LOGIC ---
-            // If we find the old 'ciEFaturados' sub-tab, migrate its data to the new structure.
-            const prefixes = { almocoPrimeiroTurno: 'apt', almocoSegundoTurno: 'ast', jantar: 'jnt' };
-            const currentPrefix = prefixes[periodId as keyof typeof prefixes];
-            if (
-              currentPrefix &&
-              existingPeriodData &&
-              typeof existingPeriodData === 'object' &&
-              'subTabs' in existingPeriodData &&
-              (existingPeriodData as PeriodData).subTabs?.ciEFaturados
-            ) {
-                const oldCiEFaturados = (existingPeriodData as PeriodData).subTabs!.ciEFaturados!;
-                const newPeriodData = JSON.parse(JSON.stringify(existingPeriodData));
-                
-                if (!newPeriodData.subTabs.faturado) newPeriodData.subTabs.faturado = { channels: {} };
-                if (!newPeriodData.subTabs.consumoInterno) newPeriodData.subTabs.consumoInterno = { channels: {} };
-
-                const mapOldToNew = {
-                    [`${currentPrefix}CiEFaturadosFaturadosQtd`]: 'faturado.channels.aptFaturadosQtd',
-                    [`${currentPrefix}CiEFaturadosValorHotel`]: 'faturado.channels.aptFaturadosValorHotel',
-                    [`${currentPrefix}CiEFaturadosValorFuncionario`]: 'faturado.channels.aptFaturadosValorFuncionario',
-                    [`${currentPrefix}CiEFaturadosConsumoInternoQtd`]: 'consumoInterno.channels.aptConsumoInternoQtd',
-                    [`${currentPrefix}CiEFaturadosReajusteCI`]: 'consumoInterno.channels.aptReajusteCI',
-                    [`${currentPrefix}CiEFaturadosTotalCI`]: 'consumoInterno.channels.aptTotalCI',
-                };
-                
-                const newFaturadoChannels = newPeriodData.subTabs.faturado.channels;
-                newFaturadoChannels[`${currentPrefix}FaturadosQtd`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosFaturadosQtd`];
-                newFaturadoChannels[`${currentPrefix}FaturadosValorHotel`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosValorHotel`];
-                newFaturadoChannels[`${currentPrefix}FaturadosValorFuncionario`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosValorFuncionario`];
-
-                const newConsumoInternoChannels = newPeriodData.subTabs.consumoInterno.channels;
-                newConsumoInternoChannels[`${currentPrefix}ConsumoInternoQtd`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosConsumoInternoQtd`];
-                newConsumoInternoChannels[`${currentPrefix}ReajusteCI`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosReajusteCI`];
-                newConsumoInternoChannels[`${currentPrefix}TotalCI`] = oldCiEFaturados.channels?.[`${currentPrefix}CiEFaturadosTotalCI`];
-                
-                delete newPeriodData.subTabs.ciEFaturados;
-                existingPeriodData = newPeriodData;
-            }
-             // --- END DATA MIGRATION LOGIC ---
-
             if (existingPeriodData) {
               if (periodId === 'eventos') {
                 const eventosData = existingPeriodData as EventosPeriodData;
@@ -378,23 +337,30 @@ export default function PeriodEntryPage() {
             }
           });
           
-          const handleFrigobarMerge = (targetPeriod: 'almocoPrimeiroTurno' | 'almocoSegundoTurno' | 'jantar') => {
-            const frigobarData = (entryForDate as any)[targetPeriod]?.subTabs?.frigobar as SubTabData | undefined;
-            if (frigobarData && dataToResetWith[targetPeriod]?.subTabs) {
-              if (!dataToResetWith[targetPeriod]!.subTabs!.frigobar) {
-                dataToResetWith[targetPeriod]!.subTabs!.frigobar = { channels: {} };
-              }
-              dataToResetWith[targetPeriod]!.subTabs!.frigobar!.channels = {
-                ...dataToResetWith[targetPeriod]!.subTabs!.frigobar!.channels,
-                ...frigobarData.channels,
-              };
+            const oldFrigobarData = entryForDate.frigobar as PeriodData | undefined;
+            if (oldFrigobarData?.subTabs) {
+                const frigobarPT = oldFrigobarData.subTabs.primeiroTurno;
+                const frigobarST = oldFrigobarData.subTabs.segundoTurno;
+                
+                if (frigobarPT?.channels && dataToResetWith.almocoPrimeiroTurno?.subTabs) {
+                    dataToResetWith.almocoPrimeiroTurno.subTabs.frigobar = {
+                        channels: {
+                            frgPTTotalQuartos: frigobarPT.channels.frgPTTotalQuartos,
+                            frgPTPagRestaurante: frigobarPT.channels.frgPTPagRestaurante,
+                            frgPTPagHotel: frigobarPT.channels.frgPTPagHotel,
+                        }
+                    };
+                }
+                if (frigobarST?.channels && dataToResetWith.almocoSegundoTurno?.subTabs) {
+                    dataToResetWith.almocoSegundoTurno.subTabs.frigobar = {
+                         channels: {
+                            frgSTTotalQuartos: frigobarST.channels.frgSTTotalQuartos,
+                            frgSTPagRestaurante: frigobarST.channels.frgSTPagRestaurante,
+                            frgSTPagHotel: frigobarST.channels.frgSTPagHotel,
+                        }
+                    };
+                }
             }
-          };
-          
-          handleFrigobarMerge('almocoPrimeiroTurno');
-          handleFrigobarMerge('almocoSegundoTurno');
-          handleFrigobarMerge('jantar');
-
 
         }
       } catch (error) {
@@ -490,7 +456,6 @@ export default function PeriodEntryPage() {
       }));
     }
     
-    // Explicitly remove the old top-level `frigobar` property if it exists
     if ((dataToSubmit as any).frigobar) {
       delete (dataToSubmit as any).frigobar;
     }
@@ -839,4 +804,3 @@ export default function PeriodEntryPage() {
     </div>
   );
 }
-

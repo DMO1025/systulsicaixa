@@ -13,7 +13,7 @@ import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as 
 import { getPeriodIcon } from '@/lib/config/periods';
 import { getSubTabIcon } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
-import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
+import { calculatePeriodGrandTotal } from '@/lib/reportGenerator';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -69,7 +69,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
         const almocoPTDataWithoutFrigobar = { ...almocoPTData, subTabs: restOfSubTabs };
         let { valor } = calculatePeriodGrandTotal(almocoPTDataWithoutFrigobar as PeriodData);
         
-        const totalCIValue = getSafeNumericValue(almocoPTData, 'subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal');
+        const totalCIValue = getSafeNumericValue(almocoPTData, 'subTabs.consumoInterno.channels.aptConsumoInternoQtd.qtd');
         valor -= totalCIValue;
         
         almocoPTSubTabsTotal = valor;

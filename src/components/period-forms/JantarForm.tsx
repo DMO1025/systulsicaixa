@@ -13,7 +13,7 @@ import { getPeriodIcon } from '@/lib/config/periods';
 import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/config/forms';
 import { getSubTabIcon } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
-import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
+import { calculatePeriodGrandTotal } from '@/lib/reportGenerator';
 import { Refrigerator } from 'lucide-react';
 
 interface PeriodFormProps {
@@ -63,7 +63,7 @@ const JantarForm: React.FC<PeriodFormProps> = ({
         const jantarDataWithoutFrigobar = { ...jantarData, subTabs: restOfSubTabs };
         let { valor } = calculatePeriodGrandTotal(jantarDataWithoutFrigobar as PeriodData);
         
-        const totalCIValue = getSafeNumericValue(jantarData, 'subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
+        const totalCIValue = getSafeNumericValue(jantarData, 'subTabs.consumoInterno.channels.jntTotalCI.vtotal');
         valor -= totalCIValue;
         
         jantarSubTabsTotal = valor;

@@ -19,10 +19,16 @@ export const SALES_CHANNELS = {
   cdmCafeAssinado: "* CAFÉ ASSINADO",
   cdmDiretoCartao: "* DIRETO (CARTÃO)",
   
-  // Frigobar Channels (Standardized)
-  frigobarTotalQuartos: "Total de Quartos",
-  frigobarPagRestaurante: "Pagamento Restaurante",
-  frigobarPagHotel: "Pagamento Hotel",
+  // Frigobar Channels (Standardized by turn)
+  frgPTTotalQuartos: "Total de Quartos (1º Turno)",
+  frgPTPagRestaurante: "Pagamento Restaurante (1º Turno)",
+  frgPTPagHotel: "Pagamento Hotel (1º Turno)",
+  frgSTTotalQuartos: "Total de Quartos (2º Turno)",
+  frgSTPagRestaurante: "Pagamento Restaurante (2º Turno)",
+  frgSTPagHotel: "Pagamento Hotel (2º Turno)",
+  frgJNTTotalQuartos: "Total de Quartos (Jantar)",
+  frgJNTPagRestaurante: "Pagamento Restaurante (Jantar)",
+  frgJNTPagHotel: "Pagamento Hotel (Jantar)",
 
   // Default/Generic for other periods if they don't have specific structures
   genericTotalValue: "Valor Total (R$)",
@@ -235,15 +241,50 @@ const commonAlmocoJantarStructure = (
         [`${periodPrefix}TotalCI`]: { vtotal: true },
     }
   };
+  
+  const getFrigobarSubTab = (shiftPrefix: 'PT' | 'ST' | 'JNT'): IndividualSubTabConfig => ({
+    label: "FRIGOBAR", icon: Refrigerator,
+    channels: {
+      [`frg${shiftPrefix}TotalQuartos`]: { qtd: true },
+      [`frg${shiftPrefix}PagRestaurante`]: { vtotal: true },
+      [`frg${shiftPrefix}PagHotel`]: { vtotal: true },
+    }
+  });
 
-  return {
+  if (periodPrefix === 'apt') {
+    return {
       roomService: roomServiceSubTab,
       hospedes: hospedesSubTab,
       clienteMesa: clienteMesaSubTab,
       delivery: deliverySubTab,
       faturado: faturadoSubTab,
       consumoInterno: consumoInternoSubTab,
+      frigobar: getFrigobarSubTab('PT')
     };
+  }
+  if (periodPrefix === 'ast') {
+    return {
+      roomService: roomServiceSubTab,
+      hospedes: hospedesSubTab,
+      clienteMesa: clienteMesaSubTab,
+      delivery: deliverySubTab,
+      faturado: faturadoSubTab,
+      consumoInterno: consumoInternoSubTab,
+      frigobar: getFrigobarSubTab('ST')
+    };
+  }
+   if (periodPrefix === 'jnt') {
+    return {
+      roomService: roomServiceSubTab,
+      hospedes: hospedesSubTab,
+      clienteMesa: clienteMesaSubTab,
+      delivery: deliverySubTab,
+      faturado: faturadoSubTab,
+      consumoInterno: consumoInternoSubTab,
+      frigobar: getFrigobarSubTab('JNT')
+    };
+  }
+  return {};
 };
 
 const _DEFAULT_DIRECT_CHANNELS_CONFIG: IndividualPeriodConfig = {
@@ -281,45 +322,15 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, IndividualPeriodConfig> = {
     observations: true,
   },
   almocoPrimeiroTurno: {
-    subTabs: {
-      ...commonAlmocoJantarStructure('apt'),
-      frigobar: {
-        label: "FRIGOBAR", icon: Refrigerator,
-        channels: {
-          frigobarTotalQuartos: { qtd: true },
-          frigobarPagRestaurante: { vtotal: true },
-          frigobarPagHotel: { vtotal: true },
-        }
-      }
-    },
+    subTabs: commonAlmocoJantarStructure('apt'),
     payments: false, observations: true
   },
   almocoSegundoTurno: {
-    subTabs: {
-      ...commonAlmocoJantarStructure('ast'),
-      frigobar: {
-        label: "FRIGOBAR", icon: Refrigerator,
-        channels: {
-          frigobarTotalQuartos: { qtd: true },
-          frigobarPagRestaurante: { vtotal: true },
-          frigobarPagHotel: { vtotal: true },
-        }
-      }
-    },
+    subTabs: commonAlmocoJantarStructure('ast'),
     payments: false, observations: true
   },
   jantar: {
-    subTabs: {
-      ...commonAlmocoJantarStructure('jnt'),
-      frigobar: {
-        label: "FRIGOBAR", icon: Refrigerator,
-        channels: {
-          frigobarTotalQuartos: { qtd: true },
-          frigobarPagRestaurante: { vtotal: true },
-          frigobarPagHotel: { vtotal: true },
-        }
-      }
-    },
+    subTabs: commonAlmocoJantarStructure('jnt'),
     payments: false, observations: true
   },
   
