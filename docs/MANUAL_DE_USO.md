@@ -58,14 +58,21 @@ O Dashboard é sua central de inteligência de negócios.
 
 ### 5. Gerando Relatórios
 
-A página de Relatórios permite uma análise profunda dos dados.
+A página de Relatórios permite uma análise profunda dos dados. É uma ferramenta interativa para explorar seus registros de vendas.
 
-1.  **Use os Filtros**: Você pode filtrar os dados por:
-    -   **Data Específica**: Para ver os detalhes de um único dia.
-    -   **Intervalo de Datas**: Para analisar um período personalizado.
-    -   **Período (dentro do Mês)**: Para ver todos os lançamentos de um período específico (Ex: todos os "Jantares") dentro de um determinado mês.
-    -   **Geral (Mês Inteiro)**: Para uma visão consolidada de todos os períodos de um mês.
-2.  **Exporte os Dados**: Após filtrar, você pode exportar a visualização atual para **PDF** (ideal para impressão e compartilhamento) ou **Excel** (ideal para análises mais profundas em planilhas).
+1.  **Use a Barra de Ferramentas de Filtros**:
+    -   **Tipo de Filtro**: Escolha como você quer ver os dados:
+        -   `Por Período (dentro do Mês)`: Ideal para focar em um serviço específico (ex: todos os Jantares de Julho).
+        -   `Geral (Mês Inteiro)`: Visão consolidada de todos os períodos do mês selecionado.
+        -   `Por Intervalo de Datas`: Análise personalizada entre duas datas.
+        -   `Por Data Específica`: Detalhes completos de um único dia.
+    -   **Filtros Adicionais**: Selecione o período, mês, ano ou intervalo de datas conforme o tipo de filtro escolhido.
+
+2.  **Explore a Visualização Dinâmica**:
+    -   **Visão por Período**: Ao focar em um período como "Almoço", a tela mostrará abas para cada subcategoria (Room Service, Mesa, Delivery, etc.), permitindo uma análise detalhada. Um gráfico de barras também mostrará a evolução diária da categoria selecionada na aba.
+    -   **Visão Geral**: Mostra uma tabela completa com os totais diários de todos os períodos.
+
+3.  **Exporte os Dados**: Após aplicar os filtros, você pode exportar a visualização atual para **PDF** (ideal para impressão e compartilhamento) ou **Excel** (ideal para análises mais profundas em planilhas). O arquivo exportado refletirá exatamente os dados que você está vendo na tela.
 
 ![Página de Relatórios](https://placehold.co/800x400.png "Página de relatórios com filtros por data, período e opções de exportação.")
 

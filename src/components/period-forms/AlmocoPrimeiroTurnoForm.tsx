@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
+import type { PeriodId, PeriodDefinition } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/config/forms';
+import { getPeriodIcon } from '@/lib/config/periods';
+import { getSubTabIcon } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
 import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
@@ -73,7 +75,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
         almocoPTSubTabsTotal = valor;
     }
     
-    const frigobarPTTotal = getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frgPTPagHotel.vtotal');
+    const frigobarPTTotal = getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frigobarPagRestaurante.vtotal') + getVtotal('almocoPrimeiroTurno.subTabs.frigobar.channels.frigobarPagHotel.vtotal');
 
     return madrugadaTotal + cafeAvulsosTotal + almocoPTSubTabsTotal + frigobarPTTotal;
   }, [watchedData]);

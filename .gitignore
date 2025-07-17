@@ -9,7 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+  
 # testing
 /coverage
 
@@ -38,7 +38,7 @@ yarn-error.log*
 next-env.d.ts
 
 .genkit/*
-#.env*
+.env*
 
 # firebase
 firebase-debug.log

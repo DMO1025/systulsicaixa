@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-    ListChecks, Truck, Utensils, Building, Package, FileCheck2, UtensilsCrossed, HelpCircle, DollarSign
+    ListChecks, Truck, Utensils, Building, Package, FileCheck2, UtensilsCrossed, HelpCircle, DollarSign, Wallet, Refrigerator, CalendarDays, Sun, Moon, Coffee
 } from "lucide-react";
 
 interface PeriodSpecificReportViewProps {
@@ -17,7 +17,7 @@ interface PeriodSpecificReportViewProps {
 }
 
 const tabDefinitions = [
-    { id: 'faturados', label: 'FATURADOS', IconComp: ListChecks,
+    { id: 'faturados', label: 'FATURADOS', IconComp: Wallet,
       cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD FAT.', isNum: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'funcionario', label: 'R$ FUNC.', isCurrency: true}, {key: 'total', label: 'TOTAL FAT.', isCurrency: true}] },
     { id: 'ifood', label: 'IFOOD', IconComp: Truck,
       cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
@@ -43,6 +43,16 @@ const tabDefinitions = [
     // Unified tab for Madrugada
     { id: 'madrugadaResumo', label: 'RESUMO MADRUGADA', IconComp: UtensilsCrossed,
       cols: [ {key: 'date', label: 'DATA'}, {key: 'qtdPedidos', label: 'QTD PEDIDOS', isNum: true}, {key: 'qtdPratos', label: 'QTD PRATOS', isNum: true}, {key: 'pagDireto', label: 'PAG. DIRETO (R$)', isCurrency: true}, {key: 'valorServico', label: 'VALOR SERVIÇO (R$)', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true}] },
+    // Tab for Eventos
+    { id: 'eventos', label: 'RESUMO EVENTOS', IconComp: CalendarDays,
+      cols: [ {key: 'date', label: 'DATA'}, {key: 'diretoQtd', label: 'DIRETO (QTD)', isNum: true }, {key: 'diretoValor', label: 'DIRETO (R$)', isCurrency: true }, {key: 'hotelQtd', label: 'HOTEL (QTD)', isNum: true }, {key: 'hotelValor', label: 'HOTEL (R$)', isCurrency: true }, {key: 'totalQtd', label: 'TOTAL (QTD)', isNum: true }, {key: 'totalValor', label: 'TOTAL (R$)', isCurrency: true } ]},
+    // Frigobar has special tabs
+    { id: 'frigobarPT', label: '1º TURNO', IconComp: Sun,
+      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD QUARTOS', isNum: true}, {key: 'restaurante', label: 'R$ RESTAURANTE', isCurrency: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true} ]},
+    { id: 'frigobarST', label: '2º TURNO', IconComp: Sun,
+      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD QUARTOS', isNum: true}, {key: 'restaurante', label: 'R$ RESTAURANTE', isCurrency: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true} ]},
+    { id: 'frigobarJNT', label: 'JANTAR', IconComp: Moon,
+      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD QUARTOS', isNum: true}, {key: 'restaurante', label: 'R$ RESTAURANTE', isCurrency: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true} ]},
 ];
 
 const summaryTableItems = [
@@ -54,6 +64,12 @@ const summaryTableItems = [
     // Summary Items for Café da Manhã
     { item: "HÓSPEDES (CAFÉ)", dataKey: "cdmHospedes" },
     { item: "AVULSOS (CAFÉ)", dataKey: "cdmAvulsos" },
+    // Summary Items for Eventos
+    { item: "EVENTOS", dataKey: "eventos" },
+    // Summary Items for Frigobar
+    { item: "1º TURNO", dataKey: "frigobarPT" },
+    { item: "2º TURNO", dataKey: "frigobarST" },
+    { item: "JANTAR", dataKey: "frigobarJNT" },
 ];
 
 const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -62,6 +78,7 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
     const [activeDetailTab, setActiveDetailTab] = useState<string>('');
 
     const availableTabs = useMemo(() => {
+        const standardExclusions = ['frigobarPT', 'frigobarST', 'frigobarJNT'];
         if (periodId === 'madrugada') {
             return tabDefinitions.filter(tab => 
                 tab.id === 'madrugadaResumo' && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
@@ -72,8 +89,18 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                 (tab.id === 'cdmHospedes' || tab.id === 'cdmAvulsos') && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
             );
         }
+        if (periodId === 'eventos') {
+            return tabDefinitions.filter(tab => 
+                tab.id === periodId && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+            );
+        }
+        if (periodId === 'frigobar') {
+            return tabDefinitions.filter(tab => 
+                (tab.id === 'frigobarPT' || tab.id === 'frigobarST' || tab.id === 'frigobarJNT') && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+            );
+        }
         return tabDefinitions.filter(tab => 
-            !(tab.id.startsWith('cdm')) && !(tab.id.startsWith('madrugada')) && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+            !(tab.id.startsWith('cdm')) && !(tab.id.startsWith('madrugada')) && tab.id !== 'eventos' && !standardExclusions.includes(tab.id) && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
         );
     }, [data.dailyBreakdowns, periodId]);
 

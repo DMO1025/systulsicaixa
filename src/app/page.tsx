@@ -7,12 +7,12 @@ import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText } 
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import type { DailyLogEntry, PeriodId, DashboardAnalysisInput } from '@/lib/types';
-import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
 import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
 import { processEntryForTotals } from '@/lib/reportUtils';
+import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 
 
 import SummaryCards from '@/components/dashboard/SummaryCards';

@@ -1,6 +1,6 @@
 
 import type { DailyEntryFormData, DailyLogEntry, EventosPeriodData, PeriodData } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { format, parseISO, isValid } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -19,16 +19,16 @@ function processEntryFromSource(entry: any): DailyLogEntry {
       console.warn(`Data inválida da fonte para o ID ${processedEntry.id}: ${entry.date}`);
       processedEntry.date = new Date(NaN);
     }
-  } else if (processedEntry.date && !(processedEntry.date instanceof Date)) {
-     console.warn(`Data para o ID ${processedEntry.id} não é uma string ou objeto Date. Definindo como inválida.`);
+  } else if (entry.date && !(entry.date instanceof Date)) {
+     console.warn(`Data para o ID ${entry.id} não é uma string ou objeto Date. Definindo como inválida.`);
      processedEntry.date = new Date(NaN);
-  } else if (!processedEntry.date) {
-    if (processedEntry.id && typeof processedEntry.id === 'string') {
-        const parsedDateFromId = parseISO(processedEntry.id);
+  } else if (!entry.date) {
+    if (entry.id && typeof entry.id === 'string') {
+        const parsedDateFromId = parseISO(entry.id);
         if (isValid(parsedDateFromId)) {
             processedEntry.date = parsedDateFromId;
         } else {
-            console.warn(`Data ausente para o ID ${processedEntry.id}, e ID não é uma data válida. Definindo como inválida.`);
+            console.warn(`Data ausente para o ID ${entry.id}, e ID não é uma data válida. Definindo como inválida.`);
             processedEntry.date = new Date(NaN);
         }
     } else {
@@ -42,7 +42,8 @@ function processEntryFromSource(entry: any): DailyLogEntry {
     const periodKey = pDef.id as keyof DailyLogEntry;
     if (processedEntry[periodKey] && typeof processedEntry[periodKey] === 'string') {
       try {
-        processedEntry[periodKey] = JSON.parse(processedEntry[periodKey] as string);
+        const parsedData = JSON.parse(processedEntry[periodKey] as string);
+        processedEntry[periodKey] = parsedData;
       } catch (e) {
         console.error(`Erro ao analisar a string do período ${pDef.id} para o lançamento ${processedEntry.id}:`, e);
       }

@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { PERIOD_DEFINITIONS } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { useRouter } from 'next/navigation';
 import { Save, Eye, Loader2, ArrowLeft } from 'lucide-react';
 import type { CardVisibilityConfig } from '@/lib/types';

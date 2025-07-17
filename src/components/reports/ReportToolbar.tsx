@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
 import type { FilterType, PeriodId, DateRange } from '@/lib/types';
-import type { PeriodDefinition } from '@/lib/constants';
+import type { PeriodDefinition } from '@/lib/config/periods';
 
 interface ReportToolbarProps {
     filterType: FilterType;

@@ -4,7 +4,8 @@
 
 import { getSafeNumericValue } from '@/lib/utils';
 import type { DailyLogEntry, PeriodId, PeriodData, EventosPeriodData, ReportData, GeneralReportViewData, PeriodReportViewData, GeneralReportDailyItem, GeneralReportSummary, DailyCategoryDataItem } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { SALES_CHANNELS } from './config/forms';
 
 const getReportTitleLabel = (periodId: PeriodId | "all"): string => {
   if (periodId === "all") return "GERAL (MÊS)";
@@ -93,8 +94,8 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     };
 
     const frigobar = {
-        valor: (calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any)).valor + (calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any)).valor + (calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any)).valor + (calculatePeriodGrandTotal((entry as any).frigobar)).valor,
-        qtd: (calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any)).qtd + (calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any)).qtd + (calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any)).qtd + (calculatePeriodGrandTotal((entry as any).frigobar)).qtd
+        valor: (calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any)).valor + (calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any)).valor + (calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any)).valor,
+        qtd: (calculatePeriodGrandTotal((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar as any)).qtd + (calculatePeriodGrandTotal((entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar as any)).qtd + (calculatePeriodGrandTotal((entry.jantar as PeriodData)?.subTabs?.frigobar as any)).qtd
     };
 
     const eventosDireto = { qtd: 0, valor: 0 };
@@ -108,13 +109,13 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // --- ALMOÇO PT ---
     const almocoPTServicos = getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData);
     const almocoPTFaturado = {
-        qtd: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosFaturadosQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosValorFuncionario.vtotal')
+        qtd: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.faturado.channels.aptFaturadosQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.faturado.channels.aptFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.faturado.channels.aptFaturadosValorFuncionario.vtotal')
     };
     const almocoPTCI = {
-        qtd: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosConsumoInternoQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosTotalCI.vtotal'),
-        reajuste: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.ciEFaturados.channels.aptCiEFaturadosReajusteCI.vtotal')
+        qtd: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.consumoInterno.channels.aptConsumoInternoQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.consumoInterno.channels.aptTotalCI.vtotal'),
+        reajuste: getSafeNumericValue(entry, 'almocoPrimeiroTurno.subTabs.consumoInterno.channels.aptReajusteCI.vtotal')
     };
     const almocoPrimeiroTurnoTotal = {
         qtd: almocoPTServicos.qtd + almocoPTFaturado.qtd,
@@ -124,13 +125,13 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // --- ALMOÇO ST ---
     const almocoSTServicos = getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData);
     const almocoSTFaturado = {
-        qtd: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosFaturadosQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosValorFuncionario.vtotal')
+        qtd: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.faturado.channels.astFaturadosQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.faturado.channels.astFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.faturado.channels.astFaturadosValorFuncionario.vtotal')
     };
     const almocoSTCI = {
-        qtd: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosConsumoInternoQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosTotalCI.vtotal'),
-        reajuste: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.ciEFaturados.channels.astCiEFaturadosReajusteCI.vtotal')
+        qtd: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.consumoInterno.channels.astConsumoInternoQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.consumoInterno.channels.astTotalCI.vtotal'),
+        reajuste: getSafeNumericValue(entry, 'almocoSegundoTurno.subTabs.consumoInterno.channels.astReajusteCI.vtotal')
     };
     const almocoSegundoTurnoTotal = {
         qtd: almocoSTServicos.qtd + almocoSTFaturado.qtd,
@@ -140,13 +141,13 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // --- JANTAR ---
     const jantarServicos = getPeriodRestaurantTotal(entry.jantar as PeriodData);
     const jantarFaturado = {
-        qtd: getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosFaturadosQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosValorFuncionario.vtotal')
+        qtd: getSafeNumericValue(entry, 'jantar.subTabs.faturado.channels.jntFaturadosQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'jantar.subTabs.faturado.channels.jntFaturadosValorHotel.vtotal') + getSafeNumericValue(entry, 'jantar.subTabs.faturado.channels.jntFaturadosValorFuncionario.vtotal')
     };
     const jantarCI = {
-        qtd: getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosConsumoInternoQtd.qtd'),
-        valor: getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal'),
-        reajuste: getSafeNumericValue(entry, 'jantar.subTabs.ciEFaturados.channels.jntCiEFaturadosReajusteCI.vtotal')
+        qtd: getSafeNumericValue(entry, 'jantar.subTabs.consumoInterno.channels.jntConsumoInternoQtd.qtd'),
+        valor: getSafeNumericValue(entry, 'jantar.subTabs.consumoInterno.channels.jntTotalCI.vtotal'),
+        reajuste: getSafeNumericValue(entry, 'jantar.subTabs.consumoInterno.channels.jntReajusteCI.vtotal')
     };
     const jantarTotal = {
         qtd: jantarServicos.qtd + jantarFaturado.qtd,
@@ -253,10 +254,40 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     madrugadaValorServicoValor: 0,
     madrugadaQtdPedidos: 0,
     madrugadaQtdPratos: 0,
+    eventosDiretoQtd: 0, eventosDiretoValor: 0,
+    eventosHotelQtd: 0, eventosHotelValor: 0,
+    frigobarPTQtd: 0, frigobarPTRestauranteValor: 0, frigobarPTHotelValor: 0, frigobarPTTotalValor: 0,
+    frigobarSTQtd: 0, frigobarSTRestauranteValor: 0, frigobarSTHotelValor: 0, frigobarSTTotalValor: 0,
+    frigobarJNTQtd: 0, frigobarJNTRestauranteValor: 0, frigobarJNTHotelValor: 0, frigobarJNTTotalValor: 0,
   };
 
   const periodEntryData = entry[periodId] as PeriodData | EventosPeriodData | undefined;
-  if (!periodEntryData || typeof periodEntryData === 'string') return data;
+  
+  if (periodId === 'frigobar') {
+    const frigobarAlmocoPT = (entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.frigobar;
+    data.frigobarPTQtd = getSafeNumericValue(frigobarAlmocoPT, 'channels.frigobarTotalQuartos.qtd');
+    data.frigobarPTRestauranteValor = getSafeNumericValue(frigobarAlmocoPT, 'channels.frigobarPagRestaurante.vtotal');
+    data.frigobarPTHotelValor = getSafeNumericValue(frigobarAlmocoPT, 'channels.frigobarPagHotel.vtotal');
+    data.frigobarPTTotalValor = data.frigobarPTRestauranteValor + data.frigobarPTHotelValor;
+
+    const frigobarAlmocoST = (entry.almocoSegundoTurno as PeriodData)?.subTabs?.frigobar;
+    data.frigobarSTQtd = getSafeNumericValue(frigobarAlmocoST, 'channels.frigobarTotalQuartos.qtd');
+    data.frigobarSTRestauranteValor = getSafeNumericValue(frigobarAlmocoST, 'channels.frigobarPagRestaurante.vtotal');
+    data.frigobarSTHotelValor = getSafeNumericValue(frigobarAlmocoST, 'channels.frigobarPagHotel.vtotal');
+    data.frigobarSTTotalValor = data.frigobarSTRestauranteValor + data.frigobarSTHotelValor;
+
+    const frigobarJantar = (entry.jantar as PeriodData)?.subTabs?.frigobar;
+    data.frigobarJNTQtd = getSafeNumericValue(frigobarJantar, 'channels.frigobarTotalQuartos.qtd');
+    data.frigobarJNTRestauranteValor = getSafeNumericValue(frigobarJantar, 'channels.frigobarPagRestaurante.vtotal');
+    data.frigobarJNTHotelValor = getSafeNumericValue(frigobarJantar, 'channels.frigobarPagHotel.vtotal');
+    data.frigobarJNTTotalValor = data.frigobarJNTRestauranteValor + data.frigobarJNTHotelValor;
+
+    return data;
+  }
+  
+  if (!periodEntryData || typeof periodEntryData === 'string') {
+    return data;
+  }
 
   const prefixes: ('apt' | 'ast' | 'jnt')[] = [];
   if (periodId === 'almocoPrimeiroTurno') prefixes.push('apt');
@@ -266,11 +297,10 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
   if (prefixes.length > 0) {
     prefixes.forEach(prefix => {
       const pData = periodEntryData as PeriodData;
-      const cifKey = `${prefix}CiEFaturados`;
       
-      const hotelValor = getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorHotel.vtotal`);
-      const funcionarioValor = getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ValorFuncionario.vtotal`);
-      data.faturadosQtd += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}FaturadosQtd.qtd`);
+      const hotelValor = getSafeNumericValue(pData, `subTabs.faturado.channels.${prefix}FaturadosValorHotel.vtotal`);
+      const funcionarioValor = getSafeNumericValue(pData, `subTabs.faturado.channels.${prefix}FaturadosValorFuncionario.vtotal`);
+      data.faturadosQtd += getSafeNumericValue(pData, `subTabs.faturado.channels.${prefix}FaturadosQtd.qtd`);
       data.faturadosHotelValor += hotelValor;
       data.faturadosFuncionarioValor += funcionarioValor;
       data.faturadosTotalValor += hotelValor + funcionarioValor;
@@ -296,12 +326,12 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
       data.hospedesQtd += getSafeNumericValue(pData, `subTabs.hospedes.channels.${prefix}HospedesQtdHospedes.qtd`);
       data.hospedesValor += getSafeNumericValue(pData, `subTabs.hospedes.channels.${prefix}HospedesPagamentoHospedes.vtotal`);
 
-      data.retiradaQtd += getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaQtd.qtd`);
-      data.retiradaValor += getSafeNumericValue(pData, `subTabs.clienteMesa.channels.${prefix}ClienteMesaRetiradaValor.vtotal`);
+      data.retiradaQtd += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}ClienteMesaRetiradaQtd.qtd`);
+      data.retiradaValor += getSafeNumericValue(pData, `subTabs.delivery.channels.${prefix}ClienteMesaRetiradaValor.vtotal`);
 
-      data.ciQtd += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ConsumoInternoQtd.qtd`);
-      data.ciReajusteValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}ReajusteCI.vtotal`);
-      data.ciTotalValor += getSafeNumericValue(pData, `subTabs.ciEFaturados.channels.${cifKey}TotalCI.vtotal`);
+      data.ciQtd += getSafeNumericValue(pData, `subTabs.consumoInterno.channels.${prefix}ConsumoInternoQtd.qtd`);
+      data.ciReajusteValor += getSafeNumericValue(pData, `subTabs.consumoInterno.channels.${prefix}ReajusteCI.vtotal`);
+      data.ciTotalValor += getSafeNumericValue(pData, `subTabs.consumoInterno.channels.${prefix}TotalCI.vtotal`);
 
       data.roomServiceQtd += getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServiceQtdPedidos.qtd`);
       data.roomServiceValor += getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServicePagDireto.vtotal`) + getSafeNumericValue(pData, `subTabs.roomService.channels.${prefix}RoomServiceValorServico.vtotal`);
@@ -324,10 +354,13 @@ const extractDetailedCategoryDataForPeriod = (entry: DailyLogEntry, periodId: Pe
     data.cdmCafeAssinadoValor += getSafeNumericValue(pData, 'channels.cdmCafeAssinado.vtotal');
     data.cdmDiretoCartaoQtd += getSafeNumericValue(pData, 'channels.cdmDiretoCartao.qtd');
     data.cdmDiretoCartaoValor += getSafeNumericValue(pData, 'channels.cdmDiretoCartao.vtotal');
-  } else if (periodId === 'frigobar') {
-    const pData = periodEntryData as PeriodData;
-    data.genericPeriodQtd += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTTotalQuartos.qtd') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTTotalQuartos.qtd');
-    data.genericPeriodValor += getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.primeiroTurno.channels.frgPTPagHotel.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(pData, 'subTabs.segundoTurno.channels.frgSTPagHotel.vtotal');
+  } else if (periodId === 'eventos') {
+      const evData = periodEntryData as EventosPeriodData;
+      (evData.items || []).forEach(item => { (item.subEvents || []).forEach(subEvent => {
+          const qty = subEvent.quantity || 0; const val = subEvent.totalValue || 0;
+          if (subEvent.location === 'DIRETO') { data.eventosDiretoQtd += qty; data.eventosDiretoValor += val; }
+          else if (subEvent.location === 'HOTEL') { data.eventosHotelQtd += qty; data.eventosHotelValor += val; }
+      }); });
   } else if (['baliAlmoco', 'baliHappy', 'deliverysEventos', 'extras', 'cafeJasmin', 'italianoAlmoco', 'italianoJantar', 'indianoAlmoco', 'indianoJantar', 'breakfast'].includes(periodId)) {
     const pData = periodEntryData as PeriodData;
     if (pData.channels) {
@@ -434,7 +467,9 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
       const dailyResults: Record<string, DailyCategoryDataItem[]> = {
         faturados: [], ifood: [], rappi: [], mesa: [], hospedes: [], retirada: [], ci: [], roomService: [], generic: [],
         cdmHospedes: [], cdmAvulsos: [], 
-        madrugadaPagDireto: [], madrugadaValorServico: [], madrugadaResumo: [],
+        madrugadaResumo: [],
+        eventos: [],
+        frigobarPT: [], frigobarST: [], frigobarJNT: [],
       };
       const summaryAcc: Record<string, { qtd: number; total: number; reajuste?: number; qtdPedidos?: number, qtdPratos?: number, totalPagDireto?: number, totalValorServico?: number }> = {
         faturados: { qtd: 0, total: 0 }, ifood: { qtd: 0, total: 0 }, rappi: { qtd: 0, total: 0 },
@@ -442,6 +477,8 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
         consumoInterno: { qtd: 0, total: 0, reajuste: 0 }, roomService: { qtd: 0, total: 0 }, generic: {qtd: 0, total: 0},
         cdmHospedes: { qtd: 0, total: 0 }, cdmAvulsos: { qtd: 0, total: 0 },
         madrugadaResumo: { qtd: 0, total: 0, qtdPedidos: 0, qtdPratos: 0, totalPagDireto: 0, totalValorServico: 0 },
+        eventos: { qtd: 0, total: 0 },
+        frigobarPT: { qtd: 0, total: 0 }, frigobarST: { qtd: 0, total: 0 }, frigobarJNT: { qtd: 0, total: 0 },
       };
 
       filteredEntries.forEach(entry => {
@@ -456,8 +493,6 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
 
             if (pagDireto > 0 || valorServico > 0 || qtdPedidos > 0 || qtdPratos > 0) {
                 dailyResults.madrugadaResumo.push({ date: entryDateStr, qtdPedidos, qtdPratos, pagDireto, valorServico, total: pagDireto + valorServico });
-                if (pagDireto > 0) dailyResults.madrugadaPagDireto.push({ date: entryDateStr, valor: pagDireto });
-                if (valorServico > 0) dailyResults.madrugadaValorServico.push({ date: entryDateStr, valor: valorServico });
             }
             
             (summaryAcc.madrugadaResumo.qtdPedidos as number) += qtdPedidos;
@@ -492,6 +527,27 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
             }
             summaryAcc.cdmAvulsos.qtd += avulsosTotalQtd;
             summaryAcc.cdmAvulsos.total += avulsosTotalValor;
+        } else if (selectedPeriod === 'frigobar') {
+            const { frigobarPTQtd, frigobarPTRestauranteValor, frigobarPTHotelValor, frigobarPTTotalValor } = dailyData;
+            if(frigobarPTQtd > 0 || frigobarPTTotalValor > 0) { dailyResults.frigobarPT.push({ date: entryDateStr, qtd: frigobarPTQtd, restaurante: frigobarPTRestauranteValor, hotel: frigobarPTHotelValor, total: frigobarPTTotalValor }); }
+            summaryAcc.frigobarPT.qtd += frigobarPTQtd; summaryAcc.frigobarPT.total += frigobarPTTotalValor;
+            
+            const { frigobarSTQtd, frigobarSTRestauranteValor, frigobarSTHotelValor, frigobarSTTotalValor } = dailyData;
+            if(frigobarSTQtd > 0 || frigobarSTTotalValor > 0) { dailyResults.frigobarST.push({ date: entryDateStr, qtd: frigobarSTQtd, restaurante: frigobarSTRestauranteValor, hotel: frigobarSTHotelValor, total: frigobarSTTotalValor }); }
+            summaryAcc.frigobarST.qtd += frigobarSTQtd; summaryAcc.frigobarST.total += frigobarSTTotalValor;
+
+            const { frigobarJNTQtd, frigobarJNTRestauranteValor, frigobarJNTHotelValor, frigobarJNTTotalValor } = dailyData;
+            if(frigobarJNTQtd > 0 || frigobarJNTTotalValor > 0) { dailyResults.frigobarJNT.push({ date: entryDateStr, qtd: frigobarJNTQtd, restaurante: frigobarJNTRestauranteValor, hotel: frigobarJNTHotelValor, total: frigobarJNTTotalValor }); }
+            summaryAcc.frigobarJNT.qtd += frigobarJNTQtd; summaryAcc.frigobarJNT.total += frigobarJNTTotalValor;
+        } else if (selectedPeriod === 'eventos') {
+            const { eventosDiretoQtd, eventosDiretoValor, eventosHotelQtd, eventosHotelValor } = dailyData;
+            const totalQtd = eventosDiretoQtd + eventosHotelQtd;
+            const totalValor = eventosDiretoValor + eventosHotelValor;
+            if (totalQtd > 0 || totalValor > 0) {
+                dailyResults.eventos.push({ date: entryDateStr, diretoQtd: eventosDiretoQtd, diretoValor: eventosDiretoValor, hotelQtd: eventosHotelQtd, hotelValor: eventosHotelValor, totalQtd, totalValor });
+            }
+            summaryAcc.eventos.qtd += totalQtd;
+            summaryAcc.eventos.total += totalValor;
         } else {
             if (dailyData.faturadosTotalValor > 0 || dailyData.faturadosQtd > 0) { dailyResults.faturados.push({ date: entryDateStr, qtd: dailyData.faturadosQtd, hotel: dailyData.faturadosHotelValor, funcionario: dailyData.faturadosFuncionarioValor, total: dailyData.faturadosTotalValor }); }
             if (dailyData.ifoodValor > 0 || dailyData.ifoodQtd > 0) { dailyResults.ifood.push({ date: entryDateStr, qtd: dailyData.ifoodQtd, valor: dailyData.ifoodValor }); }
@@ -523,7 +579,7 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
             ? (summaryAcc.madrugadaResumo.qtdPedidos || 0)
             : Object.values(summaryAcc).reduce((sum, cat) => sum + cat.qtd, 0);
       
-      const subtotalGeralSemCI_TOTAL = subtotalGeralComCI_TOTAL - (summaryAcc.consumoInterno?.total || 0);
+      const subtotalGeralSemCI_TOTAL = subtotalGeralComCI_TOTAL - (summaryAcc.consumoInterno?.total || 0) - (summaryAcc.consumoInterno?.reajuste || 0);
       const subtotalGeralSemCI_QTD = subtotalGeralComCI_QTD - (summaryAcc.consumoInterno?.qtd || 0);
 
       const data: PeriodReportViewData = {
@@ -536,5 +592,7 @@ export const generateReportData = (filteredEntries: DailyLogEntry[], selectedPer
       return { type: 'period', data };
     }
 };
+
+    
 
     

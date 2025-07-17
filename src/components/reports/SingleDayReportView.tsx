@@ -6,7 +6,8 @@ import React, { useMemo } from 'react';
 import type { DailyLogEntry, PeriodData, EventosPeriodData, SalesChannelId } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PERIOD_DEFINITIONS, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
 import { processEntryForTotals } from '@/lib/reportUtils';
 import { DollarSign, ReceiptText, ChevronDown } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -171,9 +172,9 @@ const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
                 } else if (label === 'CONSUMO INTERNO') {
                     items.push({key: 'ConsumoInternoQtd', label: '* CONSUMO INTERNO - CI (QTD)', type: 'qtd'}, {key: 'ReajusteCI', label: 'REAJUSTE DE C.I', type: 'vtotal'}, {key: 'TotalCI', label: 'TOTAL C.I', type: 'vtotal'});
                 } else if (label === 'FRIGOBAR') {
-                    if (subTabKey.includes('PT')) { items.push({key: 'frgPTTotalQuartos', label: 'TOTAL DE QUARTOS (1º Turno)', type: 'qtd'}, {key: 'frgPTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (1º Turno)', type: 'vtotal'}, {key: 'frgPTPagHotel', label: 'PAGAMENTO HOTÉL (1º Turno)', type: 'vtotal'}); }
-                    if (subTabKey.includes('ST')) { items.push({key: 'frgSTTotalQuartos', label: 'TOTAL DE QUARTOS (2º Turno)', type: 'qtd'}, {key: 'frgSTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (2º Turno)', type: 'vtotal'}, {key: 'frgSTPagHotel', label: 'PAGAMENTO HOTÉL (2º Turno)', type: 'vtotal'}); }
-                    if (subTabKey.includes('JNT')) { items.push({key: 'frgJNTTotalQuartos', label: 'TOTAL DE QUARTOS (Jantar)', type: 'qtd'}, {key: 'frgJNTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (Jantar)', type: 'vtotal'}, {key: 'frgJNTPagHotel', label: 'PAGAMENTO HOTÉL (Jantar)', type: 'vtotal'}); }
+                    if (subTabKey.includes('PT')) { items.push({key: 'frgPTTotalQuartos', label: 'TOTAL DE QUARTOS (1º Turno)', type: 'qtd'}, {key: 'frgPTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (1º Turno)', type: 'vtotal'}, {key: 'frgPTPagHotel', label: 'PAGAMENTO HOTEL (1º Turno)', type: 'vtotal'}); }
+                    if (subTabKey.includes('ST')) { items.push({key: 'frgSTTotalQuartos', label: 'TOTAL DE QUARTOS (2º Turno)', type: 'qtd'}, {key: 'frgSTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (2º Turno)', type: 'vtotal'}, {key: 'frgSTPagHotel', label: 'PAGAMENTO HOTEL (2º Turno)', type: 'vtotal'}); }
+                    if (subTabKey.includes('JNT')) { items.push({key: 'frgJNTTotalQuartos', label: 'TOTAL DE QUARTOS (Jantar)', type: 'qtd'}, {key: 'frgJNTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (Jantar)', type: 'vtotal'}, {key: 'frgJNTPagHotel', label: 'PAGAMENTO HOTEL (Jantar)', type: 'vtotal'}); }
                 }
 
                 const sectionRows: React.ReactNode[] = [];

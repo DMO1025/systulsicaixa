@@ -6,13 +6,16 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileSpreadsheet, Download } from 'lucide-react';
-import { PERIOD_DEFINITIONS, PERIOD_FORM_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
-import type { PeriodId, SalesChannelId } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { PERIOD_FORM_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import type { PeriodId, SalesChannelId } from '@/lib/types';
 
 export default function DataTemplatesPage() {
 
   const generateHeaders = (periodId: PeriodId): { sheetName: string; data: (string[])[] }[] => {
     const periodConfig = PERIOD_FORM_CONFIG[periodId];
+    if (!periodConfig) return [];
+    
     const sheets = [];
 
     if (periodId === 'eventos') {

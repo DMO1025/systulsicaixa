@@ -3,7 +3,7 @@ import mysql from 'mysql2/promise';
 import type { Pool, PoolOptions } from 'mysql2/promise';
 import { getSettingFromFile } from '@/lib/fileDb';
 import type { MysqlConnectionConfig } from './types';
-import { PERIOD_DEFINITIONS } from './constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 
 let pool: Pool | null = null;
 

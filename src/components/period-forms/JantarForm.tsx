@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
+import type { PeriodId, PeriodDefinition } from '@/lib/config/periods';
+import { getPeriodIcon } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/config/forms';
+import { getSubTabIcon } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
 import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
 import { Refrigerator } from 'lucide-react';
@@ -67,7 +69,7 @@ const JantarForm: React.FC<PeriodFormProps> = ({
         jantarSubTabsTotal = valor;
     }
 
-    const frigobarJantarTotal = getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
+    const frigobarJantarTotal = getVtotal('jantar.subTabs.frigobar.channels.frigobarPagRestaurante.vtotal') + getVtotal('jantar.subTabs.frigobar.channels.frigobarPagHotel.vtotal');
 
     return jantarSubTabsTotal + frigobarJantarTotal;
   }, [watchedData]);

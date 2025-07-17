@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon } from '@/lib/constants';
+import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
+import type { PeriodId } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/config/forms';
 
 // Re-using PeriodFormProps from MadrugadaForm or define it here if preferred
 interface PeriodFormProps {
