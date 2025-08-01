@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { GeneralReportDailyItem } from '@/lib/types';
+import { parseISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale/pt-BR';
 
 interface ReportLineChartProps {
   data: GeneralReportDailyItem[];
@@ -21,7 +23,7 @@ const chartConfig = {
 
 const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, description }) => {
   const chartData = data.map(item => ({
-    date: item.date,
+    date: item.date.split('/').reverse().join('-'), // Convert DD/MM/YYYY to YYYY-MM-DD for parsing
     valorSemCI: item.totalSemCI,
     valorCI: item.totalComCI - item.totalSemCI - item.totalReajusteCI,
     reajusteCIValor: item.totalReajusteCI,
@@ -44,6 +46,10 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
                 axisLine={false}
                 tickMargin={8}
                 fontSize={12}
+                tickFormatter={(value) => {
+                  const date = parseISO(value);
+                  return format(date, "dd/MM", { timeZone: 'UTC', locale: ptBR });
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `R$${(value / 1000).toLocaleString('pt-BR')}k`}
@@ -76,7 +82,10 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
                             </div>
                         );
                     }}
-                    labelKey="date"
+                     labelFormatter={(label) => {
+                      const date = parseISO(label);
+                      return format(date, "PPP", { timeZone: 'UTC', locale: ptBR });
+                    }}
                     />
                 }
               />

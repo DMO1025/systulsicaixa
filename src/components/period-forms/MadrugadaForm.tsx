@@ -6,9 +6,10 @@ import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig, OperatorShift } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon } from '@/lib/constants';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, OperatorShift, GroupedChannelConfig } from '@/lib/types';
+import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
+import type { PeriodId } from '@/lib/config/periods';
+import { SALES_CHANNELS, type IndividualPeriodConfig as PeriodConfig, type IndividualSubTabConfig as SubTabConfig, type SalesChannelId } from '@/lib/config/forms';
 
 export interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -18,7 +19,7 @@ export interface PeriodFormProps {
   unitPricesConfig: ChannelUnitPricesConfig;
   calculatePeriodTotal: (periodId: PeriodId) => number;
   renderChannelInputs: (
-    channelsConfig: NonNullable<PeriodConfig['channels'] | SubTabConfig['channels']>,
+    groupedChannels: GroupedChannelConfig[],
     basePath: string,
     totalValue: number,
     currentForm: UseFormReturn<DailyEntryFormData>,
@@ -47,6 +48,12 @@ const MadrugadaForm: React.FC<PeriodFormProps> = ({
     cardDescriptionText = "ROOM SERVICE MADRUGADA";
   }
 
+  const groupedChannels: GroupedChannelConfig[] = periodConfig.channels ? Object.entries(periodConfig.channels).map(([key, value]) => ({
+    label: SALES_CHANNELS[key as SalesChannelId] || key,
+    qtd: value.qtd ? key as SalesChannelId : undefined,
+    vtotal: value.vtotal ? key as SalesChannelId : undefined,
+  })) : [];
+
   return (
     <Card>
       <CardHeader>
@@ -65,7 +72,7 @@ const MadrugadaForm: React.FC<PeriodFormProps> = ({
         {periodConfig.channels && Object.keys(periodConfig.channels).length > 0 ? (
           <div className="space-y-4">
             {renderChannelInputs(
-              periodConfig.channels,
+              groupedChannels,
               `${periodId}.channels`,
               periodTotal,
               form,

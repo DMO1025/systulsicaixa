@@ -1,18 +1,18 @@
 
 {
   "channelUnitPricesConfig": {
-    "cdmListaHospedes": 15,
-    "cdmNoShow": 15,
-    "cdmSemCheckIn": 15
+    "cdmNoShow": 45.6,
+    "cdmSemCheckIn": 45.58,
+    "cdmListaHospedes": 45.6
   },
   "dashboardItemVisibilityConfig": {
     "ROOM SERVICE": true,
     "CAFÉ DA MANHÃ": true,
     "BREAKFAST": false,
     "ALMOÇO": true,
-    "ALMOÇO C.I.": true,
+    "ALMOÇO C.I.": false,
     "JANTAR": true,
-    "JANTAR C.I.": true,
+    "JANTAR C.I.": false,
     "RW ITALIANO ALMOÇO": false,
     "RW ITALIANO JANTAR": false,
     "RW INDIANO ALMOÇO": false,
@@ -26,6 +26,7 @@
   "cardVisibilityConfig": {
     "madrugada": true,
     "cafeDaManha": true,
+    "cafeManhaNoShow": true,
     "almocoPrimeiroTurno": true,
     "almocoSegundoTurno": true,
     "jantar": true,
@@ -50,6 +51,8 @@
     "rwItalianoJantar": false,
     "rwIndianoAlmoco": false,
     "rwIndianoJantar": false,
+    "baliAlmoco": false,
+    "baliHappy": false,
     "frigobar": true,
     "cafeHospedes": true,
     "almocoCI": true,
@@ -58,10 +61,36 @@
     "eventosHotel": true
   },
   "mysqlConnectionConfig": {
-    "host": "186.202.152.74",
+    "host": "186.202.152.196",
     "port": 3306,
-    "user": "vercel",
+    "user": "agendat",
     "password": "Tulsi@123",
-    "database": "vercel"
-  }
+    "database": "agendat"
+  },
+  "billedClients": [
+    {
+      "id": "2fe25308-8d2e-446a-aaa3-aa9c46f39a6f",
+      "name": "demetrios"
+    },
+    {
+      "id": "c685e68f-5b8f-40e8-a868-018236effd68",
+      "name": "delipe"
+    },
+    {
+      "id": "6566c70d-3326-40e7-88fe-6cd8f767a4ab",
+      "name": "teste"
+    },
+    {
+      "id": "70cc9769-6b3a-4063-a1e2-263d0d759476",
+      "name": "teste 2"
+    },
+    {
+      "id": "dc514e88-0086-490f-bd70-17cee6bbdf81",
+      "name": "demetrios teste 2"
+    },
+    {
+      "id": "b72e629a-475b-4a50-8886-76167fb2469b",
+      "name": "teste 03"
+    }
+  ]
 }

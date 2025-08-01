@@ -21,6 +21,7 @@ import {
   FileText,
   CalendarPlus,
   HelpCircle,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -28,10 +29,12 @@ import { cn } from '@/lib/utils';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import type { PageId } from '@/lib/types';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 
 const baseNavItems = [
   { id: 'dashboard', href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'entry', href: '/entry', label: 'Lançamento Diário', icon: CalendarPlus },
+  { id: 'controls', href: '/controls', label: 'Controles Diários', icon: ClipboardCheck },
   { id: 'reports', href: '/reports', label: 'Relatórios', icon: FileText },
   { id: 'help', href: '/help', label: 'Ajuda', icon: HelpCircle },
 ];
@@ -53,19 +56,31 @@ export default function Header() {
     return false;
   });
 
-  const getLinkClassName = (href: string) => {
-    // Exact match for homepage, startsWith for others
+  const getIsActive = (href: string) => {
+    // Exact match for homepage
     if (href === '/') {
-        return pathname === href ? "bg-muted text-primary font-semibold" : "font-medium";
+        return pathname === href;
     }
-    return pathname.startsWith(href) ? "bg-muted text-primary font-semibold" : "font-medium";
+    // Handle the /entry/ and /controls/ paths
+    if (pathname.startsWith('/entry/')) {
+        const periodId = pathname.split('/')[2];
+        const periodDef = PERIOD_DEFINITIONS.find(p => p.id === periodId);
+        if (periodDef) {
+            if (periodDef.type === 'control' && href === '/controls') return true;
+            if (periodDef.type === 'entry' && href === '/entry') return true;
+        }
+        return false; // Fallback if no specific period matches
+    }
+    // Default check for other pages like /reports, /help
+    return pathname.startsWith(href);
+  };
+
+  const getLinkClassName = (href: string) => {
+    return getIsActive(href) ? "bg-muted text-primary font-semibold" : "font-medium";
   };
 
   const getButtonVariant = (href: string) => {
-    if (href === '/') {
-      return pathname === href ? 'secondary' : 'ghost';
-    }
-    return pathname.startsWith(href) ? 'secondary' : 'ghost';
+    return getIsActive(href) ? 'secondary' : 'ghost';
   };
 
 
@@ -85,7 +100,7 @@ export default function Header() {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                 </svg>
-                <SheetTitle className="text-xl font-semibold text-primary">SysTulsi Caixa</SheetTitle>
+                <SheetTitle className="text-xl font-semibold text-primary">Caixa Tulsi</SheetTitle>
               </Link>
             </SheetHeader>
             <nav className="grid gap-2 text-lg font-medium">
@@ -112,7 +127,7 @@ export default function Header() {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
           </svg>
-          <h1 className="text-xl font-semibold text-primary">SysTulsi Caixa</h1>
+          <h1 className="text-xl font-semibold text-primary">Caixa Tulsi</h1>
         </Link>
         <nav className="flex items-center gap-1">
           {navItems.map((item) => (

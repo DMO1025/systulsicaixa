@@ -6,9 +6,10 @@ import type { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon } from '@/lib/constants';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, GroupedChannelConfig } from '@/lib/types';
+import { getPeriodIcon, type PeriodDefinition, type PeriodId } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/config/forms';
+
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -18,7 +19,7 @@ interface PeriodFormProps {
   unitPricesConfig: ChannelUnitPricesConfig;
   calculatePeriodTotal: (periodId: PeriodId) => number;
   renderChannelInputs: (
-    channelsConfig: NonNullable<PeriodConfig['channels'] | SubTabConfig['channels']>,
+    groupedChannels: GroupedChannelConfig[],
     basePath: string,
     totalValue: number,
     currentForm: UseFormReturn<DailyEntryFormData>,
@@ -40,6 +41,11 @@ const BaliHappyForm: React.FC<PeriodFormProps> = ({
   const periodTotal = calculatePeriodTotal(periodId);
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
 
+  const groupedChannels: GroupedChannelConfig[] = [
+    { label: "Valor Total", vtotal: "genericTotalValue" },
+    { label: "Quantidade Itens", qtd: "genericQtdItems" },
+  ];
+
   return (
     <Card>
       <CardHeader>
@@ -58,7 +64,7 @@ const BaliHappyForm: React.FC<PeriodFormProps> = ({
         {periodConfig.channels && Object.keys(periodConfig.channels).length > 0 ? (
           <div className="space-y-4">
             {renderChannelInputs(
-              periodConfig.channels,
+              groupedChannels,
               `${periodId}.channels`,
               periodTotal,
               form,

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -8,20 +9,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Download, CalendarIcon } from "lucide-react";
+import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
 import type { FilterType, PeriodId, DateRange } from '@/lib/types';
-import type { PeriodDefinition } from '@/lib/constants';
+import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
 
 interface ReportToolbarProps {
     filterType: FilterType;
     setFilterType: (value: FilterType) => void;
     selectedDate: Date | undefined;
     setSelectedDate: (date: Date | undefined) => void;
-    selectedPeriod: PeriodId | 'all';
-    setSelectedPeriod: (value: PeriodId | 'all') => void;
+    selectedPeriod: PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService';
+    setSelectedPeriod: (value: PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService') => void;
     visiblePeriodDefinitions: PeriodDefinition[];
     selectedMonth: Date;
     setSelectedMonth: (date: Date) => void;
@@ -31,6 +32,8 @@ interface ReportToolbarProps {
     isDataAvailable: boolean;
     isPeriodFilterDisabled: boolean;
     datesWithEntries: Date[];
+    consumptionType: string;
+    setConsumptionType: (value: string) => void;
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -48,7 +51,9 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     handleExport,
     isDataAvailable,
     isPeriodFilterDisabled,
-    datesWithEntries
+    datesWithEntries,
+    consumptionType,
+    setConsumptionType
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -80,6 +85,23 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     const modifiers = { hasEntry: datesWithEntries };
     const modifiersClassNames = { hasEntry: 'has-entry-dot' };
 
+    const sortedPeriodOptions = React.useMemo(() => {
+        const specialPeriods = [
+            { id: 'roomService', label: 'Room Service', icon: BedDouble },
+            { id: 'frigobar', label: 'Frigobar', icon: Refrigerator },
+            { id: 'consumoInterno', label: 'Consumo Interno', icon: FileCheck2 },
+            { id: 'faturado', label: 'Faturado', icon: Wallet },
+        ];
+        
+        const regularPeriods = visiblePeriodDefinitions
+            .filter(p => p.type === 'entry') // Filter out control types
+            .map(p => ({ ...p, icon: getPeriodIcon(p.id) }));
+
+        const allOptions = [...regularPeriods, ...specialPeriods];
+        return allOptions.sort((a, b) => a.label.localeCompare(b.label));
+    }, [visiblePeriodDefinitions]);
+
+
     return (
         <Card>
             <CardHeader>
@@ -102,10 +124,14 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                             <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="date">Por Data Específica</SelectItem>
-                            <SelectItem value="range">Por Intervalo de Datas</SelectItem>
-                            <SelectItem value="period">Por Período (dentro do Mês)</SelectItem>
-                            <SelectItem value="month">Geral (Mês Inteiro)</SelectItem>
+                            <SelectItem value="date"><div className="flex items-center gap-2"><CalendarIcon className="h-4 w-4"/>Por Data Específica</div></SelectItem>
+                            <SelectItem value="range"><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4"/>Por Intervalo de Datas</div></SelectItem>
+                            <SelectItem value="period"><div className="flex items-center gap-2"><ListFilter className="h-4 w-4"/>Por Período (dentro do Mês)</div></SelectItem>
+                            <SelectItem value="month"><div className="flex items-center gap-2"><BarChartBig className="h-4 w-4"/>Geral (Mês Inteiro)</div></SelectItem>
+                            <SelectItem value="client-extract"><div className="flex items-center gap-2"><UserSquare className="h-4 w-4"/>Por Pessoa (Extrato Detalhado)</div></SelectItem>
+                            <SelectItem value="client-summary"><div className="flex items-center gap-2"><Users className="h-4 w-4"/>Por Pessoa (Resumo Mensal)</div></SelectItem>
+                            <SelectItem value="controle-cafe"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4"/>Controle Café da Manhã</div></SelectItem>
+                            <SelectItem value="controle-cafe-no-show"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4"/>Controle No-Show Café da Manhã</div></SelectItem>
                         </SelectContent>
                         </Select>
                     </div>
@@ -135,7 +161,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
                     
-                    {filterType === 'range' && (
+                    {(filterType === 'range' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) && (
                         <div className="space-y-2 min-w-full md:min-w-[280px] flex-grow md:flex-grow-0">
                             <Label htmlFor="date-range">Intervalo de Datas</Label>
                              <Popover>
@@ -176,17 +202,50 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                     {filterType === 'period' && (
                         <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
                         <Label htmlFor="period">Período</Label>
-                        <Select value={String(selectedPeriod)} onValueChange={(value) => setSelectedPeriod(value as PeriodId | 'all')}>
+                        <Select value={String(selectedPeriod)} onValueChange={(value) => setSelectedPeriod(value as any)}>
                             <SelectTrigger id="period" className="w-full">
-                            <SelectValue placeholder="Selecione o período" />
+                                <SelectValue placeholder="Selecione o período" />
                             </SelectTrigger>
                             <SelectContent>
-                            <SelectItem value="all">Todos os Períodos</SelectItem>
-                            {visiblePeriodDefinitions.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                                <SelectItem value="all">
+                                    <div className="flex items-center gap-2">
+                                        Todos os Períodos
+                                    </div>
+                                </SelectItem>
+                                {sortedPeriodOptions.filter(p => p.type === 'entry').map(p => {
+                                    const Icon = p.icon;
+                                    return (
+                                        <SelectItem key={p.id} value={p.id}>
+                                            <div className="flex items-center gap-2">
+                                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                                {p.label}
+                                            </div>
+                                        </SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
                         </div>
                     )}
+
+                    {(filterType === 'client-summary' || filterType === 'client-extract') && (
+                         <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
+                            <Label htmlFor="consumptionType">Tipo de Consumo</Label>
+                            <Select value={consumptionType} onValueChange={setConsumptionType}>
+                                <SelectTrigger id="consumptionType" className="w-full">
+                                    <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
+                                    <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
+                                    <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
+                                    <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
 
                     {(filterType === 'month' || filterType === 'period') && (
                         <>
@@ -195,7 +254,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                 <Select
                                     value={selectedMonthIndex.toString()}
                                     onValueChange={handleMonthChange}
-                                    disabled={isPeriodFilterDisabled}
+                                    disabled={isPeriodFilterDisabled && filterType === 'period'}
                                 >
                                     <SelectTrigger id="month-picker" className="w-full">
                                         <SelectValue placeholder="Selecione o Mês" />
@@ -212,7 +271,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                 <Select
                                     value={selectedYear.toString()}
                                     onValueChange={handleYearChange}
-                                    disabled={isPeriodFilterDisabled}
+                                    disabled={isPeriodFilterDisabled && filterType === 'period'}
                                 >
                                     <SelectTrigger id="year-picker" className="w-full">
                                         <SelectValue placeholder="Selecione o Ano" />

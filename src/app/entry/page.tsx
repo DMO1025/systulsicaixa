@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card"; // Renamed CardDescription
-import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/constants';
-import type { PeriodId } from '@/lib/constants';
+import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/config/periods';
+import type { PeriodId } from '@/lib/types';
 import { useAuth, UserRole, OperatorShift } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -22,7 +22,7 @@ interface UICardConfig { // Renamed from CardConfig to avoid conflict
 }
 
 const operatorShiftCardsConfig: Record<OperatorShift, string[]> = {
-  first: ["madrugada", "cafeDaManha", "almocoPrimeiroTurno", "eventos"], 
+  first: ["madrugada", "cafeDaManha", "almocoPrimeiroTurno", "eventos", "cafeManhaNoShow"], 
   second: ["almocoSegundoTurno", "jantar", "eventos"], 
 };
 
@@ -37,13 +37,15 @@ export default function DailyEntrySelectorPage() {
     async function loadConfigAndSetCards() {
       setPageLoading(true); // Ensure loading is true at the start
       let cardsToDisplay: UICardConfig[] = [];
-      const allPossiblePeriodCards: UICardConfig[] = PERIOD_DEFINITIONS.map(period => ({
-        id: period.id,
-        label: period.label,
-        href: `/entry/${period.id}`,
-        icon: getPeriodIcon(period.id),
-        type: 'period',
-      }));
+      const allPossiblePeriodCards: UICardConfig[] = PERIOD_DEFINITIONS
+        .filter(p => p.type === 'entry') // Only show entry types here
+        .map(period => ({
+          id: period.id,
+          label: period.label,
+          href: `/entry/${period.id}`,
+          icon: getPeriodIcon(period.id),
+          type: 'period',
+        }));
 
       try {
         if (userRole === 'administrator') {
@@ -103,8 +105,8 @@ export default function DailyEntrySelectorPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Selecione o Período</CardTitle>
-          <ShadcnCardDescription>Clique em um card para lançar os dados do período.</ShadcnCardDescription>
+          <CardTitle>Selecione o Período de Lançamento</CardTitle>
+          <ShadcnCardDescription>Clique em um card para lançar os dados financeiros do período.</ShadcnCardDescription>
         </CardHeader>
         <CardContent>
           {visibleCards.length > 0 ? (

@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import React from 'react';
@@ -5,15 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { ChartConfig } from '@/lib/types';
+import { parseISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale/pt-BR';
 
 
 interface PeriodReportLineChartProps {
   data: any[];
   config: ChartConfig;
   title: string;
+  connectNulls?: boolean;
 }
 
-const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, config, title }) => {
+const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, config, title, connectNulls = false }) => {
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -31,6 +36,18 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
                 axisLine={false}
                 tickMargin={8}
                 fontSize={12}
+                tickFormatter={(value, index) => {
+                    try {
+                        const date = parseISO(value);
+                        if (!isValid(date)) return value;
+                        if (index % 2 === 0) { // Show every other label to prevent crowding
+                            return format(date, "dd/MM", { timeZone: 'UTC', locale: ptBR });
+                        }
+                    } catch(e) {
+                        return value;
+                    }
+                    return "";
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `R$${(value / 1000).toLocaleString('pt-BR')}k`}
@@ -63,7 +80,15 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
                             </div>
                         );
                     }}
-                    labelKey="date"
+                    labelFormatter={(label) => {
+                      try {
+                          const date = parseISO(label);
+                          if (!isValid(date)) return label;
+                          return format(date, "PPP", { timeZone: 'UTC', locale: ptBR });
+                      } catch(e) {
+                          return label;
+                      }
+                    }}
                   />
                 }
               />
@@ -77,6 +102,7 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
                   strokeWidth={2}
                   dot={false}
                   name={config[key].label as string}
+                  connectNulls={connectNulls}
                 />
               ))}
             </LineChart>

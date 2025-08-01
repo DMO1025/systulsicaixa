@@ -1,7 +1,8 @@
 
+
 import type { PeriodId } from './periods';
 import {
-  type LucideIcon, HelpCircle, Building, ClipboardList, Truck, FileCheck2, Utensils, Refrigerator, Wallet
+  type LucideIcon, HelpCircle, Building, ClipboardList, Truck, FileCheck2, Utensils, Wallet, Package, Sun, Moon
 } from 'lucide-react';
 
 // --- Sales Channels Definitions ---
@@ -52,13 +53,8 @@ export const SALES_CHANNELS = {
   aptDeliveryIfoodValor: "IFOOD (Valor)",
   aptDeliveryRappiQtd: "RAPPI (Qtd)",
   aptDeliveryRappiValor: "RAPPI (Valor)",
-  aptFaturadosQtd: "FATURADOS QUANTIDADE (Almoço PT)",
-  aptFaturadosValorHotel: "VALOR HOTEL (FATURADO) (Almoço PT)",
-  aptFaturadosValorFuncionario: "VALOR FUNCIONÁRIO (FATURADO) (Almoço PT)",
-  aptConsumoInternoQtd: "* CONSUMO INTERNO - CI QUANTIDADE (Almoço PT)",
-  aptReajusteCI: "REAJUSTE DE C.I (Almoço PT)",
-  aptTotalCI: "TOTAL C.I (Almoço PT)",
-
+  reajusteCI: "REAJUSTE DE C.I",
+  
   // Channels for Almoço Segundo Turno (AST)
   astRoomServiceQtdPedidos: "QUANTIDADE PEDIDOS (Almoço ST)",
   astRoomServicePagDireto: "PAGAMENTO DIRETO (DINHEIRO / CARTÃO) (Almoço ST)",
@@ -77,12 +73,6 @@ export const SALES_CHANNELS = {
   astDeliveryIfoodValor: "IFOOD (Valor)",
   astDeliveryRappiQtd: "RAPPI (Qtd)",
   astDeliveryRappiValor: "RAPPI (Valor)",
-  astFaturadosQtd: "FATURADOS QUANTIDADE (Almoço ST)",
-  astFaturadosValorHotel: "VALOR HOTEL (FATURADO) (Almoço ST)",
-  astFaturadosValorFuncionario: "VALOR FUNCIONÁRIO (FATURADO) (Almoço ST)",
-  astConsumoInternoQtd: "* CONSUMO INTERNO - CI QUANTIDADE (Almoço ST)",
-  astReajusteCI: "REAJUSTE DE C.I (Almoço ST)",
-  astTotalCI: "TOTAL C.I (Almoço ST)",
 
   // Channels for Jantar (JNT)
   jntRoomServiceQtdPedidos: "QUANTIDADE PEDIDOS (Jantar)",
@@ -102,12 +92,6 @@ export const SALES_CHANNELS = {
   jntDeliveryIfoodValor: "IFOOD (Valor)",
   jntDeliveryRappiQtd: "RAPPI (Qtd)",
   jntDeliveryRappiValor: "RAPPI (Valor)",
-  jntFaturadosQtd: "FATURADOS QUANTIDADE (Jantar)",
-  jntFaturadosValorHotel: "VALOR HOTEL (FATURADO) (Jantar)",
-  jntFaturadosValorFuncionario: "VALOR FUNCIONÁRIO (FATURADO) (Jantar)",
-  jntConsumoInternoQtd: "* CONSUMO INTERNO - CI QUANTIDADE (Jantar)",
-  jntReajusteCI: "REAJUSTE DE C.I (Jantar)",
-  jntTotalCI: "TOTAL C.I (Jantar)",
 
   // Channels for Unit Price Configurable Items
   breakfastEntry: "Breakfast",
@@ -164,10 +148,15 @@ export const EVENT_SERVICE_TYPE_OPTIONS = Object.entries(EVENT_SERVICE_TYPES).ma
 
 // --- Form Configurations ---
 
+export interface GroupedChannelConfig {
+    label: string;
+    qtd?: SalesChannelId;
+    vtotal?: SalesChannelId;
+}
+
 export interface IndividualSubTabConfig {
   label: string;
-  icon: LucideIcon;
-  channels: Partial<Record<SalesChannelId, { qtd?: boolean; vtotal?: boolean; text?: boolean }>>;
+  groupedChannels: GroupedChannelConfig[];
 }
 export interface IndividualPeriodConfig {
   channels?: Partial<Record<SalesChannelId, { qtd?: boolean; vtotal?: boolean; text?: boolean }>>;
@@ -183,72 +172,62 @@ const commonAlmocoJantarStructure = (
   periodPrefix: 'apt' | 'ast' | 'jnt'
 ): Record<string, IndividualSubTabConfig> => {
     
-  const deliverySubTab = {
-    label: "DELIVERY & RETIRADA", icon: Truck,
-    channels: {
-      [`${periodPrefix}DeliveryIfoodQtd`]: { qtd: true },
-      [`${periodPrefix}DeliveryIfoodValor`]: { vtotal: true },
-      [`${periodPrefix}DeliveryRappiQtd`]: { qtd: true },
-      [`${periodPrefix}DeliveryRappiValor`]: { vtotal: true },
-      [`${periodPrefix}ClienteMesaRetiradaQtd`]: { qtd: true },
-      [`${periodPrefix}ClienteMesaRetiradaValor`]: { vtotal: true },
-    }
+  const deliverySubTab: IndividualSubTabConfig = {
+    label: "DELIVERY & RETIRADA",
+    groupedChannels: [
+      { label: "IFOOD", qtd: `${periodPrefix}DeliveryIfoodQtd`, vtotal: `${periodPrefix}DeliveryIfoodValor` },
+      { label: "RAPPI", qtd: `${periodPrefix}DeliveryRappiQtd`, vtotal: `${periodPrefix}DeliveryRappiValor` },
+      { label: "RETIRADA", qtd: `${periodPrefix}ClienteMesaRetiradaQtd`, vtotal: `${periodPrefix}ClienteMesaRetiradaValor` },
+    ]
   };
 
-  const roomServiceSubTab = {
-    label: "ROOM SERVICE", icon: Utensils,
-    channels: {
-      [`${periodPrefix}RoomServiceQtdPedidos`]: { qtd: true },
-      [`${periodPrefix}RoomServicePagDireto`]: { vtotal: true },
-      [`${periodPrefix}RoomServiceValorServico`]: { vtotal: true },
-    }
+  const roomServiceSubTab: IndividualSubTabConfig = {
+    label: "ROOM SERVICE",
+    groupedChannels: [
+      { label: "QUANTIDADE PEDIDOS", qtd: `${periodPrefix}RoomServiceQtdPedidos` },
+      { label: "PAGAMENTO DIRETO (DINHEIRO/CARTÃO)", vtotal: `${periodPrefix}RoomServicePagDireto` },
+      { label: "ROOM SERVICE", vtotal: `${periodPrefix}RoomServiceValorServico` },
+    ]
   };
 
-  const hospedesSubTab = {
-    label: "HÓSPEDES", icon: Building,
-    channels: {
-      [`${periodPrefix}HospedesQtdHospedes`]: { qtd: true },
-      [`${periodPrefix}HospedesPagamentoHospedes`]: { vtotal: true },
-    }
+  const hospedesSubTab: IndividualSubTabConfig = {
+    label: "HÓSPEDES",
+    groupedChannels: [
+        { label: "HÓSPEDES", qtd: `${periodPrefix}HospedesQtdHospedes`, vtotal: `${periodPrefix}HospedesPagamentoHospedes` },
+    ]
   };
 
-  const clienteMesaSubTab = {
-    label: "CLIENTE MESA", icon: ClipboardList,
-    channels: {
-      [`${periodPrefix}ClienteMesaTotaisQtd`]: { qtd: true },
-      [`${periodPrefix}ClienteMesaDinheiro`]: { vtotal: true },
-      [`${periodPrefix}ClienteMesaCredito`]: { vtotal: true },
-      [`${periodPrefix}ClienteMesaDebito`]: { vtotal: true },
-      [`${periodPrefix}ClienteMesaPix`]: { vtotal: true },
-      [`${periodPrefix}ClienteMesaTicketRefeicao`]: { vtotal: true },
-    }
+  const clienteMesaSubTab: IndividualSubTabConfig = {
+    label: "CLIENTE MESA",
+    groupedChannels: [
+      { label: "TOTAIS CLIENTE MESA", qtd: `${periodPrefix}ClienteMesaTotaisQtd` },
+      { label: "DINHEIRO", vtotal: `${periodPrefix}ClienteMesaDinheiro` },
+      { label: "CRÉDITO", vtotal: `${periodPrefix}ClienteMesaCredito` },
+      { label: "DÉBITO", vtotal: `${periodPrefix}ClienteMesaDebito` },
+      { label: "PIX", vtotal: `${periodPrefix}ClienteMesaPix` },
+      { label: "TICKET REFEIÇÃO", vtotal: `${periodPrefix}ClienteMesaTicketRefeicao` },
+    ]
   };
 
-  const faturadoSubTab = {
-    label: "Faturado", icon: Wallet,
-    channels: {
-        [`${periodPrefix}FaturadosQtd`]: { qtd: true },
-        [`${periodPrefix}FaturadosValorHotel`]: { vtotal: true },
-        [`${periodPrefix}FaturadosValorFuncionario`]: { vtotal: true },
-    }
+  const faturadoSubTab: IndividualSubTabConfig = {
+    label: "Faturado",
+    groupedChannels: [] // This is now handled by FaturadoForm
   };
   
-  const consumoInternoSubTab = {
-    label: "Consumo Interno", icon: FileCheck2,
-    channels: {
-        [`${periodPrefix}ConsumoInternoQtd`]: { qtd: true },
-        [`${periodPrefix}ReajusteCI`]: { vtotal: true },
-        [`${periodPrefix}TotalCI`]: { vtotal: true },
-    }
+  const consumoInternoSubTab: IndividualSubTabConfig = {
+    label: "Consumo Interno",
+    groupedChannels: [
+      { label: "REAJUSTE DE C.I", vtotal: `reajusteCI` },
+    ]
   };
   
   const getFrigobarSubTab = (shiftPrefix: 'PT' | 'ST' | 'JNT'): IndividualSubTabConfig => ({
-    label: "FRIGOBAR", icon: Refrigerator,
-    channels: {
-      [`frg${shiftPrefix}TotalQuartos`]: { qtd: true },
-      [`frg${shiftPrefix}PagRestaurante`]: { vtotal: true },
-      [`frg${shiftPrefix}PagHotel`]: { vtotal: true },
-    }
+    label: "FRIGOBAR",
+    groupedChannels: [
+      { label: "TOTAL DE QUARTOS", qtd: `frg${shiftPrefix}TotalQuartos`},
+      { label: "PAGAMENTO RESTAURANTE", vtotal: `frg${shiftPrefix}PagRestaurante`},
+      { label: "PAGAMENTO HOTEL", vtotal: `frg${shiftPrefix}PagHotel`},
+    ]
   });
 
   if (periodPrefix === 'apt') {
@@ -321,6 +300,16 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, IndividualPeriodConfig> = {
     payments: false,
     observations: true,
   },
+  cafeManhaNoShow: {
+    description: "Registre ocorrências de no-show, cortesias ou outras observações para controle interno.",
+    customForm: true,
+    observations: true,
+  },
+  controleCafeDaManha: {
+    description: "Registre os controles diários do café da manhã.",
+    customForm: true,
+    observations: true,
+  },
   almocoPrimeiroTurno: {
     subTabs: commonAlmocoJantarStructure('apt'),
     payments: false, observations: true
@@ -387,10 +376,22 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, IndividualPeriodConfig> = {
 };
 
 
-export function getSubTabIcon(periodId: PeriodId, subTabKey: string): LucideIcon {
-  const periodConfig = PERIOD_FORM_CONFIG[periodId];
-  if (periodConfig?.subTabs && periodConfig.subTabs[subTabKey]) {
-    return periodConfig.subTabs[subTabKey].icon || HelpCircle;
-  }
-  return HelpCircle;
+// --- Sub-Tab Definitions with Colors for Consistency ---
+export const SUB_TAB_DEFINITIONS: Record<string, { icon: LucideIcon }> = {
+  roomService:  { icon: Utensils },
+  hospedes:     { icon: Building },
+  clienteMesa:  { icon: ClipboardList },
+  delivery:     { icon: Truck },
+  faturado:     { icon: Wallet },
+  consumoInterno: { icon: FileCheck2 },
+  frigobar:     { icon: Package },
+  // Frigobar shifts
+  primeiroTurno: { icon: Sun },
+  segundoTurno: { icon: Sun },
+  jantar: { icon: Moon },
+  default:      { icon: HelpCircle },
+} as const;
+
+export function getSubTabDefinition(subTabKey: string) {
+    return SUB_TAB_DEFINITIONS[subTabKey as keyof typeof SUB_TAB_DEFINITIONS] || SUB_TAB_DEFINITIONS.default;
 }

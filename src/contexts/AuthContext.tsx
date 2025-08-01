@@ -20,10 +20,38 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
   '/': 'dashboard',
   '/entry': 'entry',
+  '/controls': 'controls',
   '/reports': 'reports',
   '/help': 'help',
   '/admin': 'admin',
 };
+
+// Helper function to set a cookie
+function setCookie(name: string, value: string, days: number) {
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+}
+
+// Helper function to get a cookie
+function getCookie(name: string): string | null {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i=0;i < ca.length;i++) {
+        let c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+    }
+    return null;
+}
+
+function eraseCookie(name: string) {   
+    document.cookie = name+'=; Max-Age=-99999999; path=/;';  
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -35,9 +63,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const storedRole = localStorage.getItem('userRole') as UserRole | null;
-    const storedShift = localStorage.getItem('operatorShift') as OperatorShift | null;
-    const storedPages = localStorage.getItem('allowedPages');
+    const storedRole = getCookie('userRole') as UserRole | null;
+    const storedShift = getCookie('operatorShift') as OperatorShift | null;
+    const storedPagesJSON = getCookie('allowedPages');
     
     if (storedRole) {
       setIsAuthenticated(true);
@@ -45,10 +73,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (storedRole === 'operator' && storedShift) {
         setOperatorShift(storedShift);
       }
-      if (storedPages) {
-        setAllowedPages(JSON.parse(storedPages));
+       if (storedPagesJSON) {
+        try {
+          const storedPages = JSON.parse(storedPagesJSON);
+          setAllowedPages(storedPages);
+        } catch (e) {
+            console.error("Failed to parse allowedPages cookie", e);
+            setAllowedPages(storedRole === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls'] : []);
+        }
       } else if (storedRole === 'administrator') {
-        setAllowedPages(['dashboard', 'entry', 'reports']);
+        setAllowedPages(['dashboard', 'entry', 'reports', 'controls']);
       }
     }
     setIsLoading(false);
@@ -100,18 +134,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (role: UserRole, shift?: OperatorShift, pages?: PageId[]) => {
     setIsAuthenticated(true);
     setUserRole(role);
-    localStorage.setItem('userRole', role);
+    setCookie('userRole', role, 1);
 
-    const pagesToStore = role === 'administrator' ? ['dashboard', 'entry', 'reports'] : (pages || []);
+    const pagesToStore = role === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls'] : (pages || []);
     setAllowedPages(pagesToStore);
-    localStorage.setItem('allowedPages', JSON.stringify(pagesToStore));
+    setCookie('allowedPages', JSON.stringify(pagesToStore), 1);
     
     if (role === 'operator' && shift) {
       setOperatorShift(shift);
-      localStorage.setItem('operatorShift', shift);
+      setCookie('operatorShift', shift, 1);
     } else {
       setOperatorShift(null);
-      localStorage.removeItem('operatorShift');
+      eraseCookie('operatorShift');
     }
 
     const primaryPage = pagesToStore[0] || (role === 'administrator' ? 'dashboard' : 'entry');
@@ -124,9 +158,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserRole(null);
     setOperatorShift(null);
     setAllowedPages(null);
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('operatorShift');
-    localStorage.removeItem('allowedPages');
+    eraseCookie('userRole');
+    eraseCookie('operatorShift');
+    eraseCookie('allowedPages');
     router.push('/login');
   };
 

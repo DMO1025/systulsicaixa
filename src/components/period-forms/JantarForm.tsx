@@ -8,11 +8,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodData } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, SalesChannelId } from '@/lib/constants';
-import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
+import type { PeriodId, PeriodDefinition } from '@/lib/config/periods';
+import { getPeriodIcon } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig, GroupedChannelConfig } from '@/lib/config/forms';
+import { getSubTabDefinition } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
-import { calculatePeriodGrandTotal } from '@/lib/reportUtils';
-import { Refrigerator } from 'lucide-react';
+import { Package, Utensils, Building, ClipboardList, Truck, Wallet, FileCheck2, Refrigerator } from 'lucide-react';
+import { processEntryForTotals } from '@/lib/utils/calculations';
+import type { DailyLogEntry } from '@/lib/types';
+import FaturadoForm from './FaturadoForm';
+import ConsumoInternoForm from './ConsumoInternoForm';
+import { cn } from '@/lib/utils';
+
+const subTabIcons = {
+  roomService: Utensils,
+  hospedes: Building,
+  clienteMesa: ClipboardList,
+  delivery: Truck,
+  faturado: Wallet,
+  consumoInterno: FileCheck2,
+  frigobar: Refrigerator,
+  default: Utensils,
+};
 
 interface PeriodFormProps {
   form: UseFormReturn<DailyEntryFormData>;
@@ -22,7 +39,7 @@ interface PeriodFormProps {
   unitPricesConfig: ChannelUnitPricesConfig;
   calculatePeriodTotal: (periodId: PeriodId) => number;
   renderChannelInputs: (
-    channelsConfig: NonNullable<PeriodConfig['channels'] | SubTabConfig['channels']>,
+    groupedChannels: GroupedChannelConfig[],
     basePath: string,
     totalValue: number,
     currentForm: UseFormReturn<DailyEntryFormData>,
@@ -33,6 +50,7 @@ interface PeriodFormProps {
   setActiveSubTabs?: React.Dispatch<React.SetStateAction<Record<PeriodId, string>>>;
   calculateSubTabTotal?: (periodId: PeriodId, subTabId: string) => number;
 }
+
 
 const JantarForm: React.FC<PeriodFormProps> = ({
   form,
@@ -52,24 +70,10 @@ const JantarForm: React.FC<PeriodFormProps> = ({
   const watchedData = form.watch();
 
   const periodTotal = useMemo(() => {
-    const getVtotal = (path: string) => getSafeNumericValue(watchedData, path, 0);
-
-    let jantarSubTabsTotal = 0;
-    const jantarData = watchedData.jantar;
-    if (jantarData?.subTabs) {
-        const { frigobar, ...restOfSubTabs } = jantarData.subTabs;
-        const jantarDataWithoutFrigobar = { ...jantarData, subTabs: restOfSubTabs };
-        let { valor } = calculatePeriodGrandTotal(jantarDataWithoutFrigobar as PeriodData);
-        
-        const totalCIValue = getSafeNumericValue(jantarData, 'subTabs.ciEFaturados.channels.jntCiEFaturadosTotalCI.vtotal');
-        valor -= totalCIValue;
-        
-        jantarSubTabsTotal = valor;
-    }
-
-    const frigobarJantarTotal = getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getVtotal('jantar.subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
-
-    return jantarSubTabsTotal + frigobarJantarTotal;
+    const totals = processEntryForTotals(watchedData as DailyLogEntry);
+    const jantarTotal = totals.jantar.valor;
+    const frigobarJantarTotal = totals.reajusteCI.jantar;
+    return jantarTotal + frigobarJantarTotal;
   }, [watchedData]);
 
   useEffect(() => {
@@ -105,10 +109,14 @@ const JantarForm: React.FC<PeriodFormProps> = ({
           <Tabs value={activeSubTabs[periodId]} onValueChange={(value) => setActiveSubTabs(prev => ({...prev, [periodId]: value}))} className="w-full">
             <TabsList className="mb-4 h-auto flex-wrap justify-start">
               {Object.entries(periodConfig.subTabs).map(([subTabKey, subTabConfig]) => {
-                const SubIcon = subTabKey === 'frigobar' ? Refrigerator : getSubTabIcon(periodId, subTabKey);
+                const Icon = subTabIcons[subTabKey as keyof typeof subTabIcons] || subTabIcons.default;
                 return (
-                  <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
-                    <SubIcon className="h-4 w-4" />
+                  <TabsTrigger 
+                    key={subTabKey} 
+                    value={subTabKey} 
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase font-semibold data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                  >
+                    <Icon className="h-4 w-4" />
                     {subTabConfig.label}
                   </TabsTrigger>
                 );
@@ -118,20 +126,26 @@ const JantarForm: React.FC<PeriodFormProps> = ({
               const subTabTotal = calculateSubTabTotal(periodId, subTabKey);
               return (
                 <TabsContent key={subTabKey} value={subTabKey}>
-                  <Card className="border-primary/30">
+                  <Card className={cn("border-2 transition-all", activeSubTabs[periodId] === subTabKey ? 'border-primary/20 ring-1 ring-primary/10' : 'border-border')}>
                     <CardHeader className="pb-3 pt-4 px-4">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-xl">{subTabConfig.label}</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="p-4">
-                      {renderChannelInputs(
-                        subTabConfig.channels,
-                        `${periodId}.subTabs.${subTabKey}.channels`,
-                        subTabTotal,
-                        form,
-                        unitPricesConfig,
-                        periodId
+                      {subTabKey === 'faturado' ? (
+                        <FaturadoForm form={form} basePath="jantar.subTabs.faturado" />
+                      ) : subTabKey === 'consumoInterno' ? (
+                        <ConsumoInternoForm form={form} basePath="jantar.subTabs.consumoInterno" />
+                      ) : (
+                        renderChannelInputs(
+                          subTabConfig.groupedChannels,
+                          `${periodId}.subTabs.${subTabKey}.channels`,
+                          subTabTotal,
+                          form,
+                          unitPricesConfig,
+                          periodId
+                        )
                       )}
                     </CardContent>
                   </Card>

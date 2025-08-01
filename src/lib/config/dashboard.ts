@@ -14,7 +14,7 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
   { item: "RW INDIANO JANTAR", periodId: "indianoJantar" },
   { item: "BALI ALMOÇO", periodId: "baliAlmoco" },
   { item: "BALI HAPPY HOUR", periodId: "baliHappy" },
-  { item: "FRIGOBAR", periodId: "almocoPrimeiroTurno"}, // Link to a period form where frigobar can be edited
+  { item: "FRIGOBAR", periodId: "frigobar"},
   { item: "EVENTOS DIRETO", periodId: "eventos" },
   { item: "EVENTOS HOTEL", periodId: "eventos" },
 ] as const;

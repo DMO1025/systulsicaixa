@@ -1,11 +1,16 @@
+
+
 "use client";
 
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import type { GeneralReportViewData } from '@/lib/types';
-import type { PeriodDefinition } from '@/lib/constants';
+import type { PeriodDefinition } from '@/lib/config/periods';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { DollarSign, Hash, ReceiptText } from 'lucide-react';
+import { DollarSign, Hash, ReceiptText, PlusCircle, Edit, BedDouble } from 'lucide-react';
+import { format, parseISO, isValid } from 'date-fns';
+import { ptBR } from 'date-fns/locale/pt-BR';
+import { getPeriodIcon } from '@/lib/config/periods';
 
 interface GeneralReportViewProps {
   data: GeneralReportViewData;
@@ -19,6 +24,13 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
     const ticketMedio = (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd > 0)
         ? data.summary.grandTotalSemCI / (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)
         : 0;
+    
+    // Filter out 'madrugada', control periods, and add a custom 'roomService' definition for the header
+    const reportablePeriods = useMemo(() => {
+        return visiblePeriods.filter(p => p.type === 'entry' && p.id !== 'madrugada');
+    }, [visiblePeriods]);
+    
+    const roomServiceDefinition = { id: 'roomService', label: 'Room Service', icon: BedDouble };
 
     return (
         <div className="space-y-6" ref={ref}>
@@ -70,18 +82,36 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Data</TableHead>
-                                {visiblePeriods.map(p => <TableHead key={p.id} className="text-right">{p.label}</TableHead>)}
+                                <TableHead key={roomServiceDefinition.id} className="text-right">{roomServiceDefinition.label}</TableHead>
+                                {reportablePeriods.map(p => <TableHead key={p.id} className="text-right">{p.label}</TableHead>)}
                                 <TableHead className="text-right font-bold">Total GERAL</TableHead>
                                 <TableHead className="text-right font-bold">Reajuste C.I</TableHead>
                                 <TableHead className="text-right font-bold">Total LÍQUIDO</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {data.dailyBreakdowns.map((row, idx) => (
+                            {data.dailyBreakdowns.map((row, idx) => {
+                                const createdAtDate = row.createdAt ? (typeof row.createdAt === 'string' ? parseISO(row.createdAt) : row.createdAt) : null;
+                                const lastModifiedDate = row.lastModifiedAt ? (typeof row.lastModifiedAt === 'string' ? parseISO(row.lastModifiedAt) : row.lastModifiedAt) : null;
+                                const formattedCreationTime = createdAtDate && isValid(createdAtDate) ? format(createdAtDate, 'HH:mm', { locale: ptBR }) : '--:--';
+                                const formattedModificationTime = lastModifiedDate && isValid(lastModifiedDate) ? format(lastModifiedDate, 'HH:mm', { locale: ptBR }) : '--:--';
+
+                                return (
                                 <React.Fragment key={idx}>
                                     <TableRow className={idx > 0 ? "border-t-2 border-border" : ""}>
-                                        <TableCell rowSpan={2} className="align-middle border-r font-medium text-sm">{row.date}</TableCell>
-                                        {visiblePeriods.map(p => (
+                                        <TableCell rowSpan={2} className="align-top border-r font-medium pt-3">
+                                            <div className="text-sm">{row.date}</div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                                                <PlusCircle className="h-3 w-3" /> {formattedCreationTime}
+                                            </div>
+                                             <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                                <Edit className="h-3 w-3" /> {formattedModificationTime}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell key={`${roomServiceDefinition.id}-qtd`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
+                                            {formatQty(row.periodTotals['roomService']?.qtd)}
+                                        </TableCell>
+                                        {reportablePeriods.map(p => (
                                             <TableCell key={`${p.id}-qtd`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
                                                 {formatQty(row.periodTotals[p.id]?.qtd)}
                                             </TableCell>
@@ -91,7 +121,10 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                                         <TableCell className="text-right font-bold text-xs text-muted-foreground pt-2 pb-0">{formatQty(row.totalQtd - row.totalCIQtd)}</TableCell>
                                     </TableRow>
                                     <TableRow>
-                                        {visiblePeriods.map(p => (
+                                        <TableCell key={`${roomServiceDefinition.id}-valor`} className="text-right font-medium text-sm pb-2 pt-0">
+                                            {formatCurrency(row.periodTotals['roomService']?.valor)}
+                                        </TableCell>
+                                        {reportablePeriods.map(p => (
                                             <TableCell key={`${p.id}-valor`} className="text-right font-medium text-sm pb-2 pt-0">
                                                 {formatCurrency(row.periodTotals[p.id]?.valor)}
                                             </TableCell>
@@ -101,12 +134,16 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                                         <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(row.totalSemCI)}</TableCell>
                                     </TableRow>
                                 </React.Fragment>
-                            ))}
+                                )
+                            })}
                         </TableBody>
                         <TableFooter>
                             <TableRow className="bg-muted/50 font-bold border-t-4 border-double border-foreground/50">
                                 <TableCell rowSpan={2} className="align-middle border-r text-base">TOTAL</TableCell>
-                                {visiblePeriods.map(p => (
+                                <TableCell key={`${roomServiceDefinition.id}-qtd-total`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
+                                    {formatQty(data.summary.periodTotals['roomService']?.qtd)}
+                                </TableCell>
+                                {reportablePeriods.map(p => (
                                     <TableCell key={`${p.id}-qtd-total`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
                                         {formatQty(data.summary.periodTotals[p.id]?.qtd)}
                                     </TableCell>
@@ -116,7 +153,10 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                                 <TableCell className="text-right text-xs font-bold text-muted-foreground pt-2 pb-0">{formatQty(data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)}</TableCell>
                             </TableRow>
                             <TableRow className="bg-muted/50 font-bold">
-                                {visiblePeriods.map(p => (
+                                <TableCell key={`${roomServiceDefinition.id}-valor-total`} className="text-right font-semibold text-sm pb-2 pt-0">
+                                    {formatCurrency(data.summary.periodTotals['roomService']?.valor)}
+                                </TableCell>
+                                {reportablePeriods.map(p => (
                                     <TableCell key={`${p.id}-valor-total`} className="text-right font-semibold text-sm pb-2 pt-0">
                                         {formatCurrency(data.summary.periodTotals[p.id]?.valor)}
                                     </TableCell>

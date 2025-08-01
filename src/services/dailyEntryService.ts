@@ -1,39 +1,42 @@
 
-import type { DailyEntryFormData, DailyLogEntry, EventosPeriodData, PeriodData } from '@/lib/types';
-import { PERIOD_DEFINITIONS } from '@/lib/constants';
+
+import type { DailyEntryFormData, DailyLogEntry, EventosPeriodData, PeriodData, BilledClient, FaturadoItem } from '@/lib/types';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { format, parseISO, isValid } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
+import { getSetting, saveSetting } from './settingsService';
 
 const API_BASE_URL = '/api/daily-entry';
+
+function getFaturadoItemsFromData(data: DailyEntryFormData): FaturadoItem[] {
+    const allItems: FaturadoItem[] = [];
+    
+    const almocoPT = data.almocoPrimeiroTurno?.subTabs?.faturado?.faturadoItems;
+    if (almocoPT) allItems.push(...almocoPT);
+
+    const almocoST = data.almocoSegundoTurno?.subTabs?.faturado?.faturadoItems;
+    if (almocoST) allItems.push(...almocoST);
+
+    const jantar = data.jantar?.subTabs?.faturado?.faturadoItems;
+    if (jantar) allItems.push(...jantar);
+    
+    return allItems;
+}
 
 function processEntryFromSource(entry: any): DailyLogEntry {
   if (!entry) return entry;
 
   const processedEntry = { ...entry };
 
-  if (processedEntry.date && typeof processedEntry.date === 'string') {
+  if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parsedDateFromId = parseISO(entry.id);
+      if (isValid(parsedDateFromId)) {
+        processedEntry.date = parsedDateFromId;
+      }
+  } else if (processedEntry.date && typeof processedEntry.date === 'string') {
     const parsedDate = parseISO(processedEntry.date);
     if (isValid(parsedDate)) {
       processedEntry.date = parsedDate;
-    } else {
-      console.warn(`Data inválida da fonte para o ID ${processedEntry.id}: ${entry.date}`);
-      processedEntry.date = new Date(NaN);
-    }
-  } else if (processedEntry.date && !(processedEntry.date instanceof Date)) {
-     console.warn(`Data para o ID ${processedEntry.id} não é uma string ou objeto Date. Definindo como inválida.`);
-     processedEntry.date = new Date(NaN);
-  } else if (!processedEntry.date) {
-    if (processedEntry.id && typeof processedEntry.id === 'string') {
-        const parsedDateFromId = parseISO(processedEntry.id);
-        if (isValid(parsedDateFromId)) {
-            processedEntry.date = parsedDateFromId;
-        } else {
-            console.warn(`Data ausente para o ID ${processedEntry.id}, e ID não é uma data válida. Definindo como inválida.`);
-            processedEntry.date = new Date(NaN);
-        }
-    } else {
-        console.warn(`Data e ID ausentes ou inválidos. Definindo como inválida.`);
-        processedEntry.date = new Date(NaN);
     }
   }
 
@@ -42,7 +45,8 @@ function processEntryFromSource(entry: any): DailyLogEntry {
     const periodKey = pDef.id as keyof DailyLogEntry;
     if (processedEntry[periodKey] && typeof processedEntry[periodKey] === 'string') {
       try {
-        processedEntry[periodKey] = JSON.parse(processedEntry[periodKey] as string);
+        const parsedData = JSON.parse(processedEntry[periodKey] as string);
+        processedEntry[periodKey] = parsedData;
       } catch (e) {
         console.error(`Erro ao analisar a string do período ${pDef.id} para o lançamento ${processedEntry.id}:`, e);
       }
@@ -103,6 +107,7 @@ export async function saveDailyEntry(date: Date, data: DailyEntryFormData, baseU
     console.error('Serviço saveDailyEntry chamado com data inválida:', date);
     throw new Error('Tentativa de salvar lançamento com data inválida.');
   }
+
   const formattedDate = format(date, 'yyyy-MM-dd');
   const finalUrl = `${baseUrl || ''}${API_BASE_URL}/${formattedDate}`;
   

@@ -1,13 +1,13 @@
 
 import mysql from 'mysql2/promise';
 import type { Pool, PoolOptions } from 'mysql2/promise';
-import { getSettingFromFile } from '@/lib/fileDb';
-import type { MysqlConnectionConfig } from './types';
-import { PERIOD_DEFINITIONS } from './constants';
+import type { Settings, MysqlConnectionConfig } from './types';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 let pool: Pool | null = null;
 
-// Rename for clarity and export all table names
 export const DAILY_ENTRIES_TABLE_NAME = 'daily_entries';
 export const SETTINGS_TABLE_NAME = 'settings';
 export const USERS_TABLE_NAME = 'users';
@@ -48,22 +48,35 @@ const generateSchema = (): string => {
   return `${dailyEntriesSchema}\n\n${settingsSchema}\n\n${usersSchema}`;
 };
 
-// Renamed from DAILY_ENTRIES_TABLE_SCHEMA
 export const DATABASE_INIT_SCHEMA = generateSchema();
+
+async function getMysqlConfigFromFile(): Promise<MysqlConnectionConfig | null> {
+    const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
+    try {
+        await fs.access(path.dirname(SETTINGS_FILE_PATH));
+        const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
+        const settings = JSON.parse(fileContent) as Settings;
+        return settings.mysqlConnectionConfig || null;
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+          return null;
+        }
+        console.error('Error reading mysqlConnectionConfig from settings.json:', error);
+        return null;
+    }
+}
 
 
 export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
   if (pool && !forceNew) {
     try {
-      // Test existing pool before returning
       const connection = await pool.getConnection();
       await connection.ping();
       connection.release();
       return pool;
     } catch (pingError) {
-      // Existing pool is bad, proceed to create a new one
       console.warn('Existing MySQL pool failed ping, attempting to recreate.');
-      pool = null; // Invalidate the current pool
+      pool = null;
     }
   }
   
@@ -72,7 +85,7 @@ export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
     pool = null;
   }
   
-  const dbConfig = await getSettingFromFile('mysqlConnectionConfig');
+  const dbConfig = await getMysqlConfigFromFile();
 
   if (!dbConfig || !dbConfig.host || !dbConfig.user || !dbConfig.database) {
     pool = null;
@@ -94,14 +107,16 @@ export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
 
   try {
     pool = mysql.createPool(options);
-    // Test the new pool immediately
     const connection = await pool.getConnection();
     await connection.ping();
     connection.release();
     return pool;
   } catch (error: any) {
     pool = null;
-    throw new Error(`MySQL Connection Error: ${error.message}`);
+    // Don't throw here, as it might be expected during setup.
+    // Return null, and let callers decide how to handle a failed connection.
+    console.error(`MySQL Connection Error: ${error.message}`);
+    return null;
   }
 }
 
@@ -115,7 +130,6 @@ export async function isMysqlConnected(currentPool?: Pool | null): Promise<boole
         connection.release();
         return true;
     } catch (error: any) {
-        // If ping fails, we should invalidate the main pool so getDbPool tries to recreate it next time.
         pool = null; 
         return false;
     }
@@ -125,22 +139,36 @@ export async function isMysqlConnected(currentPool?: Pool | null): Promise<boole
 export function safeStringify(value: any): string | null {
   if (value === undefined || value === null) return null;
   try {
-    // Avoid storing empty objects or objects with only empty periodObservations
-    if (typeof value === 'object') {
+    if (typeof value === 'object' && value !== null) {
       const keys = Object.keys(value);
-      if (keys.length === 0) return null;
-      if (keys.length === 1 && keys[0] === 'periodObservations' && 
-          (value.periodObservations === '' || value.periodObservations === null || value.periodObservations === undefined)) {
+
+      if ('items' in value && Array.isArray(value.items)) {
+        const hasObservations = value.periodObservations && value.periodObservations.trim() !== '';
+        if (value.items.length === 0 && !hasObservations) {
+          return null;
+        }
+      }
+      
+      const hasMeaningfulData = Object.values(value).some(v => {
+        if (v === null || v === undefined) return false;
+        if (typeof v === 'string' && v.trim() === '') return false;
+        if (Array.isArray(v) && v.length === 0) return false;
+        if (typeof v === 'object' && v !== null && Object.keys(v).length === 0) return false;
+        if (typeof v === 'object' && v !== null && 'faturado' in v && (v as any).faturado?.faturadoItems?.length > 0) {
+            return true;
+        }
+        if(typeof v === 'object' && v !== null && 'channels' in v && Object.keys((v as any).channels).length > 0){
+            return Object.values((v as any).channels).some(ch => ch && ( (ch as any).qtd !== undefined || (ch as any).vtotal !== undefined));
+        }
+
+        return true;
+      });
+
+      if (!hasMeaningfulData) {
         return null;
       }
-       // Specific check for 'eventos' to not store if items array is empty and no observations
-      if ('items' in value && Array.isArray(value.items) && value.items.length === 0) {
-        if (keys.length === 1 || (keys.length === 2 && 'periodObservations' in value && 
-            (value.periodObservations === '' || value.periodObservations === null || value.periodObservations === undefined))) {
-                return null;
-            }
-      }
     }
+    
     return JSON.stringify(value);
   } catch (e) {
     return JSON.stringify({serializationError: `Failed to stringify: ${(e as Error).message}`});
@@ -152,7 +180,7 @@ export function safeParse<T>(jsonString: string | null | undefined): T | null {
   try {
     const parsed = JSON.parse(jsonString) as T;
     if (parsed && typeof parsed === 'object' && 'serializationError' in parsed) {
-        return null; // Or handle as an error appropriately
+        return null;
     }
     return parsed;
   } catch (e) {

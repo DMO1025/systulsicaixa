@@ -1,4 +1,5 @@
 
+
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Settings } from '@/lib/types';
@@ -10,7 +11,10 @@ const validConfigIds = z.enum([
   'channelUnitPricesConfig', 
   'mysqlConnectionConfig',
   'dashboardItemVisibilityConfig',
-  'summaryCardItemsConfig'
+  'summaryCardItemsConfig',
+  'billedClients',
+  'noShowClients',
+  'apiAccessConfig'
 ]);
 type ValidConfigId = z.infer<typeof validConfigIds>;
 

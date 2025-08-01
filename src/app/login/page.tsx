@@ -83,7 +83,7 @@ export default function LoginPage() {
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
             </svg>
           </div>
-          <CardTitle className="text-3xl font-bold">SysTulsi Caixa Login</CardTitle>
+          <CardTitle className="text-3xl font-bold">Caixa Tulsi Login</CardTitle>
           <CardDescription>Entre com suas credenciais para acessar sua conta</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

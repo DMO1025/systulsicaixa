@@ -7,12 +7,12 @@ import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText } 
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import type { DailyLogEntry, PeriodId, DashboardAnalysisInput } from '@/lib/types';
-import { PERIOD_DEFINITIONS, DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/constants';
 import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
 import { processEntryForTotals } from '@/lib/reportUtils';
+import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 
 
 import SummaryCards from '@/components/dashboard/SummaryCards';
@@ -146,13 +146,13 @@ export default function DashboardPage() {
         
         const visibilityConfig = await getSetting('dashboardItemVisibilityConfig');
         
-        const targetYear = selectedMonth.getFullYear();
-        const targetMonth = selectedMonth.getMonth();
+        const targetYear = selectedMonth.getUTCFullYear();
+        const targetMonth = selectedMonth.getUTCMonth();
 
         const entriesForMonth = entriesInRange.filter(entry => {
             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
             if (!isValid(entryDate)) return false;
-            // The date from the database is parsed as UTC midnight. We must use UTC methods to get its date parts to avoid timezone-related off-by-one errors for the month.
+            // Use UTC methods to ignore timezone offsets and compare date parts directly.
             const entryYearUTC = entryDate.getUTCFullYear();
             const entryMonthUTC = entryDate.getUTCMonth();
             return entryYearUTC === targetYear && entryMonthUTC === targetMonth;
@@ -203,9 +203,9 @@ export default function DashboardPage() {
           monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
           
           // Accumulate for monthly table
-          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtdPedidos || 0;
+          accAcumulativo.roomService.pedidosQtd += entryTotals.roomServiceTotal.qtd;
           accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
-          accAcumulativo.roomService.valor += entryTotals.rsMadrugada.valor || 0;
+          accAcumulativo.roomService.valor += entryTotals.roomServiceTotal.valor;
           accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
           accAcumulativo.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
           accAcumulativo.breakfast.qtd += entryTotals.breakfast.qtd;
@@ -538,6 +538,7 @@ export default function DashboardPage() {
                 ciAlmoco={dashboardData.totalCIAlmoco}
                 ciJantar={dashboardData.totalCIJantar}
                 totalConsumoInternoGeral={dashboardData.totalConsumoInternoGeral}
+                selectedMonth={selectedMonth}
             />
             <GeneralTotalsTable
                 overallTotalTransactions={dashboardData.overallTotalTransactions}

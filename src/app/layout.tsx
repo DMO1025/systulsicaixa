@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'SysTulsi Caixa',
+  title: 'Caixa Tulsi',
   description: 'Sistema de Lançamentos Diários para Restaurantes e Hotéis',
 };
 

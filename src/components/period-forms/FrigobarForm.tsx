@@ -7,10 +7,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from '@/components/ui/textarea';
-import type { DailyEntryFormData, ChannelUnitPricesConfig } from '@/lib/types';
-import type { PeriodId, PeriodDefinition, IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/constants';
-import { getPeriodIcon, getSubTabIcon } from '@/lib/constants';
-import type { PeriodFormProps } from './MadrugadaForm';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, OperatorShift, GroupedChannelConfig, UserRole } from '@/lib/types';
+import type { PeriodId, PeriodDefinition } from '@/lib/config/periods';
+import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as SubTabConfig } from '@/lib/config/forms';
+import { getPeriodIcon } from '@/lib/config/periods';
+import { getSubTabDefinition } from '@/lib/config/forms';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+
+
+interface PeriodFormProps {
+  form: UseFormReturn<DailyEntryFormData>;
+  periodId: PeriodId;
+  periodDefinition: PeriodDefinition;
+  periodConfig: PeriodConfig;
+  unitPricesConfig: ChannelUnitPricesConfig;
+  calculatePeriodTotal: (periodId: PeriodId) => number;
+  renderChannelInputs: (
+    groupedChannels: GroupedChannelConfig[],
+    basePath: string,
+    totalValue: number,
+    currentForm: UseFormReturn<DailyEntryFormData>,
+    currentUnitPrices: ChannelUnitPricesConfig,
+    currentPeriodId: PeriodId
+  ) => JSX.Element;
+  activeSubTabs?: Record<PeriodId, string>;
+  setActiveSubTabs?: React.Dispatch<React.SetStateAction<Record<PeriodId, string>>>;
+  calculateSubTabTotal?: (periodId: PeriodId, subTabId: string) => number;
+}
 
 const FrigobarForm: React.FC<PeriodFormProps> = ({
   form,
@@ -23,8 +47,8 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
   calculateSubTabTotal,
   calculatePeriodTotal,
   renderChannelInputs,
-  operatorShift,
 }) => {
+  const { userRole, operatorShift } = useAuth();
   const ActivePeriodMainIcon = getPeriodIcon(periodId);
   const periodTotal = calculatePeriodTotal(periodId);
   const cardDescriptionText = periodConfig.description || `Insira os dados para o período de ${periodDefinition.label.toLowerCase()}.`;
@@ -33,7 +57,7 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
     if (!periodConfig.subTabs) {
       return {};
     }
-    if (!operatorShift) {
+    if (userRole === 'administrator' || !operatorShift) {
       return periodConfig.subTabs;
     }
     
@@ -46,11 +70,11 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
       }
     });
     return filteredTabs;
-  }, [periodConfig.subTabs, operatorShift]);
+  }, [periodConfig.subTabs, operatorShift, userRole]);
 
 
   useEffect(() => {
-    if (visibleSubTabs && activeSubTabs && setActiveSubTabs && !activeSubTabs[periodId]) {
+    if (Object.keys(visibleSubTabs).length > 0 && activeSubTabs && setActiveSubTabs && !activeSubTabs[periodId]) {
       const firstSubTabKey = Object.keys(visibleSubTabs)[0];
       if (firstSubTabKey) {
         setActiveSubTabs(prev => ({ ...prev, [periodId]: firstSubTabKey }));
@@ -80,21 +104,25 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
         {Object.keys(visibleSubTabs).length > 0 ? (
           <Tabs value={activeSubTabs[periodId]} onValueChange={(value) => setActiveSubTabs(prev => ({...prev, [periodId]: value}))} className="w-full">
             <TabsList className="mb-4 h-auto flex-wrap justify-start">
-              {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig]) => {
-                const SubIcon = getSubTabIcon(periodId, subTabKey);
+              {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig], index) => {
+                const tabDef = getSubTabDefinition(subTabKey);
                 return (
-                  <TabsTrigger key={subTabKey} value={subTabKey} className="flex items-center gap-1 px-2 py-1 text-xs">
-                    <SubIcon className="h-4 w-4" />
+                  <TabsTrigger 
+                    key={subTabKey} 
+                    value={subTabKey}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase font-semibold data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                  >
+                    <tabDef.Icon className="h-4 w-4" />
                     {subTabConfig.label}
                   </TabsTrigger>
                 );
               })}
             </TabsList>
-            {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig]) => {
+            {Object.entries(visibleSubTabs).map(([subTabKey, subTabConfig], index) => {
               const subTabTotal = calculateSubTabTotal(periodId, subTabKey);
               return (
                 <TabsContent key={subTabKey} value={subTabKey}>
-                  <Card className="border-primary/30">
+                  <Card className={cn("border-2 transition-all", activeSubTabs[periodId] === subTabKey ? 'border-primary/20 ring-1 ring-primary/10' : 'border-border')}>
                     <CardHeader className="pb-3 pt-4 px-4">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-xl">{subTabConfig.label}</CardTitle>
@@ -102,7 +130,7 @@ const FrigobarForm: React.FC<PeriodFormProps> = ({
                     </CardHeader>
                     <CardContent className="p-4">
                       {renderChannelInputs(
-                        subTabConfig.channels,
+                        subTabConfig.groupedChannels,
                         `${periodId}.subTabs.${subTabKey}.channels`,
                         subTabTotal,
                         form,

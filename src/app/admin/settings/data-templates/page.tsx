@@ -6,13 +6,16 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileSpreadsheet, Download } from 'lucide-react';
-import { PERIOD_DEFINITIONS, PERIOD_FORM_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/constants';
-import type { PeriodId, SalesChannelId } from '@/lib/constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
+import { PERIOD_FORM_CONFIG, SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import type { PeriodId, SalesChannelId } from '@/lib/types';
 
 export default function DataTemplatesPage() {
 
   const generateHeaders = (periodId: PeriodId): { sheetName: string; data: (string[])[] }[] => {
     const periodConfig = PERIOD_FORM_CONFIG[periodId];
+    if (!periodConfig) return [];
+    
     const sheets = [];
 
     if (periodId === 'eventos') {
@@ -44,20 +47,30 @@ export default function DataTemplatesPage() {
     if (periodConfig.subTabs) {
       for (const subTabKey in periodConfig.subTabs) {
         const subTabConfig = periodConfig.subTabs[subTabKey];
-        const headers: string[] = ["Data (AAAA-MM-DD)"];
-        Object.entries(subTabConfig.channels).forEach(([channelId, config]) => {
-          const channelLabel = SALES_CHANNELS[channelId as SalesChannelId];
-          if (config.qtd) headers.push(`${channelLabel} (Qtd)`);
-          if (config.vtotal) headers.push(`${channelLabel} (Valor)`);
-        });
-        sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers] });
+        if (subTabKey === 'faturado') {
+            const headers = ["Data (AAAA-MM-DD)", "Pessoa", "Tipo (hotel/funcionario/outros)", "Quantidade", "Valor (R$)", "Observação"];
+            const exampleRow = ["2024-12-31", "Nome do Cliente", "hotel", "1", "150.00", "Referente ao jantar"];
+            sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers, exampleRow] });
+        } else if (subTabKey === 'consumoInterno') {
+            const headers = ["Data (AAAA-MM-DD)", "Pessoa/Setor", "Quantidade", "Valor (R$)", "Observação", "Reajuste de C.I (Valor Total do Dia)"];
+            const exampleRow = ["2024-12-31", "Diretoria", "4", "200.00", "Jantar da diretoria", "50.00"];
+            sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers, exampleRow] });
+        } else {
+            const headers: string[] = ["Data (AAAA-MM-DD)"];
+            Object.entries(subTabConfig.groupedChannels).forEach(([channelId, config]) => {
+              const channelLabel = SALES_CHANNELS[channelId as SalesChannelId];
+              if (config.qtd) headers.push(`${channelLabel} (Qtd)`);
+              if (config.vtotal) headers.push(`${channelLabel} (R$)`);
+            });
+            sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers] });
+        }
       }
     } else if (periodConfig.channels) {
       const headers: string[] = ["Data (AAAA-MM-DD)"];
         Object.entries(periodConfig.channels).forEach(([channelId, config]) => {
           const channelLabel = SALES_CHANNELS[channelId as SalesChannelId];
           if (config.qtd) headers.push(`${channelLabel} (Qtd)`);
-          if (config.vtotal) headers.push(`${channelLabel} (Valor)`);
+          if (config.vtotal) headers.push(`${channelLabel} (R$)`);
         });
       sheets.push({ sheetName: 'Lançamentos', data: [headers] });
     }

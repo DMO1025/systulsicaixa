@@ -1,81 +1,34 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { PeriodReportViewData, DailyCategoryDataItem, PeriodId } from '@/lib/types';
+import type { PeriodReportViewData, DailyCategoryDataItem, PeriodId, FaturadoItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-    ListChecks, Truck, Utensils, Building, Package, FileCheck2, UtensilsCrossed, HelpCircle, DollarSign
+    HelpCircle
 } from "lucide-react";
+import { TAB_DEFINITIONS } from './tabDefinitions';
 
 interface PeriodSpecificReportViewProps {
     data: PeriodReportViewData;
-    periodId: PeriodId | 'all';
+    periodId: PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService';
 }
 
-const tabDefinitions = [
-    { id: 'faturados', label: 'FATURADOS', IconComp: ListChecks,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD FAT.', isNum: true}, {key: 'hotel', label: 'R$ HOTEL', isCurrency: true}, {key: 'funcionario', label: 'R$ FUNC.', isCurrency: true}, {key: 'total', label: 'TOTAL FAT.', isCurrency: true}] },
-    { id: 'ifood', label: 'IFOOD', IconComp: Truck,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
-    { id: 'rappi', label: 'RAPPI', IconComp: Truck,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
-    { id: 'mesa', label: 'MESA', IconComp: Utensils,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD TOTAIS', isNum: true}, {key: 'dinheiro', label: 'R$ DINHEIRO', isCurrency: true}, {key: 'credito', label: 'R$ CRÉDITO', isCurrency: true}, {key: 'debito', label: 'R$ DÉBITO', isCurrency: true}, {key: 'pix', label: 'R$ PIX', isCurrency: true}, {key: 'ticket', label: 'R$ TICKET', isCurrency: true}, {key: 'total', label: 'TOTAL MESA', isCurrency: true}] },
-    { id: 'hospedes', label: 'HÓSPEDES', IconComp: Building,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD HÓSP.', isNum: true}, {key: 'valor', label: 'R$ PAG.', isCurrency: true}] },
-    { id: 'retirada', label: 'RETIRADA', IconComp: Package,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
-    { id: 'ci', label: 'C.I.', IconComp: FileCheck2,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD CI', isNum: true}, {key: 'reajuste', label: 'R$ REAJ.', isCurrency: true}, {key: 'total', label: 'R$ TOTAL CI', isCurrency: true}] },
-    { id: 'roomService', label: 'ROOM SERVICE', IconComp: UtensilsCrossed,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
-    { id: 'generic', label: 'DIVERSOS', IconComp: HelpCircle,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtd', label: 'QTD', isNum: true}, {key: 'valor', label: 'VALOR', isCurrency: true}] },
-    // Tabs for Café da Manhã
-    { id: 'cdmHospedes', label: 'HÓSPEDES (CAFÉ)', IconComp: Building,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'listaQtd', label: 'LISTA QTD', isNum: true}, {key: 'listaValor', label: 'LISTA VLR', isCurrency: true}, {key: 'noShowQtd', label: 'NO-SHOW QTD', isNum: true}, {key: 'noShowValor', label: 'NO-SHOW VLR', isCurrency: true}, {key: 'semCheckInQtd', label: 'S/ CHECK-IN QTD', isNum: true}, {key: 'semCheckInValor', label: 'S/ CHECK-IN VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
-    { id: 'cdmAvulsos', label: 'AVULSOS (CAFÉ)', IconComp: Utensils,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'assinadoQtd', label: 'ASSINADO QTD', isNum: true}, {key: 'assinadoValor', label: 'ASSINADO VLR', isCurrency: true}, {key: 'diretoQtd', label: 'DIRETO QTD', isNum: true}, {key: 'diretoValor', label: 'DIRETO VLR', isCurrency: true}, {key: 'total', label: 'TOTAL', isCurrency: true}] },
-    // Unified tab for Madrugada
-    { id: 'madrugadaResumo', label: 'RESUMO MADRUGADA', IconComp: UtensilsCrossed,
-      cols: [ {key: 'date', label: 'DATA'}, {key: 'qtdPedidos', label: 'QTD PEDIDOS', isNum: true}, {key: 'qtdPratos', label: 'QTD PRATOS', isNum: true}, {key: 'pagDireto', label: 'PAG. DIRETO (R$)', isCurrency: true}, {key: 'valorServico', label: 'VALOR SERVIÇO (R$)', isCurrency: true}, {key: 'total', label: 'TOTAL (R$)', isCurrency: true}] },
-];
-
-const summaryTableItems = [
-    { item: "FATURADOS", dataKey: "faturados" }, { item: "IFOOD", dataKey: "ifood" },
-    { item: "RAPPI", dataKey: "rappi" }, { item: "MESA", dataKey: "mesa" },
-    { item: "HÓSPEDES", dataKey: "hospedes" }, { item: "RETIRADA", dataKey: "retirada" },
-    { item: "ROOM SERVICE", dataKey: "roomService" }, { item: "CONSUMO INTERNO", dataKey: "consumoInterno" },
-    { item: "DIVERSOS", dataKey: "generic" },
-    // Summary Items for Café da Manhã
-    { item: "HÓSPEDES (CAFÉ)", dataKey: "cdmHospedes" },
-    { item: "AVULSOS (CAFÉ)", dataKey: "cdmAvulsos" },
-];
-
-const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const formatCurrency = (value: number) => Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+const formatNumber = (value: number) => (value || 0).toLocaleString('pt-BR');
 
 const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ data, periodId }) => {
     const [activeDetailTab, setActiveDetailTab] = useState<string>('');
-
+    
     const availableTabs = useMemo(() => {
-        if (periodId === 'madrugada') {
-            return tabDefinitions.filter(tab => 
-                tab.id === 'madrugadaResumo' && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
-            );
-        }
-        if (periodId === 'cafeDaManha') {
-            return tabDefinitions.filter(tab => 
-                (tab.id === 'cdmHospedes' || tab.id === 'cdmAvulsos') && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
-            );
-        }
-        return tabDefinitions.filter(tab => 
-            !(tab.id.startsWith('cdm')) && !(tab.id.startsWith('madrugada')) && data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
+        return TAB_DEFINITIONS.filter(tab => 
+            data.dailyBreakdowns[tab.id] && data.dailyBreakdowns[tab.id].length > 0
         );
-    }, [data.dailyBreakdowns, periodId]);
+    }, [data.dailyBreakdowns]);
 
     useEffect(() => {
         if (availableTabs.length > 0) {
@@ -87,17 +40,69 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
             setActiveDetailTab('');
         }
     }, [availableTabs, activeDetailTab]);
+    
+    const summaryData = useMemo(() => {
+      const summaryTotals = data.summary || {};
+      const hotel = summaryTotals['faturado-hotel'] || { qtd: 0, total: 0 };
+      const funcionario = summaryTotals['faturado-funcionario'] || { qtd: 0, total: 0 };
+      const ciAlmocoPT = summaryTotals['ci-almoco-pt'] || { qtd: 0, total: 0 };
+      const ciAlmocoST = summaryTotals['ci-almoco-st'] || { qtd: 0, total: 0 };
+      const ciJantar = summaryTotals['ci-jantar'] || { qtd: 0, total: 0 };
+      const rsMadrugada = summaryTotals['rsMadrugada'] || { qtd: 0, total: 0 };
+      const rsAlmocoPT = summaryTotals['rsAlmocoPT'] || { qtd: 0, total: 0 };
+      const rsAlmocoST = summaryTotals['rsAlmocoST'] || { qtd: 0, total: 0 };
+      const rsJantar = summaryTotals['rsJantar'] || { qtd: 0, total: 0 };
 
-    const showCISubtotals = useMemo(() => 
-        ['almocoPrimeiroTurno', 'almocoSegundoTurno', 'jantar'].includes(periodId as string),
-        [periodId]
-    );
+      const subtotalFaturado = hotel.total + funcionario.total;
+      const totalFaturadoQtd = hotel.qtd + funcionario.qtd;
+      const ticketMedioFaturado = totalFaturadoQtd > 0 ? subtotalFaturado / totalFaturadoQtd : 0;
+      
+      const subtotalCI = ciAlmocoPT.total + ciAlmocoST.total + ciJantar.total;
+      const totalCIQtd = ciAlmocoPT.qtd + ciAlmocoST.qtd + ciJantar.qtd;
+      const ticketMedioCI = totalCIQtd > 0 ? subtotalCI / totalCIQtd : 0;
+      
+      const subtotalRoomService = rsMadrugada.total + rsAlmocoPT.total + rsAlmocoST.total + rsJantar.total;
+      const totalRoomServiceQtd = (summaryTotals['rsMadrugada']?.qtd || 0) + (summaryTotals['rsAlmocoPT']?.qtd || 0) + (summaryTotals['rsAlmocoST']?.qtd || 0) + (summaryTotals['rsJantar']?.qtd || 0);
+      const ticketMedioRoomService = totalRoomServiceQtd > 0 ? subtotalRoomService / totalRoomServiceQtd : 0;
+      
+      const cdmLista = summaryTotals['cdmLista'] || { qtd: 0, total: 0 };
+      const cdmNoShow = summaryTotals['cdmNoShow'] || { qtd: 0, total: 0 };
+      const cdmSemCheckIn = summaryTotals['cdmSemCheckIn'] || { qtd: 0, total: 0 };
+      const cdmAvulsos = summaryTotals['cdmAvulsos'] || { qtd: 0, total: 0 };
+      const subtotalCafe = cdmLista.total + cdmNoShow.total + cdmSemCheckIn.total + cdmAvulsos.total;
+      const totalCafeQtd = cdmLista.qtd + cdmNoShow.qtd + cdmSemCheckIn.qtd + cdmAvulsos.qtd;
+      const ticketMedioCafe = totalCafeQtd > 0 ? subtotalCafe / totalCafeQtd : 0;
 
-    const ticketMedio = (periodId === 'madrugada' && (data.summary.madrugadaResumo?.qtdPedidos ?? 0) > 0)
-        ? ((data.summary.madrugadaResumo?.totalPagDireto ?? 0) + (data.summary.madrugadaResumo?.totalValorServico ?? 0)) / (data.summary.madrugadaResumo?.qtdPedidos ?? 1)
-        : (data.subtotalGeralSemCI.qtd > 0 
-            ? data.subtotalGeralSemCI.total / data.subtotalGeralSemCI.qtd
-            : 0);
+
+      return {
+          faturado: { hotel, funcionario, subtotal: subtotalFaturado, ticketMedio: ticketMedioFaturado },
+          consumoInterno: { ciAlmocoPT, ciAlmocoST, ciJantar, subtotal: subtotalCI, ticketMedio: ticketMedioCI },
+          roomService: { rsMadrugada, rsAlmocoPT, rsAlmocoST, rsJantar, subtotal: subtotalRoomService, ticketMedio: ticketMedioRoomService },
+          cafeDaManha: { cdmLista, cdmNoShow, cdmSemCheckIn, cdmAvulsos, subtotal: subtotalCafe, ticketMedio: ticketMedioCafe },
+      };
+    }, [data.summary]);
+
+    const genericSummaryRows = useMemo(() => {
+        const grandTotal = { qtd: 0, valor: 0 };
+        const rows = availableTabs.map(tab => {
+            const summary = data.summary[tab.id];
+            if (!summary) return null;
+            grandTotal.qtd += summary.qtd;
+            grandTotal.valor += summary.total;
+            return (
+                <TableRow key={`summary-${tab.id}`}>
+                    <TableCell className="font-medium text-xs py-1.5 px-2">{tab.label}</TableCell>
+                    <TableCell className="text-right text-xs py-1.5 px-2">{formatNumber(summary.qtd)}</TableCell>
+                    <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summary.total)}</TableCell>
+                </TableRow>
+            );
+        }).filter(Boolean);
+
+        const ticketMedio = grandTotal.qtd > 0 ? grandTotal.valor / grandTotal.qtd : 0;
+
+        return { rows, grandTotal, ticketMedio };
+    }, [availableTabs, data.summary]);
+
 
     return (
         <div className="space-y-6">
@@ -111,24 +116,40 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                         <CardContent>
                             {availableTabs.length > 0 ? (
                                 <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-4">
-                                    {availableTabs.map(tab => (
-                                        <TabsTrigger key={tab.id} value={tab.id} className="text-xs px-1"><tab.IconComp className="h-3.5 w-3.5 mr-1 hidden sm:inline"/>{tab.label}</TabsTrigger>
-                                    ))}
+                                    <TabsList className="mb-4 h-auto flex-wrap justify-start">
+                                    {availableTabs.map(tab => {
+                                        const Icon = tab.IconComp || HelpCircle;
+                                        return (
+                                        <TabsTrigger 
+                                            key={tab.id} 
+                                            value={tab.id}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase font-semibold data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                                        >
+                                            <Icon className="h-4 w-4" />{tab.label}
+                                        </TabsTrigger>
+                                        );
+                                    })}
                                     </TabsList>
                                     {availableTabs.map(tab => {
                                         const breakdownData = data.dailyBreakdowns[tab.id] || [];
+                                        const columnTotals = tab.cols.map(col => {
+                                            if (col.isNum || col.isCurrency) {
+                                                return breakdownData.reduce((acc, item) => acc + (Number((item as any)[col.key]) || 0), 0);
+                                            }
+                                            return null;
+                                        });
+
                                         return (
                                             <TabsContent key={tab.id} value={tab.id}>
-                                                <div>
+                                                <div className={cn("border-2 rounded-lg transition-all", activeDetailTab === tab.id ? 'border-primary/20 ring-1 ring-primary/10' : 'border-border')}>
                                                     <Table>
                                                     <TableHeader><TableRow>{tab.cols.map(col => <TableHead key={col.key} className={cn("text-xs", col.isNum || col.isCurrency ? "text-right" : "")}>{col.label}</TableHead>)}</TableRow></TableHeader>
                                                     <TableBody>
                                                         {breakdownData.map((item: DailyCategoryDataItem, idx: number) => (
                                                         <TableRow key={idx}>
                                                             {tab.cols.map(col => (
-                                                            <TableCell key={col.key} className={cn("text-xs py-1.5 px-2", col.isNum || col.isCurrency ? "text-right" : "")}>
-                                                                {col.isCurrency ? formatCurrency(Number(item[col.key] || 0)) : (item[col.key] ?? (col.isNum ? '0' : '-'))}
+                                                            <TableCell key={col.key} className={cn("text-xs py-1.5 px-2", col.isNum || col.isCurrency ? "text-right" : "", col.key === 'observation' ? 'text-muted-foreground' : '')}>
+                                                                {col.isCurrency ? formatCurrency(Number((item as any)[col.key] || 0)) : ((item as any)[col.key] ?? (col.isNum ? '0' : '-'))}
                                                             </TableCell>
                                                             ))}
                                                         </TableRow>
@@ -136,6 +157,20 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                                                         {breakdownData.length === 0 && 
                                                         <TableRow><TableCell colSpan={tab.cols.length} className="text-center text-xs py-3">Nenhum dado para esta categoria.</TableCell></TableRow>}
                                                     </TableBody>
+                                                    {breakdownData.length > 0 && (
+                                                        <TableFooter>
+                                                            <TableRow className="font-bold bg-muted/50">
+                                                                {tab.cols.map((col, index) => (
+                                                                    <TableCell key={`total-${col.key}`} className={cn("text-xs py-1.5 px-2", col.isNum || col.isCurrency ? "text-right" : "")}>
+                                                                        {index === 0 ? "TOTAL" : 
+                                                                         columnTotals[index] !== null ? 
+                                                                         (col.isCurrency ? formatCurrency(columnTotals[index]!) : formatNumber(columnTotals[index]!))
+                                                                         : ''}
+                                                                    </TableCell>
+                                                                ))}
+                                                            </TableRow>
+                                                        </TableFooter>
+                                                    )}
                                                     </Table>
                                                 </div>
                                             </TabsContent>
@@ -154,70 +189,84 @@ const PeriodSpecificReportView: React.FC<PeriodSpecificReportViewProps> = ({ dat
                     <Card>
                         <CardHeader><CardTitle className="text-lg">{data.reportTitle}</CardTitle></CardHeader>
                         <CardContent>
-                        <Table>
-                            <TableHeader><TableRow><TableHead className="text-xs">ITEM</TableHead><TableHead className="text-xs text-right">QTD</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                            {periodId === 'madrugada' ? (
-                                <>
+                        {periodId === 'roomService' ? (
+                           <Table>
+                                <TableHeader><TableRow><TableHead className="text-xs">TURNO</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">MADRUGADA</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.rsMadrugada.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">ALMOÇO 01</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.rsAlmocoPT.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">ALMOÇO 02</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.rsAlmocoST.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">JANTAR</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.rsJantar.total)}</TableCell></TableRow>
+                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.subtotal)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.roomService.ticketMedio)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                        ) : periodId === 'faturado' ? (
+                            <Table>
+                                <TableHeader><TableRow><TableHead className="text-xs">ITEM</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">HOTEL</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.faturado.hotel.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">FUNCIONÁRIO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.faturado.funcionario.total)}</TableCell></TableRow>
+                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.faturado.subtotal)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.faturado.ticketMedio)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                         ) : periodId === 'cafeDaManha' ? (
+                            <Table>
+                                <TableHeader><TableRow><TableHead className="text-xs">CATEGORIA</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">LISTA DE HÓSPEDES</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.cdmLista.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">NO-SHOW</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.cdmNoShow.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">S/ CHECK-IN</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.cdmSemCheckIn.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">AVULSOS</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.cdmAvulsos.total)}</TableCell></TableRow>
+                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.subtotal)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.cafeDaManha.ticketMedio)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                        ) : periodId === 'consumoInterno' ? (
+                           <Table>
+                                <TableHeader><TableRow><TableHead className="text-xs">TURNO</TableHead><TableHead className="text-xs text-right">TOTAL</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">ALMOÇO 1º TURNO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.consumoInterno.ciAlmocoPT.total)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">ALMOÇO 2º TURNO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.consumoInterno.ciAlmocoST.total)}</TableCell></TableRow>
+                                     <TableRow><TableCell className="font-medium text-xs py-1.5 px-2">JANTAR</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.consumoInterno.ciJantar.total)}</TableCell></TableRow>
+                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.consumoInterno.subtotal)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO</TableCell><TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(summaryData.consumoInterno.ticketMedio)}</TableCell></TableRow>
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell className="font-medium text-xs py-1.5 px-2">PAGAMENTO DIRETO</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.summary.madrugadaResumo?.totalPagDireto || 0)}</TableCell>
+                                        <TableHead className="text-xs">CATEGORIA</TableHead>
+                                        <TableHead className="text-xs text-right">QTD</TableHead>
+                                        <TableHead className="text-xs text-right">VALOR</TableHead>
                                     </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-medium text-xs py-1.5 px-2">VALOR SERVIÇO</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.summary.madrugadaResumo?.totalValorServico || 0)}</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-medium text-xs py-1.5 px-2">QTD PEDIDOS</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{(data.summary.madrugadaResumo?.qtdPedidos || 0).toLocaleString('pt-BR')}</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-medium text-xs py-1.5 px-2">QTD PRATOS</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{(data.summary.madrugadaResumo?.qtdPratos || 0).toLocaleString('pt-BR')}</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
-                                    </TableRow>
-                                </>
-                            ) : summaryTableItems.map(sItem => {
-                                const itemData = data.summary[sItem.dataKey];
-                                if (itemData && (itemData.qtd > 0 || itemData.total > 0 || (sItem.dataKey === 'consumoInterno' && (itemData.reajuste ?? 0) !== 0 ))) {
-                                    const isMadrugadaValueItem = periodId === 'madrugada' && (sItem.dataKey === 'madrugadaPagDireto' || sItem.dataKey === 'madrugadaValorServico');
-                                    
-                                    return (
-                                        <TableRow key={sItem.dataKey}>
-                                            <TableCell className="font-medium text-xs py-1.5 px-2">{sItem.item}</TableCell>
-                                            <TableCell className="text-right text-xs py-1.5 px-2">{isMadrugadaValueItem ? '-' : (itemData.qtd.toLocaleString('pt-BR') ?? '0')}</TableCell>
-                                            <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(itemData.total ?? 0)}</TableCell>
+                                </TableHeader>
+                                <TableBody>
+                                    {genericSummaryRows.rows.length > 0 ? (
+                                        <>
+                                            {genericSummaryRows.rows}
+                                            <TableRow className="font-semibold bg-muted/50">
+                                                <TableCell className="text-xs py-1.5 px-2">TOTAL</TableCell>
+                                                <TableCell className="text-right text-xs py-1.5 px-2">{formatNumber(genericSummaryRows.grandTotal.qtd)}</TableCell>
+                                                <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(genericSummaryRows.grandTotal.valor)}</TableCell>
+                                            </TableRow>
+                                            <TableRow className="font-bold border-t-2 border-primary/50">
+                                                <TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO</TableCell>
+                                                <TableCell colSpan={2} className="text-right text-xs py-1.5 px-2">{formatCurrency(genericSummaryRows.ticketMedio)}</TableCell>
+                                            </TableRow>
+                                        </>
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-3">
+                                                Nenhum total para exibir.
+                                            </TableCell>
                                         </TableRow>
-                                    );
-                                }
-                                return null;
-                            })}
-                            {showCISubtotals ? (
-                                <>
-                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL COM CI</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{data.subtotalGeralComCI.qtd.toLocaleString('pt-BR')}</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.subtotalGeralComCI.total)}</TableCell>
-                                    </TableRow>
-                                    <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL SEM CI</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{data.subtotalGeralSemCI.qtd.toLocaleString('pt-BR')}</TableCell>
-                                        <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.subtotalGeralSemCI.total)}</TableCell>
-                                    </TableRow>
-                                </>
-                            ) : (
-                                <TableRow className="font-semibold bg-muted/30"><TableCell className="text-xs py-1.5 px-2">SUBTOTAL GERAL</TableCell>
-                                    <TableCell className="text-right text-xs py-1.5 px-2">{data.subtotalGeralComCI.qtd.toLocaleString('pt-BR')}</TableCell>
-                                    <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(data.subtotalGeralComCI.total)}</TableCell>
-                                </TableRow>
-                            )}
-                            <TableRow className="font-bold border-t-2 border-primary/50"><TableCell className="text-xs py-1.5 px-2">TICKET MÉDIO (SEM CI)</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 px-2">-</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 px-2">{formatCurrency(ticketMedio)}</TableCell>
-                            </TableRow>
-                            </TableBody>
-                        </Table>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        )}
                         </CardContent>
                     </Card>
                 </div>
