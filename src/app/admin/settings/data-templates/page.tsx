@@ -47,6 +47,7 @@ export default function DataTemplatesPage() {
     if (periodConfig.subTabs) {
       for (const subTabKey in periodConfig.subTabs) {
         const subTabConfig = periodConfig.subTabs[subTabKey];
+        // Handle new structure for Faturado and Consumo Interno
         if (subTabKey === 'faturado') {
             const headers = ["Data (AAAA-MM-DD)", "Pessoa", "Tipo (hotel/funcionario/outros)", "Quantidade", "Valor (R$)", "Observação"];
             const exampleRow = ["2024-12-31", "Nome do Cliente", "hotel", "1", "150.00", "Referente ao jantar"];
@@ -55,24 +56,29 @@ export default function DataTemplatesPage() {
             const headers = ["Data (AAAA-MM-DD)", "Pessoa/Setor", "Quantidade", "Valor (R$)", "Observação", "Reajuste de C.I (Valor Total do Dia)"];
             const exampleRow = ["2024-12-31", "Diretoria", "4", "200.00", "Jantar da diretoria", "50.00"];
             sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers, exampleRow] });
-        } else {
+        } else { // Handle other sub-tabs like Room Service, Mesa, etc.
             const headers: string[] = ["Data (AAAA-MM-DD)"];
             Object.entries(subTabConfig.groupedChannels).forEach(([channelId, config]) => {
-              const channelLabel = SALES_CHANNELS[channelId as SalesChannelId];
+              const channelLabel = SALES_CHANNELS[config.qtd as SalesChannelId] || SALES_CHANNELS[config.vtotal as SalesChannelId] || config.label;
               if (config.qtd) headers.push(`${channelLabel} (Qtd)`);
               if (config.vtotal) headers.push(`${channelLabel} (R$)`);
             });
-            sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers] });
+            // Only add sheet if there are headers beyond just the date
+            if (headers.length > 1) {
+              sheets.push({ sheetName: subTabConfig.label.substring(0, 31), data: [headers] });
+            }
         }
       }
-    } else if (periodConfig.channels) {
+    } else if (periodConfig.channels) { // Handle simple periods with direct channels
       const headers: string[] = ["Data (AAAA-MM-DD)"];
         Object.entries(periodConfig.channels).forEach(([channelId, config]) => {
           const channelLabel = SALES_CHANNELS[channelId as SalesChannelId];
           if (config.qtd) headers.push(`${channelLabel} (Qtd)`);
           if (config.vtotal) headers.push(`${channelLabel} (R$)`);
         });
-      sheets.push({ sheetName: 'Lançamentos', data: [headers] });
+      if (headers.length > 1) {
+        sheets.push({ sheetName: 'Lançamentos', data: [headers] });
+      }
     }
     
     return sheets;

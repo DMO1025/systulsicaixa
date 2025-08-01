@@ -91,11 +91,11 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
     // Add CI adjustment directly to the display value for Almoço and Jantar
     const almocoDisplay = {
       qtd: totals.almoco.qtd,
-      valor: totals.almoco.valor + totals.reajusteCI.almoco,
+      valor: totals.almoco.valor,
     };
     const jantarDisplay = {
       qtd: totals.jantar.qtd,
-      valor: totals.jantar.valor + totals.reajusteCI.jantar,
+      valor: totals.jantar.valor,
     };
     
     const totalFitaValor =

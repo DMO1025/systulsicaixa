@@ -37,7 +37,7 @@ const calculateOldFormatConsumoInterno = (period: PeriodData | undefined, prefix
     const totalCI = getSafeNumericValue(channels, `${prefix}CiEFaturadosTotalCI.vtotal`);
     
     // O valor do CI é o total menos o reajuste.
-    return { qtd, valor: totalCI - reajuste, reajuste };
+    return { qtd, valor: totalCI, reajuste }; // Corrigido para retornar o valor total, o reajuste é separado.
 };
 
 
@@ -45,14 +45,28 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     const getSubTabTotal = (subTab: any, excludeRS: boolean = false) => {
         let totalValor = 0;
         let totalQtd = 0;
-        if (!subTab || !subTab.channels) {
-            return { qtd: 0, valor: 0 };
+        if (!subTab) return { qtd: 0, valor: 0 };
+
+        if (subTab.channels) {
+            for (const [key, channel] of Object.entries(subTab.channels)) {
+                if (excludeRS && key.toLowerCase().includes('roomservice')) continue;
+                totalQtd += getSafeNumericValue(channel, 'qtd');
+                totalValor += getSafeNumericValue(channel, 'vtotal');
+            }
         }
-        for (const [key, channel] of Object.entries(subTab.channels)) {
-            if (excludeRS && key.toLowerCase().includes('roomservice')) continue;
-            totalQtd += getSafeNumericValue(channel, 'qtd');
-            totalValor += getSafeNumericValue(channel, 'vtotal');
+        
+        // Incluir novos formatos no cálculo do subtotal
+        if (subTab.faturadoItems) {
+            const faturadoTotals = calculateFaturadoFromItems(subTab.faturadoItems);
+            totalQtd += faturadoTotals.qtd;
+            totalValor += faturadoTotals.valor;
         }
+        if (subTab.consumoInternoItems) {
+            const consumoTotals = calculateConsumoInternoFromItems(subTab.consumoInternoItems);
+            totalQtd += consumoTotals.qtd;
+            totalValor += consumoTotals.valor;
+        }
+
         return { qtd: totalQtd, valor: totalValor };
     };
 
@@ -216,16 +230,14 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     };
 
     const grandTotalComCI = {
-        qtd: rsMadrugada.qtdPedidos + cafeHospedes.qtd + cafeAvulsos.qtd + breakfast.qtd +
-             almocoPrimeiroTurnoTotal.qtd + almocoPTCI.qtd +
-             almocoSegundoTurnoTotal.qtd + almocoSTCI.qtd +
+        qtd: roomServiceTotal.qtd + cafeHospedes.qtd + cafeAvulsos.qtd + breakfast.qtd +
+             almocoTotal.qtd + almocoCITotal.qtd +
              jantarTotal.qtd + jantarCI.qtd +
              italianoAlmoco.qtd + italianoJantar.qtd + indianoAlmoco.qtd + indianoJantar.qtd +
              baliAlmoco.qtd + baliHappy.qtd + frigobar.qtd +
              eventosDireto.qtd + eventosHotel.qtd,
-        valor: rsMadrugada.valor + cafeHospedes.valor + cafeAvulsos.valor + breakfast.valor +
-               almocoPrimeiroTurnoTotal.valor + almocoPTCI.valor + almocoPTCI.reajuste +
-               almocoSegundoTurnoTotal.valor + almocoSTCI.valor + almocoSTCI.reajuste +
+        valor: roomServiceTotal.valor + cafeHospedes.valor + cafeAvulsos.valor + breakfast.valor +
+               almocoTotal.valor + almocoCITotal.valor + almocoPTCI.reajuste + almocoSTCI.reajuste +
                jantarTotal.valor + jantarCI.valor + jantarCI.reajuste +
                italianoAlmoco.valor + italianoJantar.valor + indianoAlmoco.valor + indianoJantar.valor +
                baliAlmoco.valor + baliHappy.valor + frigobar.valor +

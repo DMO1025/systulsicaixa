@@ -11,7 +11,7 @@ import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from '
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
-import { processEntryForTotals } from '@/lib/reportUtils';
+import { processEntryForTotals } from '@/lib/utils/calculations';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 
 
@@ -203,7 +203,7 @@ export default function DashboardPage() {
           monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
           
           // Accumulate for monthly table
-          accAcumulativo.roomService.pedidosQtd += entryTotals.roomServiceTotal.qtd;
+          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtdPedidos;
           accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
           accAcumulativo.roomService.valor += entryTotals.roomServiceTotal.valor;
           accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;

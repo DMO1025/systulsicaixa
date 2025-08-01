@@ -20,14 +20,14 @@ const userAndUIGroup = [
 ];
 
 const dataAndConfigGroup = [
-  { id: 'unit-prices', title: 'Preços Unitários', href: '/admin/settings/unit-prices', icon: DollarSign },
-  { id: 'database', title: 'Banco de Dados', href: '/admin/settings/database', icon: Database },
   { id: 'billed-clients', title: 'Pessoas/Setores Faturados', href: '/admin/settings/billed-clients', icon: Briefcase },
   { id: 'noshow-clients', title: 'Clientes No-Show', href: '/admin/settings/noshow-clients', icon: UserMinus },
-  { id: 'api-access', title: 'Acesso API', href: '/admin/settings/api-access', icon: KeyRound },
+  { id: 'unit-prices', title: 'Preços Unitários', href: '/admin/settings/unit-prices', icon: DollarSign },
   { id: 'data-templates', title: 'Modelos de Dados', href: '/admin/settings/data-templates', icon: FileSpreadsheet },
   { id: 'data-import', title: 'Importação de Dados', href: '/admin/settings/data-import', icon: Upload },
   { id: 'migration', title: 'Migração de Dados', href: '/admin/settings/migration', icon: ArrowRightLeft },
+  { id: 'database', title: 'Banco de Dados', href: '/admin/settings/database', icon: Database },
+  { id: 'api-access', title: 'Acesso API', href: '/admin/settings/api-access', icon: KeyRound },
 ];
 
 
