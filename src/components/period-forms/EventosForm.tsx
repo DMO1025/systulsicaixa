@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -314,8 +315,8 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                         {...field}
                         value={field.value ?? ''}
                         onChange={e => {
-                          const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
-                          field.onChange(val);
+                          const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
+                          field.onChange(isNaN(val as number) ? undefined : val);
                         }}
                         onFocus={(e) => e.target.select()}
                         className="h-8 text-xs"
@@ -331,21 +332,8 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                 render={({ field }) => {
                     const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                         const rawValue = e.target.value;
-                        const digitsOnly = rawValue.replace(/\D/g, '');
-                        if (digitsOnly === '') {
-                            field.onChange(undefined);
-                        } else {
-                            const numberValue = parseInt(digitsOnly, 10);
-                            field.onChange(numberValue / 100);
-                        }
-                    };
-
-                    const formatCurrencyForDisplay = (val: number | undefined) => {
-                        if (val === undefined || val === null) return '';
-                        return val.toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        });
+                        const numberValue = parseFloat(rawValue);
+                        field.onChange(isNaN(numberValue) ? undefined : numberValue);
                     };
 
                     return (
@@ -353,9 +341,10 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                           <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
                           <FormControl>
                             <Input
-                              type="text"
-                              placeholder="0,00"
-                              value={formatCurrencyForDisplay(field.value)}
+                              type="number"
+                              placeholder="0.00"
+                              step="0.01"
+                              value={field.value ?? ''}
                               onChange={handleCurrencyChange}
                               onFocus={(e) => e.target.select()}
                               className="h-8 text-xs"

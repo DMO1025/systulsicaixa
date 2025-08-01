@@ -212,7 +212,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                         Todos os Períodos
                                     </div>
                                 </SelectItem>
-                                {sortedPeriodOptions.filter(p => p.type === 'entry').map(p => {
+                                {sortedPeriodOptions.map(p => {
                                     const Icon = p.icon;
                                     return (
                                         <SelectItem key={p.id} value={p.id}>

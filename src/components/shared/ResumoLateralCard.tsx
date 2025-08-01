@@ -87,23 +87,13 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
   const summary = useMemo(() => {
     const config = summaryConfig;
     const totals = processEntryForTotals(dailyData as DailyLogEntry);
-
-    // Add CI adjustment directly to the display value for Almoço and Jantar
-    const almocoDisplay = {
-      qtd: totals.almoco.qtd,
-      valor: totals.almoco.valor,
-    };
-    const jantarDisplay = {
-      qtd: totals.jantar.qtd,
-      valor: totals.jantar.valor,
-    };
     
     const totalFitaValor =
       (config.rsMadrugada ? totals.rsMadrugada.valor : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.valor : 0) +
       (config.breakfast ? totals.breakfast.valor : 0) +
-      (config.almoco ? almocoDisplay.valor : 0) +
-      (config.jantar ? jantarDisplay.valor : 0) +
+      (config.almoco ? totals.almoco.valor : 0) +
+      (config.jantar ? totals.jantar.valor : 0) +
       (config.frigobar ? totals.frigobar.valor : 0) +
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.valor : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.valor : 0) +
@@ -116,8 +106,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rsMadrugada ? totals.rsMadrugada.qtdPedidos : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.qtd : 0) +
       (config.breakfast ? totals.breakfast.qtd : 0) +
-      (config.almoco ? almocoDisplay.qtd : 0) +
-      (config.jantar ? jantarDisplay.qtd : 0) +
+      (config.almoco ? totals.almoco.qtd : 0) +
+      (config.jantar ? totals.jantar.qtd : 0) +
       (config.frigobar ? totals.frigobar.qtd : 0) +
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.qtd : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
@@ -135,8 +125,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       rsMadrugada: totals.rsMadrugada,
       cafeAvulsos: totals.cafeAvulsos,
       breakfast: totals.breakfast,
-      almoco: almocoDisplay, // Use the adjusted value
-      jantar: jantarDisplay, // Use the adjusted value
+      almoco: totals.almoco,
+      jantar: totals.jantar,
       italianoAlmoco: totals.italianoAlmoco,
       italianoJantar: totals.italianoJantar,
       indianoAlmoco: totals.indianoAlmoco,
@@ -400,3 +390,4 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
 };
 
 export default ResumoLateralCard;
+

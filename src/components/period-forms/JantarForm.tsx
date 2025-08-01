@@ -72,8 +72,8 @@ const JantarForm: React.FC<PeriodFormProps> = ({
   const periodTotal = useMemo(() => {
     const totals = processEntryForTotals(watchedData as DailyLogEntry);
     const jantarTotal = totals.jantar.valor;
-    const frigobarJantarTotal = totals.reajusteCI.jantar;
-    return jantarTotal + frigobarJantarTotal;
+    const reajusteCIJantar = totals.reajusteCI.jantar;
+    return jantarTotal + reajusteCIJantar;
   }, [watchedData]);
 
   useEffect(() => {
@@ -99,7 +99,7 @@ const JantarForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Jantar + Frigobar Jantar)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Jantar + Reajuste C.I.)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>

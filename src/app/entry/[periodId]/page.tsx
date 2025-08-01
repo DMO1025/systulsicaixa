@@ -122,8 +122,8 @@ export default function PeriodEntryPage() {
                                     onFocus={(e) => e.target.select()}
                                     onChange={e => {
                                         const rawValue = e.target.value;
-                                        const newQty = rawValue === '' ? undefined : parseFloat(rawValue);
-                                        field.onChange(newQty);
+                                        const newQty = rawValue === '' ? undefined : parseInt(rawValue, 10);
+                                        field.onChange(isNaN(newQty as number) ? undefined : newQty);
 
                                         if (isVtotalDisabledByUnitPrice && group.vtotal) {
                                           const calculatedVtotal = (Number(newQty) || 0) * unitPriceForChannel;
@@ -145,45 +145,27 @@ export default function PeriodEntryPage() {
                         <FormField
                             control={currentForm.control}
                             name={`${basePath}.${group.vtotal}.vtotal` as any}
-                            render={({ field }) => {
-                                const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                                    const rawValue = e.target.value;
-                                    const digitsOnly = rawValue.replace(/\D/g, '');
-                                    if (digitsOnly === '') {
-                                        field.onChange(undefined);
-                                    } else {
-                                        const numberValue = parseInt(digitsOnly, 10);
-                                        field.onChange(numberValue / 100);
-                                    }
-                                };
-
-                                const formatCurrencyForDisplay = (val: number | undefined) => {
-                                    if (val === undefined || val === null) return '';
-                                    return val.toLocaleString('pt-BR', {
-                                        style: 'currency',
-                                        currency: 'BRL',
-                                    });
-                                };
-
-                                return (
-                                    <FormItem>
-                                        <FormControl>
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
                                         <div className="relative">
                                             <Input
-                                            type="text"
-                                            placeholder="R$ 0,00"
-                                            value={formatCurrencyForDisplay(field.value)}
-                                            onChange={handleCurrencyChange}
-                                            onFocus={(e) => e.target.select()}
-                                            className="h-8 text-sm text-right w-full"
-                                            disabled={isVtotalDisabledByUnitPrice}
+                                                type="number"
+                                                placeholder="0.00"
+                                                step="0.01"
+                                                {...field}
+                                                value={field.value ?? ''}
+                                                onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                                onFocus={(e) => e.target.select()}
+                                                className="h-8 text-sm text-right w-full pl-7"
+                                                disabled={isVtotalDisabledByUnitPrice}
                                             />
+                                            <DollarSign className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                         </div>
-                                        </FormControl>
+                                    </FormControl>
                                     <FormMessage className="text-xs mt-1 text-right" />
-                                    </FormItem>
-                                )
-                            }}
+                                </FormItem>
+                            )}
                         />
                         )}
                      </div>

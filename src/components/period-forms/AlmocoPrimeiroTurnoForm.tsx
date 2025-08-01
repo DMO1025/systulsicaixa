@@ -74,9 +74,10 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
     const madrugadaTotal = totals.rsMadrugada.valor;
     const cafeAvulsosTotal = totals.cafeAvulsos.valor;
     const almocoPTTotal = totals.almocoPrimeiroTurno.valor;
-    const frigobarPTTotal = totals.reajusteCI.almoco;
+    // O reajusteCI.almoco já contém a soma dos dois turnos, então usamos a parte específica do PT aqui.
+    const reajusteCIPT = totals.reajusteCI.almocoPT; 
     
-    return madrugadaTotal + cafeAvulsosTotal + almocoPTTotal + frigobarPTTotal;
+    return madrugadaTotal + cafeAvulsosTotal + almocoPTTotal + reajusteCIPT;
   }, [watchedData]);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ const AlmocoPrimeiroTurnoForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Almoço 1º Turno + Frigobar 1º Turno)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Madrugada + Café Avulso + Almoço 1º Turno + Reajuste C.I.)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>

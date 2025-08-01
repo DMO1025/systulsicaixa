@@ -70,8 +70,8 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
   const periodTotal = useMemo(() => {
     const totals = processEntryForTotals(watchedData as DailyLogEntry);
     const almocoSTTotal = totals.almocoSegundoTurno.valor;
-    const frigobarSTTotal = totals.reajusteCI.almoco;
-    return almocoSTTotal + frigobarSTTotal;
+    const reajusteCIST = totals.reajusteCI.almocoST;
+    return almocoSTTotal + reajusteCIST;
   }, [watchedData]);
 
 
@@ -98,7 +98,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno + Frigobar 2º Turno)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno + Reajuste C.I.)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>

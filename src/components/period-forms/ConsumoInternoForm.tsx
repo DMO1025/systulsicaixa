@@ -80,9 +80,9 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
   const oldFormatQtd = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosConsumoInternoQtd.qtd`);
   const oldFormatReajuste = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosReajusteCI.vtotal`);
   const oldFormatTotalCI = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosTotalCI.vtotal`);
-  const oldFormatValor = oldFormatTotalCI - oldFormatReajuste;
+  const oldFormatValor = oldFormatTotalCI;
 
-  const showLegacyWarning = oldFormatQtd > 0 || oldFormatValor > 0 || oldFormatReajuste > 0;
+  const showLegacyWarning = oldFormatQtd > 0 || oldFormatValor > 0;
 
   return (
     <div className="space-y-6">
@@ -204,7 +204,7 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
         <div className="border-t pt-4">
              <FormField
                 control={form.control}
-                name={`${basePath.split('.').slice(0, 2).join('.')}.consumoInterno.channels.reajusteCI.vtotal` as any}
+                name={`${basePath}.channels.reajusteCI.vtotal` as any}
                 render={({ field }) => {
                     const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                         const rawValue = e.target.value;
