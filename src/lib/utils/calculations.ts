@@ -173,16 +173,16 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
 
     // -- TOTALS PER SHIFT --
     const turnoAlmocoPT = {
-        qtd: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + rsAlmocoPT.qtd + frigobarPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd,
-        valor: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + rsAlmocoPT.valor + frigobarPT.valor + aptFaturado.new.valor + aptFaturado.old.valor + aptCI.old.reajuste + aptCI.reajusteNew,
+        qtd: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + rsAlmocoPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd,
+        valor: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + rsAlmocoPT.valor +  aptFaturado.new.valor + aptFaturado.old.valor + aptCI.old.reajuste + aptCI.reajusteNew,
     };
     const turnoAlmocoST = {
-        qtd: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd + rsAlmocoST.qtd + frigobarST.qtd + astFaturado.new.qtd + astFaturado.old.qtd,
-        valor: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + rsAlmocoST.valor + frigobarST.valor + astFaturado.new.valor + astFaturado.old.valor + astCI.old.reajuste + astCI.reajusteNew,
+        qtd: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd + rsAlmocoST.qtd + astFaturado.new.qtd + astFaturado.old.qtd,
+        valor: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + rsAlmocoST.valor  + astFaturado.new.valor + astFaturado.old.valor + astCI.old.reajuste + astCI.reajusteNew,
     };
     const turnoJantar = {
-        qtd: getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd + rsJantar.qtd + frigobarJantar.qtd + jntFaturado.new.qtd + jntFaturado.old.qtd,
-        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + rsJantar.valor + frigobarJantar.valor + jntFaturado.new.valor + jntFaturado.old.valor + jntCI.old.reajuste + jntCI.reajusteNew,
+        qtd: getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd + rsJantar.qtd +  jntFaturado.new.qtd + jntFaturado.old.qtd,
+        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + rsJantar.valor +  jntFaturado.new.valor + jntFaturado.old.valor + jntCI.old.reajuste + jntCI.reajusteNew,
     };
     
     // -- TOTALS PER SERVICE TYPE --
