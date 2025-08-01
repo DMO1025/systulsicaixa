@@ -214,12 +214,12 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
 
     const almocoDisplayTotal = {
         qtd: almocoTotal.qtd,
-        valor: almocoTotal.valor + rsAlmocoPT.valor + rsAlmocoST.valor + almocoPTCI.reajuste + almocoSTCI.reajuste,
+        valor: almocoTotal.valor + almocoPTCI.reajuste + almocoSTCI.reajuste,
     };
 
     const jantarDisplayTotal = {
         qtd: jantarTotal.qtd,
-        valor: jantarTotal.valor + rsJantar.valor + jantarCI.reajuste
+        valor: jantarTotal.valor + jantarCI.reajuste
     };
     
     const grandTotalComCI = {
@@ -283,4 +283,3 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
         reajusteCI: { total: totalReajusteCI, almoco: almocoPTCI.reajuste + almocoSTCI.reajuste, almocoPT: almocoPTCI.reajuste, almocoST: almocoSTCI.reajuste, jantar: jantarCI.reajuste },
     };
 };
-
