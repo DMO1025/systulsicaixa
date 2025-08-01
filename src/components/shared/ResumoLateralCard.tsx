@@ -149,7 +149,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       grandTotalComCI: totals.grandTotal.comCI,
       grandTotalSemCI: totals.grandTotal.semCI,
       totalCI: totals.totalCI,
-      totalReajusteCI: totals.reajusteCI.total,
+      totalReajusteCI: totals.totalReajusteCI,
     };
   }, [dailyData, summaryConfig]);
 
@@ -390,4 +390,5 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
 };
 
 export default ResumoLateralCard;
+
 

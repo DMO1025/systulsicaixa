@@ -5,13 +5,14 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, PeriodData, CafeManhaNoShowItem, ControleCafeItem } from '@/lib/types';
+import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, PeriodData, CafeManhaNoShowItem, ControleCafeItem, ChannelUnitPricesConfig } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from './config/periods';
 import { EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from './config/forms';
 import { TAB_DEFINITIONS } from '@/components/reports/tabDefinitions';
 import { extractPersonTransactions } from './reportUtils';
+import { getSetting } from '@/services/settingsService';
 
 
 interface ExportParams {
@@ -51,15 +52,20 @@ const getFilename = (parts: (string | undefined | null)[], ext: string): string 
 
 
 const addHeaderAndFooter = (doc: jsPDF, title: string, dateRange: string) => {
-    doc.setFontSize(14);
-    doc.text(title, 40, 30);
-    doc.setFontSize(10);
-    doc.text(dateRange, 40, 45);
-
-    // Add footer to all pages
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
+
+        // Header
+        doc.setFontSize(14);
+        doc.text("Empresa de Exemplo LTDA", 40, 30);
+        doc.setFontSize(10);
+        doc.text(title, 40, 45);
+        doc.setFontSize(9);
+        doc.text(dateRange, 40, 58);
+
+
+        // Footer
         doc.setFontSize(8);
         doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 20);
         doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
@@ -99,45 +105,109 @@ const getControleCafeItems = (entries: DailyLogEntry[], type: 'no-show' | 'contr
 
 // --- PDF Generation ---
 
-const generateControleCafePdf = (doc: jsPDF, entries: DailyLogEntry[], type: 'no-show' | 'controle') => {
-    if (type === 'no-show') {
-        const allItems = getControleCafeItems(entries, 'no-show') as (CafeManhaNoShowItem & { entryDate: string })[];
-        const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Observação']];
-        const body = allItems.map(item => [
-            item.entryDate,
-            item.horario || '-',
-            item.hospede || '-',
-            item.uh || '-',
-            item.reserva || '-',
-            formatCurrency(item.valor),
-            item.observation || '-',
-        ]);
-        const totalValor = allItems.reduce((sum, item) => sum + (item.valor || 0), 0);
-        const foot = [['TOTAL', '', '', '', '', formatCurrency(totalValor), '']];
-        autoTable(doc, { head, body, foot, startY: 60, theme: 'striped', showFoot: 'lastPage' });
-    } else {
-        const allItems = getControleCafeItems(entries, 'controle') as (Partial<ControleCafeItem> & { entryDate: string })[];
-        const head = [['Data', 'Adultos', 'Criança 01', 'Criança 02', 'Cont. Manual', 'Sem Check-in']];
-        const body = allItems.map(item => [
-            item.entryDate,
-            formatQty(item.adultoQtd),
-            formatQty(item.crianca01Qtd),
-            formatQty(item.crianca02Qtd),
-            formatQty(item.contagemManual),
-            formatQty(item.semCheckIn),
-        ]);
-        const totals = allItems.reduce((acc, item) => {
-            acc.adultoQtd += item.adultoQtd || 0;
-            acc.crianca01Qtd += item.crianca01Qtd || 0;
-            acc.crianca02Qtd += item.crianca02Qtd || 0;
-            acc.contagemManual += item.contagemManual || 0;
-            acc.semCheckIn += item.semCheckIn || 0;
-            return acc;
-        }, { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0 });
+const generateControleCafePdf = async (doc: jsPDF, entries: DailyLogEntry[], type: 'no-show' | 'controle', dateRangeStr: string) => {
+    const unitPrices = await getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig');
+    const cafePrice = unitPrices?.cdmListaHospedes || 0;
 
-        const foot = [['TOTAL', formatQty(totals.adultoQtd), formatQty(totals.crianca01Qtd), formatQty(totals.crianca02Qtd), formatQty(totals.contagemManual), formatQty(totals.semCheckIn)]];
-        autoTable(doc, { head, body, foot, startY: 60, theme: 'striped', showFoot: 'lastPage' });
-    }
+    const processDezena = (dezenaEntries: DailyLogEntry[], dezenaLabel: string, isFirstPage: boolean) => {
+        if (dezenaEntries.length === 0) return;
+
+        if (!isFirstPage) {
+            doc.addPage();
+        }
+
+        const title = type === 'no-show' 
+            ? `Relatório de Controle - No-Show Café da Manhã (${dezenaLabel})`
+            : `Relatório de Controle - Café da Manhã (${dezenaLabel})`;
+
+        addHeaderAndFooter(doc, title, dateRangeStr);
+
+        if (type === 'no-show') {
+            const allItems = getControleCafeItems(dezenaEntries, 'no-show') as (CafeManhaNoShowItem & { entryDate: string })[];
+            const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Observação']];
+            const body = allItems.map(item => [
+                item.entryDate,
+                item.horario || '-',
+                item.hospede || '-',
+                item.uh || '-',
+                item.reserva || '-',
+                formatCurrency(item.valor),
+                item.observation || '-',
+            ]);
+            const totalValor = allItems.reduce((sum, item) => sum + (item.valor || 0), 0);
+            const foot = [[{ content: `TOTAL FATURADO (${dezenaLabel}): ${formatCurrency(totalValor)}`, colSpan: 7, styles: { halign: 'right', fontStyle: 'bold', fillColor: [230, 230, 230] } }]];
+            autoTable(doc, { head, body, foot, startY: 70, theme: 'striped', showFoot: 'lastPage' });
+        } else {
+            const allItems = getControleCafeItems(dezenaEntries, 'controle') as (Partial<ControleCafeItem> & { entryDate: string })[];
+            const head = [['Data', 'Adultos', 'Criança 01', 'Criança 02', 'Cont. Manual', 'Sem Check-in', 'TOTAL DIA']];
+            
+            const body = allItems.map(item => {
+                const totalDia = (item.adultoQtd || 0) + (item.crianca01Qtd || 0) + (item.crianca02Qtd || 0) + (item.contagemManual || 0) + (item.semCheckIn || 0);
+                return [
+                    item.entryDate,
+                    formatQty(item.adultoQtd),
+                    formatQty(item.crianca01Qtd),
+                    formatQty(item.crianca02Qtd),
+                    formatQty(item.contagemManual),
+                    formatQty(item.semCheckIn),
+                    formatQty(totalDia)
+                ];
+            });
+
+            const totals = allItems.reduce((acc, item) => {
+                acc.adultoQtd += item.adultoQtd || 0;
+                acc.crianca01Qtd += item.crianca01Qtd || 0;
+                acc.crianca02Qtd += item.crianca02Qtd || 0;
+                acc.contagemManual += item.contagemManual || 0;
+                acc.semCheckIn += item.semCheckIn || 0;
+                return acc;
+            }, { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0 });
+
+            const totalPessoasDezena = totals.adultoQtd + totals.crianca01Qtd + totals.crianca02Qtd + totals.contagemManual + totals.semCheckIn;
+            const totalValorDezena = totalPessoasDezena * cafePrice;
+            
+            const fiscalSummaryBody = [
+                ['Total Adultos:', formatQty(totals.adultoQtd)],
+                ['Total Crianças:', formatQty(totals.crianca01Qtd + totals.crianca02Qtd)],
+                ['Total Contagem Manual:', formatQty(totals.contagemManual)],
+                ['Total Sem Check-in:', formatQty(totals.semCheckIn)],
+            ];
+
+            const foot = [
+                ['TOTAIS DA DEZENA', formatQty(totals.adultoQtd), formatQty(totals.crianca01Qtd), formatQty(totals.crianca02Qtd), formatQty(totals.contagemManual), formatQty(totals.semCheckIn), formatQty(totalPessoasDezena)],
+            ];
+            autoTable(doc, { head, body, foot, startY: 70, theme: 'striped', showFoot: 'lastPage' });
+
+            const finalY = (doc as any).lastAutoTable.finalY;
+
+            autoTable(doc, {
+                head: [['RESUMO FISCAL', `(${dezenaLabel})`]],
+                body: fiscalSummaryBody,
+                startY: finalY + 15,
+                theme: 'plain',
+                headStyles: { fontStyle: 'bold', fontSize: 11 },
+                bodyStyles: { fontSize: 9 },
+                columnStyles: { 0: { fontStyle: 'bold' } }
+            });
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`VALOR TOTAL (ESTIMADO - ${dezenaLabel}):`, (doc as any).lastAutoTable.finalY + 20, 40);
+            doc.text(formatCurrency(totalValorDezena), (doc as any).lastAutoTable.finalY + 20, 200);
+
+        }
+    };
+    
+    const primeiraDezenaEntries = entries.filter(e => getDate(parseISO(String(e.id))) <= 10);
+    const segundaDezenaEntries = entries.filter(e => {
+        const day = getDate(parseISO(String(e.id)));
+        return day > 10 && day <= 20;
+    });
+    const terceiraDezenaEntries = entries.filter(e => getDate(parseISO(String(e.id))) > 20);
+    
+    processDezena(primeiraDezenaEntries, "1ª Dezena", true);
+    processDezena(segundaDezenaEntries, "2ª Dezena", primeiraDezenaEntries.length === 0);
+    processDezena(terceiraDezenaEntries, "3ª Dezena", primeiraDezenaEntries.length === 0 && segundaDezenaEntries.length === 0);
 };
 
 const generateGeneralReportPdf = (doc: jsPDF, data: GeneralReportViewData, visiblePeriods: PeriodDefinition[]) => {
@@ -168,7 +238,7 @@ const generateGeneralReportPdf = (doc: jsPDF, data: GeneralReportViewData, visib
         head: head,
         body: body,
         foot: foot,
-        startY: 60,
+        startY: 70,
         theme: 'striped',
         showHead: 'firstPage',
         showFoot: 'lastPage',
@@ -182,7 +252,7 @@ const generateGeneralReportPdf = (doc: jsPDF, data: GeneralReportViewData, visib
 };
 
 const generatePeriodReportPdf = (doc: jsPDF, data: PeriodReportViewData) => {
-    let yPos = 60;
+    let yPos = 70;
     
     const availableCategories = Object.keys(data.dailyBreakdowns).filter(
       key => data.dailyBreakdowns[key] && data.dailyBreakdowns[key].length > 0
@@ -226,7 +296,7 @@ const generatePeriodReportPdf = (doc: jsPDF, data: PeriodReportViewData) => {
             showFoot: foot ? 'lastPage' : 'never',
             styles: { fontSize: 8 },
             didDrawPage: (hookData) => {
-                yPos = hookData.cursor?.y ? hookData.cursor.y + 20 : 60;
+                yPos = hookData.cursor?.y ? hookData.cursor.y + 20 : 70;
             }
         });
         yPos = (doc as any).lastAutoTable.finalY + 20;
@@ -251,7 +321,7 @@ const generatePersonExtractPdf = (doc: jsPDF, entries: DailyLogEntry[], consumpt
 
     const foot = [['TOTAL', '', '', '', formatQty(totals.qtd), formatCurrency(totals.valor)]];
 
-    autoTable(doc, { head, body, foot, startY: 60, theme: 'striped', showHead: 'firstPage', showFoot: 'lastPage' });
+    autoTable(doc, { head, body, foot, startY: 70, theme: 'striped', showHead: 'firstPage', showFoot: 'lastPage' });
 };
 
 const generatePersonSummaryPdf = (doc: jsPDF, entries: DailyLogEntry[], consumptionType: string) => {
@@ -274,7 +344,7 @@ const generatePersonSummaryPdf = (doc: jsPDF, entries: DailyLogEntry[], consumpt
     
     const foot = [['TOTAL GERAL', formatQty(grandTotals.qtd), formatCurrency(grandTotals.valor)]];
     
-    autoTable(doc, { head, body, foot, startY: 60, theme: 'striped', showHead: 'firstPage', showFoot: 'lastPage' });
+    autoTable(doc, { head, body, foot, startY: 70, theme: 'striped', showHead: 'firstPage', showFoot: 'lastPage' });
 };
 
 
@@ -305,12 +375,16 @@ const exportToPdf = async (params: ExportParams) => {
         title = `Relatório Consolidado Geral`;
         dateRangeStr = `De: ${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`;
         filename = getFilename(['Relatorio_Geral', rangeFilenameStr], 'pdf');
-        if (reportData?.type === 'general') generateGeneralReportPdf(doc, reportData.data, visiblePeriods);
+        if (reportData?.type === 'general') {
+            addHeaderAndFooter(doc, title, dateRangeStr);
+            generateGeneralReportPdf(doc, reportData.data, visiblePeriods);
+        }
     } else if (filterType === 'month' || filterType === 'period') {
         const periodTitle = reportData?.data.reportTitle || 'Mês';
         title = `Relatório Consolidado - ${periodTitle}`;
         dateRangeStr = monthYearDisplayStr;
         filename = getFilename(['Relatorio', periodTitle, rangeFilenameStr], 'pdf');
+        addHeaderAndFooter(doc, title, dateRangeStr);
         if (reportData?.type === 'general') generateGeneralReportPdf(doc, reportData.data, visiblePeriods);
         if (reportData?.type === 'period') generatePeriodReportPdf(doc, reportData.data);
     } else if (filterType === 'client-extract') {
@@ -318,25 +392,22 @@ const exportToPdf = async (params: ExportParams) => {
         title = `Extrato Detalhado - ${personName}`;
         dateRangeStr = `Período: ${rangeDisplayStr} | Tipo de Consumo: ${consumptionLabel}`;
         filename = getFilename(['Extrato_Pessoa', personName, consumptionLabel, rangeFilenameStr], 'pdf');
+        addHeaderAndFooter(doc, title, dateRangeStr);
         generatePersonExtractPdf(doc, entries, consumptionType || 'all', selectedPerson);
     } else if (filterType === 'client-summary') {
         title = `Resumo por Pessoa`;
         dateRangeStr = `Período: ${rangeDisplayStr} | Tipo de Consumo: ${consumptionLabel}`;
         filename = getFilename(['Resumo_Pessoas', consumptionLabel, rangeFilenameStr], 'pdf');
+        addHeaderAndFooter(doc, title, dateRangeStr);
         generatePersonSummaryPdf(doc, entries, consumptionType || 'all');
     } else if (filterType === 'controle-cafe' && range?.from) {
-        title = 'Relatório de Controle - Café da Manhã';
-        dateRangeStr = `De: ${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`;
         filename = getFilename(['Controle_Cafe', rangeFilenameStr], 'pdf');
-        generateControleCafePdf(doc, entries, 'controle');
+        await generateControleCafePdf(doc, entries, 'controle', rangeDisplayStr);
     } else if (filterType === 'controle-cafe-no-show' && range?.from) {
-        title = 'Relatório de Controle - No-Show Café da Manhã';
-        dateRangeStr = `De: ${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`;
         filename = getFilename(['Controle_Cafe_NoShow', rangeFilenameStr], 'pdf');
-        generateControleCafePdf(doc, entries, 'no-show');
+        await generateControleCafePdf(doc, entries, 'no-show', rangeDisplayStr);
     }
     
-    addHeaderAndFooter(doc, title, dateRangeStr);
     doc.save(filename);
 };
 
@@ -399,8 +470,8 @@ const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], 
 };
 
 const generateGeneralReportExcel = (wb: XLSX.WorkBook, data: GeneralReportViewData, visiblePeriods: PeriodDefinition[]) => {
-    const reportablePeriods = visiblePeriods.filter(p => p.type === 'entry' && p.id !== 'madrugada');
     const roomServiceDef = { id: 'roomService', label: 'Room Service' };
+    const reportablePeriods = visiblePeriods.filter(p => p.type === 'entry' && p.id !== 'madrugada');
 
     const dataForSheet = data.dailyBreakdowns.map(row => {
         const rowData: { [key: string]: any } = { Data: row.date };
@@ -567,3 +638,5 @@ export const exportReport = async (params: ExportParams) => {
         await exportToExcel(params);
     }
 };
+
+    

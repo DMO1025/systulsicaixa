@@ -374,15 +374,21 @@ export function generateReportData(
         
         const dateString = format(parseISO(String(entry.id)), 'dd/MM/yyyy');
         
+        // This is the adjustment: Almoço/Jantar values are now without Room Service.
+        const almocoPTValor = (totals.almocoPrimeiroTurno?.valor || 0) - (totals.rsAlmocoPT?.valor || 0);
+        const almocoSTValor = (totals.almocoSegundoTurno?.valor || 0) - (totals.rsAlmocoST?.valor || 0);
+        const jantarValor = (totals.jantar?.valor || 0) - (totals.rsJantar?.valor || 0);
+
         return {
             date: dateString,
             createdAt: entry.createdAt,
             lastModifiedAt: entry.lastModifiedAt,
             periodTotals: {
-                roomService: totals.roomServiceTotal, // Consolidated RS
+                roomService: totals.roomServiceTotal,
                 cafeDaManha: totals.cafeDaManha,
-                almocoPrimeiroTurno: totals.almoco,
-                jantar: totals.jantar,
+                almocoPrimeiroTurno: { qtd: totals.almocoPrimeiroTurno?.qtd || 0, valor: almocoPTValor },
+                almocoSegundoTurno: { qtd: totals.almocoSegundoTurno?.qtd || 0, valor: almocoSTValor },
+                jantar: { qtd: totals.jantar?.qtd || 0, valor: jantarValor },
                 breakfast: totals.breakfast,
                 italianoAlmoco: totals.italianoAlmoco,
                 italianoJantar: totals.italianoJantar,

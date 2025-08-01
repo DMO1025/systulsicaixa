@@ -27,10 +27,74 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
     
     // Filter out 'madrugada', control periods, and add a custom 'roomService' definition for the header
     const reportablePeriods = useMemo(() => {
-        return visiblePeriods.filter(p => p.type === 'entry' && p.id !== 'madrugada');
+      // Consolidate "Almoço Primeiro Turno" and "Almoço Segundo Turno" into a single "Almoço" column
+      const periodMap = new Map<string, PeriodDefinition>();
+      visiblePeriods.forEach(p => {
+        if (p.type !== 'entry' || p.id === 'madrugada') return;
+
+        if (p.id.includes('almoco')) {
+            if (!periodMap.has('almoco')) {
+                periodMap.set('almoco', { id: 'almoco', label: 'Almoço', icon: getPeriodIcon('almocoPrimeiroTurno'), type: 'entry' });
+            }
+        } else {
+            periodMap.set(p.id, p);
+        }
+      });
+      return Array.from(periodMap.values());
     }, [visiblePeriods]);
     
     const roomServiceDefinition = { id: 'roomService', label: 'Room Service', icon: BedDouble };
+
+    // Memoize the body rows to avoid recalculating on every render
+    const bodyRows = useMemo(() => {
+        return data.dailyBreakdowns.map((row) => {
+            const almocoTotalQtd = (row.periodTotals['almocoPrimeiroTurno']?.qtd ?? 0) + (row.periodTotals['almocoSegundoTurno']?.qtd ?? 0);
+            const almocoTotalValor = (row.periodTotals['almocoPrimeiroTurno']?.valor ?? 0) + (row.periodTotals['almocoSegundoTurno']?.valor ?? 0);
+
+            const rowData: Record<string, { qtd: number; valor: number }> = {
+                roomService: row.periodTotals.roomService || { qtd: 0, valor: 0 },
+                almoco: { qtd: almocoTotalQtd, valor: almocoTotalValor }
+            };
+
+            reportablePeriods.forEach(p => {
+                if (p.id !== 'almoco') {
+                    rowData[p.id] = row.periodTotals[p.id as keyof typeof row.periodTotals] || { qtd: 0, valor: 0 };
+                }
+            });
+
+            return {
+                id: row.date,
+                date: row.date,
+                createdAt: row.createdAt,
+                lastModifiedAt: row.lastModifiedAt,
+                rowData,
+                totalComCI: row.totalComCI,
+                totalReajusteCI: row.totalReajusteCI,
+                totalSemCI: row.totalSemCI,
+                totalQtd: row.totalQtd,
+                totalCIQtd: row.totalCIQtd
+            };
+        });
+    }, [data.dailyBreakdowns, reportablePeriods]);
+    
+    // Memoize the footer row
+    const footerRow = useMemo(() => {
+        const almocoTotalQtd = (data.summary.periodTotals['almocoPrimeiroTurno']?.qtd ?? 0) + (data.summary.periodTotals['almocoSegundoTurno']?.qtd ?? 0);
+        const almocoTotalValor = (data.summary.periodTotals['almocoPrimeiroTurno']?.valor ?? 0) + (data.summary.periodTotals['almocoSegundoTurno']?.valor ?? 0);
+
+        const rowData: Record<string, { qtd: number; valor: number }> = {
+            roomService: data.summary.periodTotals.roomService || { qtd: 0, valor: 0 },
+            almoco: { qtd: almocoTotalQtd, valor: almocoTotalValor }
+        };
+
+        reportablePeriods.forEach(p => {
+            if (p.id !== 'almoco') {
+                rowData[p.id] = data.summary.periodTotals[p.id as keyof typeof data.summary.periodTotals] || { qtd: 0, valor: 0 };
+            }
+        });
+
+        return rowData;
+    }, [data.summary, reportablePeriods]);
 
     return (
         <div className="space-y-6" ref={ref}>
@@ -90,7 +154,7 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {data.dailyBreakdowns.map((row, idx) => {
+                            {bodyRows.map((row, idx) => {
                                 const createdAtDate = row.createdAt ? (typeof row.createdAt === 'string' ? parseISO(row.createdAt) : row.createdAt) : null;
                                 const lastModifiedDate = row.lastModifiedAt ? (typeof row.lastModifiedAt === 'string' ? parseISO(row.lastModifiedAt) : row.lastModifiedAt) : null;
                                 const formattedCreationTime = createdAtDate && isValid(createdAtDate) ? format(createdAtDate, 'HH:mm', { locale: ptBR }) : '--:--';
@@ -109,11 +173,11 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                                             </div>
                                         </TableCell>
                                         <TableCell key={`${roomServiceDefinition.id}-qtd`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
-                                            {formatQty(row.periodTotals['roomService']?.qtd)}
+                                            {formatQty(row.rowData['roomService']?.qtd)}
                                         </TableCell>
                                         {reportablePeriods.map(p => (
                                             <TableCell key={`${p.id}-qtd`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
-                                                {formatQty(row.periodTotals[p.id]?.qtd)}
+                                                {formatQty(row.rowData[p.id]?.qtd)}
                                             </TableCell>
                                         ))}
                                         <TableCell className="text-right font-bold text-xs text-muted-foreground pt-2 pb-0">{formatQty(row.totalQtd)}</TableCell>
@@ -122,11 +186,11 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                                     </TableRow>
                                     <TableRow>
                                         <TableCell key={`${roomServiceDefinition.id}-valor`} className="text-right font-medium text-sm pb-2 pt-0">
-                                            {formatCurrency(row.periodTotals['roomService']?.valor)}
+                                            {formatCurrency(row.rowData['roomService']?.valor)}
                                         </TableCell>
                                         {reportablePeriods.map(p => (
                                             <TableCell key={`${p.id}-valor`} className="text-right font-medium text-sm pb-2 pt-0">
-                                                {formatCurrency(row.periodTotals[p.id]?.valor)}
+                                                {formatCurrency(row.rowData[p.id]?.valor)}
                                             </TableCell>
                                         ))}
                                         <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(row.totalComCI)}</TableCell>
@@ -141,11 +205,11 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                             <TableRow className="bg-muted/50 font-bold border-t-4 border-double border-foreground/50">
                                 <TableCell rowSpan={2} className="align-middle border-r text-base">TOTAL</TableCell>
                                 <TableCell key={`${roomServiceDefinition.id}-qtd-total`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
-                                    {formatQty(data.summary.periodTotals['roomService']?.qtd)}
+                                    {formatQty(footerRow['roomService']?.qtd)}
                                 </TableCell>
                                 {reportablePeriods.map(p => (
                                     <TableCell key={`${p.id}-qtd-total`} className="text-right text-xs text-muted-foreground pt-2 pb-0">
-                                        {formatQty(data.summary.periodTotals[p.id]?.qtd)}
+                                        {formatQty(footerRow[p.id]?.qtd)}
                                     </TableCell>
                                 ))}
                                 <TableCell className="text-right text-xs font-bold text-muted-foreground pt-2 pb-0">{formatQty(data.summary.grandTotalQtd)}</TableCell>
@@ -154,11 +218,11 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                             </TableRow>
                             <TableRow className="bg-muted/50 font-bold">
                                 <TableCell key={`${roomServiceDefinition.id}-valor-total`} className="text-right font-semibold text-sm pb-2 pt-0">
-                                    {formatCurrency(data.summary.periodTotals['roomService']?.valor)}
+                                    {formatCurrency(footerRow['roomService']?.valor)}
                                 </TableCell>
                                 {reportablePeriods.map(p => (
                                     <TableCell key={`${p.id}-valor-total`} className="text-right font-semibold text-sm pb-2 pt-0">
-                                        {formatCurrency(data.summary.periodTotals[p.id]?.valor)}
+                                        {formatCurrency(footerRow[p.id]?.valor)}
                                     </TableCell>
                                 ))}
                                 <TableCell className="text-right font-bold text-sm pb-2 pt-0">{formatCurrency(data.summary.grandTotalComCI)}</TableCell>

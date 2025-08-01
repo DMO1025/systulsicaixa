@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -194,7 +195,7 @@ export default function DashboardPage() {
           monthGrandTotalValor += entryTotals.grandTotal.comCI.valor;
           monthGrandTotalSemCIQtd += entryTotals.grandTotal.semCI.qtd;
           monthGrandTotalSemCIValor += entryTotals.grandTotal.semCI.valor;
-          monthGrandTotalReajusteCI += entryTotals.reajusteCI.total;
+          monthGrandTotalReajusteCI += entryTotals.totalReajusteCI;
           monthGrandTotalCIQtd += entryTotals.totalCI.qtd;
           monthGrandTotalCIValor += entryTotals.totalCI.valor;
           monthTotalCIAlmoco.qtd += entryTotals.almocoCI.qtd;
@@ -295,7 +296,7 @@ export default function DashboardPage() {
                     monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
                     monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
                     monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
-                    monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.reajusteCI.total;
+                    monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.totalReajusteCI;
                 }
             }
         });
@@ -573,3 +574,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

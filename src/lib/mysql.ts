@@ -121,16 +121,19 @@ export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
 }
 
 export async function isMysqlConnected(currentPool?: Pool | null): Promise<boolean> {
-    if (!currentPool) {
+    const poolToTest = currentPool || pool;
+    if (!poolToTest) {
         return false;
     }
     try {
-        const connection = await currentPool.getConnection();
+        const connection = await poolToTest.getConnection();
         await connection.ping();
         connection.release();
         return true;
     } catch (error: any) {
-        pool = null; 
+        if(poolToTest === pool){
+          pool = null; 
+        }
         return false;
     }
 }
