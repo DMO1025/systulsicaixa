@@ -108,7 +108,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.breakfast ? totals.breakfast.qtd : 0) +
       (config.almoco ? totals.almoco.qtd : 0) +
       (config.jantar ? totals.jantar.qtd : 0) +
- 
+      (config.frigobar ? totals.frigobar.qtd : 0) +
       (config.rwItalianoAlmoco ? totals.italianoAlmoco.qtd : 0) +
       (config.rwItalianoJantar ? totals.italianoJantar.qtd : 0) +
       (config.rwIndianoAlmoco ? totals.indianoAlmoco.qtd : 0) +

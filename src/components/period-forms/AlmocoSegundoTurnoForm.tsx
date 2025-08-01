@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useMemo } from 'react';
@@ -69,7 +70,6 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
 
   const periodTotal = useMemo(() => {
     const totals = processEntryForTotals(watchedData as DailyLogEntry);
-    // This total now correctly includes Room Service, Restaurant, Faturado, Frigobar, and C.I. Reajuste for this specific shift.
     return totals.turnos.almocoST.valor;
   }, [watchedData]);
 
@@ -97,7 +97,7 @@ const AlmocoSegundoTurnoForm: React.FC<PeriodFormProps> = ({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-sm font-semibold text-foreground">Total do Turno (Acumulado): <span className="font-bold text-lg text-primary">R$ {periodTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">(Almoço 2º Turno + Frigobar + Reajuste C.I.)</p>
+            <p className="text-xs text-muted-foreground mt-1">(Restaurante + R.S. + Faturado + Frigobar + Reajuste C.I.)</p>
           </div>
         </div>
         <CardDescription>{cardDescriptionText}</CardDescription>
