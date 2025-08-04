@@ -104,8 +104,42 @@ const FaturadoForm: React.FC<FaturadoFormProps> = ({ form, basePath }) => {
     setNewEntry(createDefaultFaturadoItem());
   };
 
+  const periodPrefix = basePath.startsWith('almocoPrimeiroTurno') ? 'apt' : basePath.startsWith('almocoSegundoTurno') ? 'ast' : 'jnt';
+  
+  const watchedFormData = form.watch();
+  const legacyPeriodData = watchedFormData[basePath.split('.')[0] as 'almocoPrimeiroTurno' | 'almocoSegundoTurno' | 'jantar'];
+  const legacyChannels = legacyPeriodData?.subTabs?.ciEFaturados?.channels;
+  
+  const oldFormatQtd = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosFaturadosQtd.qtd`);
+  const oldFormatValorHotel = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosValorHotel.vtotal`);
+  const oldFormatValorFuncionario = getSafeNumericValue(legacyChannels, `${periodPrefix}CiEFaturadosValorFuncionario.vtotal`);
+  const oldFormatTotal = oldFormatValorHotel + oldFormatValorFuncionario;
+
+  const showLegacyWarning = oldFormatQtd > 0 || oldFormatTotal > 0;
+
   return (
     <div className="space-y-6">
+
+        {showLegacyWarning && (
+             <div className="p-4 border border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div>
+                        <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Dados de Formato Antigo Detectados</h4>
+                        <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                            Encontramos os seguintes totais lançados no formato anterior. Se desejar, insira-os como novos itens na lista abaixo para atualizá-los e então apague os valores antigos.
+                        </p>
+                        <div className="mt-2 text-xs font-mono rounded bg-yellow-100 dark:bg-yellow-900/50 p-2 space-y-1">
+                             <p><strong>Qtd Antiga:</strong> {oldFormatQtd}</p>
+                             <p><strong>Valor Hotel Antigo:</strong> {formatCurrency(oldFormatValorHotel)}</p>
+                             <p><strong>Valor Funcionário Antigo:</strong> {formatCurrency(oldFormatValorFuncionario)}</p>
+                             <p><strong>Total Antigo:</strong> {formatCurrency(oldFormatTotal)}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="p-4 border rounded-lg bg-muted/20">
             <h4 className="text-sm font-semibold mb-3">Adicionar Novo Lançamento Faturado</h4>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">

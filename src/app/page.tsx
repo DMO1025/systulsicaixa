@@ -12,6 +12,7 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
 import { processEntryForTotals } from '@/lib/utils/calculations';
+import { processEntriesForDashboard } from '@/lib/utils/dashboardCalculations';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 
 
@@ -134,9 +135,6 @@ export default function DashboardPage() {
       setAnalysis('');
 
       try {
-        // --- PERFORMANCE OPTIMIZATION ---
-        // Fetch only the last 3 months of data relative to the selected month,
-        // which is what's needed for the evolution chart and the current month's tables.
         const endDateForFetch = endOfMonth(selectedMonth);
         const startDateForFetch = startOfMonth(subMonths(selectedMonth, 2));
 
@@ -154,93 +152,22 @@ export default function DashboardPage() {
         const entriesForMonth = entriesInRange.filter(entry => {
             const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
             if (!isValid(entryDate)) return false;
-            // Use UTC methods to ignore timezone offsets and compare date parts directly.
             const entryYearUTC = entryDate.getUTCFullYear();
             const entryMonthUTC = entryDate.getUTCMonth();
             return entryYearUTC === targetYear && entryMonthUTC === targetMonth;
         });
 
         setHasDataForMonth(entriesForMonth.length > 0);
-        
-        let monthGrandTotalQtd = 0;
-        let monthGrandTotalValor = 0;
-        let monthGrandTotalSemCIQtd = 0;
-        let monthGrandTotalSemCIValor = 0;
-        let monthGrandTotalReajusteCI = 0;
-        let monthGrandTotalCIQtd = 0;
-        let monthGrandTotalCIValor = 0;
-        let monthTotalCIAlmoco = { qtd: 0, valor: 0 };
-        let monthTotalCIJantar = { qtd: 0, valor: 0 };
 
-        const accAcumulativo = {
-          roomService: { pedidosQtd: 0, pratosMadrugadaQtd: 0, valor: 0 },
-          cafeDaManha: { qtd: 0, valor: 0 },
-          breakfast: { qtd: 0, valor: 0 },
-          italianoAlmoco: { qtd: 0, valor: 0 },
-          italianoJantar: { qtd: 0, valor: 0 },
-          indianoAlmoco: { qtd: 0, valor: 0 },
-          indianoJantar: { qtd: 0, valor: 0 },
-          almoco: { qtd: 0, valor: 0 },
-          jantar: { qtd: 0, valor: 0 },
-          baliAlmoco: { qtd: 0, valor: 0 },
-          baliHappy: { qtd: 0, valor: 0 },
-          frigobar: { qtd: 0, valor: 0 },
-          eventosDireto: { qtd: 0, valor: 0 },
-          eventosHotel: { qtd: 0, valor: 0 },
-        };
+        const monthTotals = processEntriesForDashboard(entriesForMonth);
         
-        const processedTotals = entriesForMonth.map(entry => {
+        const dailyTotalsData = entriesForMonth.map(entry => {
           const entryTotals = processEntryForTotals(entry);
-          
-          monthGrandTotalQtd += entryTotals.grandTotal.comCI.qtd;
-          monthGrandTotalValor += entryTotals.grandTotal.comCI.valor;
-          monthGrandTotalSemCIQtd += entryTotals.grandTotal.semCI.qtd;
-          monthGrandTotalSemCIValor += entryTotals.grandTotal.semCI.valor;
-          monthGrandTotalReajusteCI += entryTotals.totalReajusteCI;
-          monthGrandTotalCIQtd += entryTotals.totalCI.qtd;
-          monthGrandTotalCIValor += entryTotals.totalCI.valor;
-          monthTotalCIAlmoco.qtd += entryTotals.almocoCI.qtd;
-          monthTotalCIAlmoco.valor += entryTotals.almocoCI.valor;
-          monthTotalCIJantar.qtd += entryTotals.jantarCI.qtd;
-          monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
-          
-          // Accumulate for monthly table
-          accAcumulativo.roomService.pedidosQtd += entryTotals.roomServiceTotal.qtd;
-          accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
-          accAcumulativo.roomService.valor += entryTotals.roomServiceTotal.valor;
-          accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
-          accAcumulativo.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
-          accAcumulativo.breakfast.qtd += entryTotals.breakfast.qtd;
-          accAcumulativo.breakfast.valor += entryTotals.breakfast.valor;
-          accAcumulativo.almoco.qtd += entryTotals.almoco.qtd;
-          accAcumulativo.almoco.valor += entryTotals.almoco.valor;
-          accAcumulativo.jantar.qtd += entryTotals.jantar.qtd;
-          accAcumulativo.jantar.valor += entryTotals.jantar.valor;
-          accAcumulativo.italianoAlmoco.qtd += entryTotals.italianoAlmoco.qtd;
-          accAcumulativo.italianoAlmoco.valor += entryTotals.italianoAlmoco.valor;
-          accAcumulativo.italianoJantar.qtd += entryTotals.italianoJantar.qtd;
-          accAcumulativo.italianoJantar.valor += entryTotals.italianoJantar.valor;
-          accAcumulativo.indianoAlmoco.qtd += entryTotals.indianoAlmoco.qtd;
-          accAcumulativo.indianoAlmoco.valor += entryTotals.indianoAlmoco.valor;
-          accAcumulativo.indianoJantar.qtd += entryTotals.indianoJantar.qtd;
-          accAcumulativo.indianoJantar.valor += entryTotals.indianoJantar.valor;
-          accAcumulativo.baliAlmoco.qtd += entryTotals.baliAlmoco.qtd;
-          accAcumulativo.baliAlmoco.valor += entryTotals.baliAlmoco.valor;
-          accAcumulativo.baliHappy.qtd += entryTotals.baliHappy.qtd;
-          accAcumulativo.baliHappy.valor += entryTotals.baliHappy.valor;
-          accAcumulativo.frigobar.qtd += entryTotals.frigobar.qtd;
-          accAcumulativo.frigobar.valor += entryTotals.frigobar.valor;
-          accAcumulativo.eventosDireto.qtd += entryTotals.eventos.direto.qtd;
-          accAcumulativo.eventosDireto.valor += entryTotals.eventos.direto.valor;
-          accAcumulativo.eventosHotel.qtd += entryTotals.eventos.hotel.qtd;
-          accAcumulativo.eventosHotel.valor += entryTotals.eventos.hotel.valor;
-
           let formattedDate = "Data Inválida";
           if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
             const [year, month, day] = entry.id.split('-');
             formattedDate = `${day}/${month}/${year}`;
           }
-
           return {
             id: entry.id,
             date: formattedDate,
@@ -250,7 +177,6 @@ export default function DashboardPage() {
         }).sort((a, b) => { 
             const dateAValid = a.id && typeof a.id === 'string' && a.id.match(/^\d{4}-\d{2}-\d{2}$/);
             const dateBValid = b.id && typeof b.id === 'string' && b.id.match(/^\d{4}-\d{2}-\d{2}$/);
-
             if (dateAValid && dateBValid) {
                 const dateA = parseISO(a.id); 
                 const dateB = parseISO(b.id);
@@ -265,7 +191,6 @@ export default function DashboardPage() {
             return 0; 
         });
 
-        // Monthly Evolution Data
         const monthlyAggregates: Record<string, {
             monthLabel: string;
             valorComCI: number; qtdComCI: number;
@@ -273,7 +198,6 @@ export default function DashboardPage() {
             reajusteCIValor: number;
         }> = {};
 
-        // 1. Initialize buckets for the last 3 months based on selected local month
         for (let i = 0; i < 3; i++) { 
             const targetMonthDate = subMonths(selectedMonth, i);
             const monthKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, '0')}`;
@@ -283,7 +207,6 @@ export default function DashboardPage() {
             };
         }
         
-        // 2. Accumulate totals by iterating through the fetched range of entries
         entriesInRange.forEach(entry => {
             const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
             if (isValid(entryDateObj)) {
@@ -302,7 +225,6 @@ export default function DashboardPage() {
             }
         });
         
-        // 3. Sort and map data for the chart
         const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
             const dateA = parseISO(keyA + "-01");
             const dateB = parseISO(keyB + "-01");
@@ -337,20 +259,20 @@ export default function DashboardPage() {
 
         const updatedAcumulativoMensalData = initialAcumulativoMensalState.map(item => {
             switch (item.item) {
-                case "ROOM SERVICE": return { ...item, qtdDisplay: `${accAcumulativo.roomService.pedidosQtd} / ${accAcumulativo.roomService.pratosMadrugadaQtd}`, valorTotal: accAcumulativo.roomService.valor };
-                case "CAFÉ DA MANHÃ": return { ...item, qtdDisplay: accAcumulativo.cafeDaManha.qtd.toString(), valorTotal: accAcumulativo.cafeDaManha.valor };
-                case "BREAKFAST": return { ...item, qtdDisplay: accAcumulativo.breakfast.qtd.toString(), valorTotal: accAcumulativo.breakfast.valor };
-                case "ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.almoco.qtd.toString(), valorTotal: accAcumulativo.almoco.valor };
-                case "JANTAR": return { ...item, qtdDisplay: accAcumulativo.jantar.qtd.toString(), valorTotal: accAcumulativo.jantar.valor };
-                case "RW ITALIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.italianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.italianoAlmoco.valor };
-                case "RW ITALIANO JANTAR": return { ...item, qtdDisplay: accAcumulativo.italianoJantar.qtd.toString(), valorTotal: accAcumulativo.italianoJantar.valor };
-                case "RW INDIANO ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.indianoAlmoco.qtd.toString(), valorTotal: accAcumulativo.indianoAlmoco.valor };
-                case "RW INDIANO JANTAR": return { ...item, qtdDisplay: accAcumulativo.indianoJantar.qtd.toString(), valorTotal: accAcumulativo.indianoJantar.valor };
-                case "BALI ALMOÇO": return { ...item, qtdDisplay: accAcumulativo.baliAlmoco.qtd.toString(), valorTotal: accAcumulativo.baliAlmoco.valor };
-                case "BALI HAPPY HOUR": return { ...item, qtdDisplay: accAcumulativo.baliHappy.qtd.toString(), valorTotal: accAcumulativo.baliHappy.valor };
-                case "FRIGOBAR": return { ...item, qtdDisplay: accAcumulativo.frigobar.qtd.toString(), valorTotal: accAcumulativo.frigobar.valor };
-                case "EVENTOS DIRETO": return { ...item, qtdDisplay: accAcumulativo.eventosDireto.qtd.toString(), valorTotal: accAcumulativo.eventosDireto.valor };
-                case "EVENTOS HOTEL": return { ...item, qtdDisplay: accAcumulativo.eventosHotel.qtd.toString(), valorTotal: accAcumulativo.eventosHotel.valor };
+                case "ROOM SERVICE": return { ...item, qtdDisplay: `${monthTotals.roomService.qtdPedidos} / ${monthTotals.roomService.qtdPratos}`, valorTotal: monthTotals.roomService.valor };
+                case "CAFÉ DA MANHÃ": return { ...item, qtdDisplay: monthTotals.cafeDaManha.qtd.toString(), valorTotal: monthTotals.cafeDaManha.valor };
+                case "BREAKFAST": return { ...item, qtdDisplay: monthTotals.breakfast.qtd.toString(), valorTotal: monthTotals.breakfast.valor };
+                case "ALMOÇO": return { ...item, qtdDisplay: monthTotals.almoco.qtd.toString(), valorTotal: monthTotals.almoco.valor };
+                case "JANTAR": return { ...item, qtdDisplay: monthTotals.jantar.qtd.toString(), valorTotal: monthTotals.jantar.valor };
+                case "RW ITALIANO ALMOÇO": return { ...item, qtdDisplay: monthTotals.italianoAlmoco.qtd.toString(), valorTotal: monthTotals.italianoAlmoco.valor };
+                case "RW ITALIANO JANTAR": return { ...item, qtdDisplay: monthTotals.italianoJantar.qtd.toString(), valorTotal: monthTotals.italianoJantar.valor };
+                case "RW INDIANO ALMOÇO": return { ...item, qtdDisplay: monthTotals.indianoAlmoco.qtd.toString(), valorTotal: monthTotals.indianoAlmoco.valor };
+                case "RW INDIANO JANTAR": return { ...item, qtdDisplay: monthTotals.indianoJantar.qtd.toString(), valorTotal: monthTotals.indianoJantar.valor };
+                case "BALI ALMOÇO": return { ...item, qtdDisplay: monthTotals.baliAlmoco.qtd.toString(), valorTotal: monthTotals.baliAlmoco.valor };
+                case "BALI HAPPY HOUR": return { ...item, qtdDisplay: monthTotals.baliHappy.qtd.toString(), valorTotal: monthTotals.baliHappy.valor };
+                case "FRIGOBAR": return { ...item, qtdDisplay: monthTotals.frigobar.qtd.toString(), valorTotal: monthTotals.frigobar.valor };
+                case "EVENTOS DIRETO": return { ...item, qtdDisplay: monthTotals.eventosDireto.qtd.toString(), valorTotal: monthTotals.eventosDireto.valor };
+                case "EVENTOS HOTEL": return { ...item, qtdDisplay: monthTotals.eventosHotel.qtd.toString(), valorTotal: monthTotals.eventosHotel.valor };
                 default: return item;
             }
         });
@@ -360,24 +282,24 @@ export default function DashboardPage() {
         });
         
         setDashboardData({
-          dailyTotals: processedTotals,
+          dailyTotals: dailyTotalsData,
           acumulativoMensalData: finalVisibleData,
           monthlyEvolutionData: finalMonthlyEvolutionData,
-          totalCIAlmoco: monthTotalCIAlmoco,
-          totalCIJantar: monthTotalCIJantar,
-          totalConsumoInternoGeral: { qtd: monthGrandTotalCIQtd, valor: monthGrandTotalCIValor },
-          totalGeralSemCI: { qtd: monthGrandTotalSemCIQtd, valor: monthGrandTotalSemCIValor },
-          overallTotalRevenue: monthGrandTotalValor,
-          overallTotalTransactions: monthGrandTotalQtd,
-          totalReajusteCI: monthGrandTotalReajusteCI,
-          totalRSValor: accAcumulativo.roomService.valor,
-          totalRSQtd: accAcumulativo.roomService.pedidosQtd,
-          totalAlmocoValor: accAcumulativo.almoco.valor,
-          totalAlmocoQtd: accAcumulativo.almoco.qtd,
-          totalJantarValor: accAcumulativo.jantar.valor,
-          totalJantarQtd: accAcumulativo.jantar.qtd,
-          totalFrigobarValor: accAcumulativo.frigobar.valor,
-          totalFrigobarQtd: accAcumulativo.frigobar.qtd,
+          totalCIAlmoco: monthTotals.totalCIAlmoco,
+          totalCIJantar: monthTotals.totalCIJantar,
+          totalConsumoInternoGeral: monthTotals.totalConsumoInternoGeral,
+          totalGeralSemCI: monthTotals.grandTotalSemCI,
+          overallTotalRevenue: monthTotals.grandTotalComCI.valor,
+          overallTotalTransactions: monthTotals.grandTotalComCI.qtd,
+          totalReajusteCI: monthTotals.totalReajusteCI,
+          totalRSValor: monthTotals.roomService.valor,
+          totalRSQtd: monthTotals.roomService.qtdPedidos,
+          totalAlmocoValor: monthTotals.almoco.valor,
+          totalAlmocoQtd: monthTotals.almoco.qtd,
+          totalJantarValor: monthTotals.jantar.valor,
+          totalJantarQtd: monthTotals.jantar.qtd,
+          totalFrigobarValor: monthTotals.frigobar.valor,
+          totalFrigobarQtd: monthTotals.frigobar.qtd,
         });
 
       } catch (error: any) {
