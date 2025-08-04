@@ -62,193 +62,68 @@ const SingleDayReportView: React.FC<SingleDayReportViewProps> = ({ entry }) => {
         const processChannels = (subTabData: any | undefined, subTabKey: string) => {
             if (!subTabData?.channels) return;
             
-            const channelEntries = Object.entries(subTabData.channels);
-            const qtyRows: React.ReactNode[] = [];
-            const vtotalRows: React.ReactNode[] = [];
-        
-            const addRow = (label: string, qtd?: number, vtotal?: number) => {
-                const row = (
-                    <TableRow key={`${subTabKey}-${label}`}>
-                        <TableCell className="pl-8 text-xs"><StyledLabel text={label} /></TableCell>
-                        <TableCell className="text-right text-xs">{qtd !== undefined ? formatNumber(qtd) : '-'}</TableCell>
-                        <TableCell className="text-right text-xs">{vtotal !== undefined ? formatCurrency(vtotal) : '-'}</TableCell>
-                    </TableRow>
-                );
-                 if (label.toLowerCase().includes('quantidade') || label.toLowerCase().includes('totais cliente mesa') || label.toLowerCase().includes('total de quartos')) {
-                    qtyRows.push(row);
-                } else {
-                    vtotalRows.push(row);
-                }
-            };
-            
-            const consolidatedLabels: { [key: string]: { label: string; findKeys: (keys: string[]) => { qtdKey?: string; valorKey?: string } } } = {
-                hospedes: {
-                    label: 'Hóspedes Atendidos',
-                    findKeys: (keys) => ({
-                        qtdKey: keys.find(k => k.toLowerCase().includes('hospedesqtdhospedes')),
-                        valorKey: keys.find(k => k.toLowerCase().includes('hospedespagamentohospedes'))
-                    })
-                },
-                ifood: {
-                    label: 'iFood',
-                    findKeys: (keys) => ({
-                        qtdKey: keys.find(k => k.toLowerCase().includes('ifoodqtd')),
-                        valorKey: keys.find(k => k.toLowerCase().includes('ifoodvalor'))
-                    })
-                },
-                rappi: {
-                    label: 'Rappi',
-                    findKeys: (keys) => ({
-                        qtdKey: keys.find(k => k.toLowerCase().includes('rappiqtd')),
-                        valorKey: keys.find(k => k.toLowerCase().includes('rappivalor'))
-                    })
-                },
-                retirada: {
-                    label: 'Retirada',
-                    findKeys: (keys) => ({
-                        qtdKey: keys.find(k => k.toLowerCase().includes('retiradaqtd')),
-                        valorKey: keys.find(k => k.toLowerCase().includes('retiradavalor'))
-                    })
-                },
-            };
-
-            const checkAndAddConsolidated = (baseKey: keyof typeof consolidatedLabels) => {
-                const allChannelKeys = Object.keys(subTabData.channels || {});
-                const { qtdKey, valorKey } = consolidatedLabels[baseKey].findKeys(allChannelKeys);
-                
-                if (qtdKey && valorKey) {
-                    const qtd = subTabData.channels?.[qtdKey as SalesChannelId]?.qtd;
-                    const vtotal = subTabData.channels?.[valorKey as SalesChannelId]?.vtotal;
-                    if (qtd || vtotal) {
-                         let turnoLabel = "";
-                         if (qtdKey.startsWith('apt')) turnoLabel = " (Almoço PT)";
-                         if (qtdKey.startsWith('ast')) turnoLabel = " (Almoço ST)";
-                         if (qtdKey.startsWith('jnt')) turnoLabel = " (Jantar)";
-                        addRow(`${consolidatedLabels[baseKey].label}${turnoLabel}`, qtd, vtotal);
-                        // Mark as processed by removing from entries
-                        delete subTabData.channels?.[qtdKey as SalesChannelId];
-                        delete subTabData.channels?.[valorKey as SalesChannelId];
-                    }
-                }
-            };
-            
-            checkAndAddConsolidated('hospedes');
-            checkAndAddConsolidated('ifood');
-            checkAndAddConsolidated('rappi');
-            checkAndAddConsolidated('retirada');
-            
             Object.entries(subTabData.channels).forEach(([channelId, values]) => {
                 if (values && (values.qtd !== undefined || values.vtotal !== undefined)) {
-                    addRow(SALES_CHANNELS[channelId as SalesChannelId] || channelId, values.qtd, values.vtotal);
-                }
-            });
-
-            if (qtyRows.length > 0 || vtotalRows.length > 0) {
-                 rows.push(
-                    <TableRow key={subTabKey} className="bg-muted/50">
-                        <TableCell colSpan={3} className="font-semibold text-sm pl-4 uppercase">{subTabKey}</TableCell>
-                    </TableRow>
-                );
-                rows.push(...qtyRows, ...vtotalRows);
-            }
-        };
-        
-        const processFaturadoECI = (subTabData: any, subTabKey: string, label: string) => {
-            const items: {key: string, label: string, type: 'qtd'|'vtotal', findPrefix?: string}[] = [];
-            let prefix = '';
-
-            if (subTabKey.startsWith('apt')) prefix = 'apt';
-            if (subTabKey.startsWith('ast')) prefix = 'ast';
-            if (subTabKey.startsWith('jnt')) prefix = 'jnt';
-
-            if (label === 'FATURADO') {
-                items.push({key: 'FaturadosQtd', label: 'FATURADOS (QTD)', type: 'qtd', findPrefix: 'CiEFaturadosFaturadosQtd'}, {key: 'FaturadosValorHotel', label: 'VALOR HOTEL (FATURADO)', type: 'vtotal', findPrefix: 'CiEFaturadosValorHotel'}, {key: 'FaturadosValorFuncionario', label: 'VALOR FUNCIONÁRIO (FATURADO)', type: 'vtotal', findPrefix: 'CiEFaturadosValorFuncionario'});
-            } else if (label === 'CONSUMO INTERNO') {
-                items.push({key: 'ConsumoInternoQtd', label: '* CONSUMO INTERNO - CI (QTD)', type: 'qtd', findPrefix: 'CiEFaturadosConsumoInternoQtd'}, {key: 'ReajusteCI', label: 'REAJUSTE DE C.I', type: 'vtotal', findPrefix: 'CiEFaturadosReajusteCI'}, {key: 'TotalCI', label: 'TOTAL C.I', type: 'vtotal', findPrefix: 'CiEFaturadosTotalCI'});
-            } else if (label === 'FRIGOBAR') {
-                if (subTabKey.includes('PT')) { items.push({key: 'frgPTTotalQuartos', label: 'TOTAL DE QUARTOS (1º Turno)', type: 'qtd'}, {key: 'frgPTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (1º Turno)', type: 'vtotal'}, {key: 'frgPTPagHotel', label: 'PAGAMENTO HOTEL (1º Turno)', type: 'vtotal'}); }
-                if (subTabKey.includes('ST')) { items.push({key: 'frgSTTotalQuartos', label: 'TOTAL DE QUARTOS (2º Turno)', type: 'qtd'}, {key: 'frgSTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (2º Turno)', type: 'vtotal'}, {key: 'frgSTPagHotel', label: 'PAGAMENTO HOTEL (2º Turno)', type: 'vtotal'}); }
-                if (subTabKey.includes('JNT')) { items.push({key: 'frgJNTTotalQuartos', label: 'TOTAL DE QUARTOS (Jantar)', type: 'qtd'}, {key: 'frgJNTPagRestaurante', label: 'PAGAMENTO RESTAURANTE (Jantar)', type: 'vtotal'}, {key: 'frgJNTPagHotel', label: 'PAGAMENTO HOTEL (Jantar)', type: 'vtotal'}); }
-            }
-
-            const sectionRows: React.ReactNode[] = [];
-            items.forEach(item => {
-                // Handle new format (e.g., `aptFaturadosQtd`) and old format (`aptCiEFaturadosFaturadosQtd`)
-                const newFormatKey = prefix ? `${prefix}${item.key}` : item.key;
-                const oldFormatKey = prefix && item.findPrefix ? `${prefix}${item.findPrefix}` : '';
-                
-                const channelKey = Object.keys(subTabData.channels).find(k => 
-                    k.toLowerCase() === newFormatKey.toLowerCase() || (oldFormatKey && k.toLowerCase() === oldFormatKey.toLowerCase())
-                );
-                
-                if (channelKey) {
-                    const values = subTabData.channels[channelKey as SalesChannelId];
-                    sectionRows.push(
-                         <TableRow key={`${subTabKey}-${item.key}`}>
-                            <TableCell className="pl-8 text-xs"><StyledLabel text={item.label} /></TableCell>
-                            <TableCell className="text-right text-xs">{item.type === 'qtd' ? formatNumber(values?.qtd) : '-'}</TableCell>
-                            <TableCell className="text-right text-xs">{item.type === 'vtotal' ? formatCurrency(values?.vtotal) : '-'}</TableCell>
+                    rows.push(
+                        <TableRow key={`${subTabKey}-${channelId}`}>
+                            <TableCell className="pl-8 text-xs"><StyledLabel text={SALES_CHANNELS[channelId as SalesChannelId] || channelId} /></TableCell>
+                            <TableCell className="text-right text-xs">{values.qtd !== undefined ? formatNumber(values.qtd) : '-'}</TableCell>
+                            <TableCell className="text-right text-xs">{values.vtotal !== undefined ? formatCurrency(values.vtotal) : '-'}</TableCell>
                         </TableRow>
                     );
                 }
             });
-
-            if (sectionRows.length > 0) {
-                rows.push(<TableRow key={`${subTabKey}-${label}-header`} className="bg-muted/50"><TableCell colSpan={3} className="font-semibold text-sm pl-4 uppercase">{label}</TableCell></TableRow>, ...sectionRows);
+        };
+        
+        const processNewItems = (items: any[] | undefined, label: string) => {
+            if (items && items.length > 0) {
+                rows.push(
+                    <TableRow key={`${label}-header`} className="bg-muted/50">
+                        <TableCell colSpan={3} className="font-semibold text-sm pl-4 uppercase">{label}</TableCell>
+                    </TableRow>
+                );
+                items.forEach((item, index) => {
+                    rows.push(
+                        <TableRow key={`${label}-${item.id || index}`}>
+                            <TableCell className="pl-8 text-xs">{item.clientName} <span className="text-muted-foreground text-xs italic">{item.observation || ''}</span></TableCell>
+                            <TableCell className="text-right text-xs">{formatNumber(item.quantity)}</TableCell>
+                            <TableCell className="text-right text-xs">{formatCurrency(item.value)}</TableCell>
+                        </TableRow>
+                    );
+                });
             }
         };
 
         if (periodData.channels) {
-            const channelRows = Object.entries(periodData.channels).map(([channelId, values]) => (
-                <TableRow key={channelId}>
-                    <TableCell className="pl-4 text-xs"><StyledLabel text={SALES_CHANNELS[channelId as SalesChannelId] || channelId} /></TableCell>
-                    <TableCell className="text-right text-xs">{values?.qtd !== undefined ? formatNumber(values.qtd) : '-'}</TableCell>
-                    <TableCell className="text-right text-xs">{values?.vtotal !== undefined ? formatCurrency(values.vtotal) : '-'}</TableCell>
-                </TableRow>
-            ));
-            rows.push(...channelRows);
+            Object.entries(periodData.channels).forEach(([channelId, values]) => {
+                if (values && (values.qtd !== undefined || values.vtotal !== undefined)) {
+                    rows.push(
+                        <TableRow key={channelId}>
+                            <TableCell className="pl-4 text-xs"><StyledLabel text={SALES_CHANNELS[channelId as SalesChannelId] || channelId} /></TableCell>
+                            <TableCell className="text-right text-xs">{values.qtd !== undefined ? formatNumber(values.qtd) : '-'}</TableCell>
+                            <TableCell className="text-right text-xs">{values.vtotal !== undefined ? formatCurrency(values.vtotal) : '-'}</TableCell>
+                        </TableRow>
+                    );
+                }
+            });
         }
 
         if (periodData.subTabs) {
-            const allSubTabsForProcessing = {...periodData.subTabs };
-            
-            const orderedSubTabs = ['roomService', 'hospedes', 'clienteMesa', 'delivery'];
-            orderedSubTabs.forEach(subTabKey => {
-                if (allSubTabsForProcessing[subTabKey]) {
-                    processChannels(allSubTabsForProcessing[subTabKey], subTabKey);
-                    delete allSubTabsForProcessing[subTabKey];
+            Object.entries(periodData.subTabs).forEach(([subTabKey, subTabData]) => {
+                const subTabHasChannels = subTabData?.channels && Object.keys(subTabData.channels).length > 0;
+                const subTabHasFaturado = subTabData?.faturadoItems && subTabData.faturadoItems.length > 0;
+                const subTabHasConsumo = subTabData?.consumoInternoItems && subTabData.consumoInternoItems.length > 0;
+
+                if (subTabHasChannels || subTabHasFaturado || subTabHasConsumo) {
+                     rows.push(
+                        <TableRow key={subTabKey} className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-semibold text-sm pl-4 uppercase">{subTabKey}</TableCell>
+                        </TableRow>
+                    );
+                    if(subTabHasChannels) processChannels(subTabData, subTabKey);
+                    if(subTabHasFaturado) processNewItems(subTabData.faturadoItems, 'Faturado');
+                    if(subTabHasConsumo) processNewItems(subTabData.consumoInternoItems, 'Consumo Interno');
                 }
-            });
-
-            const subTabPrefix = Object.keys(allSubTabsForProcessing)[0]?.substring(0, 3) || '';
-
-            // Handle new and old formats for Faturado/CI
-            if (allSubTabsForProcessing.faturado) {
-                 processFaturadoECI(allSubTabsForProcessing.faturado, `${subTabPrefix}Faturados`, 'FATURADO');
-                 delete allSubTabsForProcessing.faturado;
-            }
-             if (allSubTabsForProcessing.consumoInterno) {
-                 processFaturadoECI(allSubTabsForProcessing.consumoInterno, `${subTabPrefix}ConsumoInterno`, 'CONSUMO INTERNO');
-                 delete allSubTabsForProcessing.consumoInterno;
-            }
-            if (allSubTabsForProcessing.ciEFaturados) { // Fallback for old data
-                processFaturadoECI(allSubTabsForProcessing.ciEFaturados, `${subTabPrefix}CiEFaturados`, 'FATURADO');
-                processFaturadoECI(allSubTabsForProcessing.ciEFaturados, `${subTabPrefix}CiEFaturados`, 'CONSUMO INTERNO');
-                delete allSubTabsForProcessing.ciEFaturados;
-            }
-
-            // Handle Frigobar
-             if (allSubTabsForProcessing.frigobar) {
-                let shiftKey = '';
-                if(Object.keys(allSubTabsForProcessing.frigobar.channels ?? {}).some(k => k.startsWith('frgPT'))) shiftKey = 'PT';
-                else if(Object.keys(allSubTabsForProcessing.frigobar.channels ?? {}).some(k => k.startsWith('frgST'))) shiftKey = 'ST';
-                else if(Object.keys(allSubTabsForProcessing.frigobar.channels ?? {}).some(k => k.startsWith('frgJNT'))) shiftKey = 'JNT';
-                processFaturadoECI(allSubTabsForProcessing.frigobar, `frigobar${shiftKey}`, 'FRIGOBAR');
-                delete allSubTabsForProcessing.frigobar;
-            }
-
-            Object.entries(allSubTabsForProcessing).forEach(([subTabKey, subTabData]) => {
-                if (subTabData) processChannels(subTabData, subTabKey);
             });
         }
         

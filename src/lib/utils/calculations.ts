@@ -23,27 +23,6 @@ export const calculateConsumoInternoFromItems = (items: ConsumoInternoItem[] | u
     }, { qtd: 0, valor: 0 });
 };
 
-const calculateOldFormatFaturado = (period: PeriodData | undefined, prefix: 'apt' | 'ast' | 'jnt'): { qtd: number; valor: number } => {
-    if (!period?.subTabs?.ciEFaturados?.channels) return { qtd: 0, valor: 0 };
-    const channels = period.subTabs.ciEFaturados.channels;
-    const qtd = getSafeNumericValue(channels, `${prefix}CiEFaturadosFaturadosQtd.qtd`);
-    const valorHotel = getSafeNumericValue(channels, `${prefix}CiEFaturadosValorHotel.vtotal`);
-    const valorFunc = getSafeNumericValue(channels, `${prefix}CiEFaturadosValorFuncionario.vtotal`);
-    return { qtd, valor: valorHotel + valorFunc };
-};
-
-const calculateOldFormatConsumoInterno = (period: PeriodData | undefined, prefix: 'apt' | 'ast' | 'jnt'): { qtd: number; valor: number, reajuste: number } => {
-    if (!period?.subTabs?.ciEFaturados?.channels) return { qtd: 0, valor: 0, reajuste: 0 };
-    const channels = period.subTabs.ciEFaturados.channels;
-    const qtd = getSafeNumericValue(channels, `${prefix}CiEFaturadosConsumoInternoQtd.qtd`);
-    const reajuste = getSafeNumericValue(channels, `${prefix}CiEFaturadosReajusteCI.vtotal`);
-    const totalCI = getSafeNumericValue(channels, `${prefix}CiEFaturadosTotalCI.vtotal`);
-    
-    // The value of C.I. is the total, which already includes the adjustment in the old format.
-    const valorBaseCI = totalCI - reajuste;
-    return { qtd, valor: valorBaseCI, reajuste };
-};
-
 
 const getPeriodRestaurantTotal = (period: PeriodData | undefined) => {
     let totalValor = 0;
@@ -116,35 +95,23 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
         qtd: frigobarPT.qtd + frigobarST.qtd + frigobarJantar.qtd,
     };
 
-    // -- FATURADO & C.I. (New + Old formats) --
-    const aptFaturado = {
-        new: calculateFaturadoFromItems((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.faturado?.faturadoItems),
-        old: calculateOldFormatFaturado(entry.almocoPrimeiroTurno as PeriodData, 'apt'),
-    };
+    // -- FATURADO & C.I. (New format only) --
+    const aptFaturado = calculateFaturadoFromItems((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.faturado?.faturadoItems);
     const aptCI = {
-        new: calculateConsumoInternoFromItems((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
-        old: calculateOldFormatConsumoInterno(entry.almocoPrimeiroTurno as PeriodData, 'apt'),
-        reajusteNew: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
+        ...calculateConsumoInternoFromItems((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
+        reajuste: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
     };
 
-    const astFaturado = {
-        new: calculateFaturadoFromItems((entry.almocoSegundoTurno as PeriodData)?.subTabs?.faturado?.faturadoItems),
-        old: calculateOldFormatFaturado(entry.almocoSegundoTurno as PeriodData, 'ast'),
-    };
+    const astFaturado = calculateFaturadoFromItems((entry.almocoSegundoTurno as PeriodData)?.subTabs?.faturado?.faturadoItems);
     const astCI = {
-        new: calculateConsumoInternoFromItems((entry.almocoSegundoTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
-        old: calculateOldFormatConsumoInterno(entry.almocoSegundoTurno as PeriodData, 'ast'),
-        reajusteNew: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
+        ...calculateConsumoInternoFromItems((entry.almocoSegundoTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
+        reajuste: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
     };
     
-    const jntFaturado = {
-        new: calculateFaturadoFromItems((entry.jantar as PeriodData)?.subTabs?.faturado?.faturadoItems),
-        old: calculateOldFormatFaturado(entry.jantar as PeriodData, 'jnt'),
-    };
+    const jntFaturado = calculateFaturadoFromItems((entry.jantar as PeriodData)?.subTabs?.faturado?.faturadoItems);
     const jntCI = {
-        new: calculateConsumoInternoFromItems((entry.jantar as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
-        old: calculateOldFormatConsumoInterno(entry.jantar as PeriodData, 'jnt'),
-        reajusteNew: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
+        ...calculateConsumoInternoFromItems((entry.jantar as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems),
+        reajuste: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal'),
     };
 
     // -- OTHER PERIODS --
@@ -173,50 +140,61 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     const indianoJantar = getGenericPeriodTotals(entry, 'indianoJantar');
     const baliAlmoco = getGenericPeriodTotals(entry, 'baliAlmoco');
     const baliHappy = getGenericPeriodTotals(entry, 'baliHappy');
-
+    
     // --- 2. ASSEMBLY: Combine decomposed parts into meaningful totals ---
     
-    // -- TOTALS PER SHIFT (These now include all their components) --
-    const totalReajusteCI = aptCI.old.reajuste + aptCI.reajusteNew + astCI.old.reajuste + astCI.reajusteNew + jntCI.old.reajuste + jntCI.reajusteNew;
+    const totalReajusteCI = aptCI.reajuste + astCI.reajuste + jntCI.reajuste;
     
-    const turnoAlmocoPT = {
-        qtd: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + rsAlmocoPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd + frigobarPT.qtd,
-        valor: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + rsAlmocoPT.valor + aptFaturado.new.valor + aptFaturado.old.valor + aptCI.old.reajuste + aptCI.reajusteNew + frigobarPT.valor,
-    };
-    const turnoAlmocoST = {
-        qtd: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd + rsAlmocoST.qtd + astFaturado.new.qtd + astFaturado.old.qtd + frigobarST.qtd,
-        valor: getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + rsAlmocoST.valor + astFaturado.new.valor + astFaturado.old.valor + astCI.old.reajuste + astCI.reajusteNew + frigobarST.valor,
-    };
-    const turnoJantar = {
-        qtd: getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd + rsJantar.qtd + jntFaturado.new.qtd + jntFaturado.old.qtd + frigobarJantar.qtd,
-        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + rsJantar.valor + jntFaturado.new.valor + jntFaturado.old.valor + jntCI.old.reajuste + jntCI.reajusteNew + frigobarJantar.valor,
-    };
-
     // -- TOTALS PER SERVICE TYPE --
-    const almocoCITotal = { qtd: aptCI.new.qtd + aptCI.old.qtd + astCI.new.qtd + astCI.old.qtd, valor: aptCI.new.valor + aptCI.old.valor + astCI.new.valor + astCI.old.valor };
-    const jantarCITotal = { qtd: jntCI.new.qtd + jntCI.old.qtd, valor: jntCI.new.valor + jntCI.old.valor };
+    const almocoCITotal = { qtd: aptCI.qtd + astCI.qtd, valor: aptCI.valor + astCI.valor };
+    const jantarCITotal = { qtd: jntCI.qtd, valor: jntCI.valor };
     const totalCI = { qtd: almocoCITotal.qtd + jantarCITotal.qtd, valor: almocoCITotal.valor + jantarCITotal.valor };
     const roomServiceTotal = { valor: rsMadrugada.valor + rsAlmocoPT.valor + rsAlmocoST.valor + rsJantar.valor, qtd: rsMadrugada.qtdPedidos + rsAlmocoPT.qtd + rsAlmocoST.qtd + rsJantar.qtd };
     
-    // Summary Card specific totals (without Frigobar)
     const almocoTotal = {
-        qtd: turnoAlmocoPT.qtd - frigobarPT.qtd + turnoAlmocoST.qtd - frigobarST.qtd,
-        valor: turnoAlmocoPT.valor - frigobarPT.valor + turnoAlmocoST.valor - frigobarST.valor,
+        qtd: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + aptFaturado.qtd + getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd + astFaturado.qtd,
+        valor: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + aptFaturado.valor + getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + astFaturado.valor,
     };
     const jantarTotal = {
-        qtd: turnoJantar.qtd - frigobarJantar.qtd,
-        valor: turnoJantar.valor - frigobarJantar.valor
+        qtd: getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd + jntFaturado.qtd,
+        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + jntFaturado.valor
     };
-
 
     // -- GRAND TOTALS --
+    const allRevenueComponentsValor = [
+        getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor,
+        getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor,
+        getPeriodRestaurantTotal(entry.jantar as PeriodData).valor,
+        roomServiceTotal.valor,
+        frigobarTotal.valor,
+        aptFaturado.valor, astFaturado.valor, jntFaturado.valor,
+        cafeHospedes.valor, cafeAvulsos.valor, breakfast.valor,
+        italianoAlmoco.valor, italianoJantar.valor, indianoAlmoco.valor, indianoJantar.valor,
+        baliAlmoco.valor, baliHappy.valor,
+        eventosDireto.valor, eventosHotel.valor
+    ];
+    const allRevenueComponentsQtd = [
+        getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd,
+        getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd,
+        getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd,
+        roomServiceTotal.qtd, frigobarTotal.qtd,
+        aptFaturado.qtd, astFaturado.qtd, jntFaturado.qtd,
+        cafeHospedes.qtd, cafeAvulsos.qtd, breakfast.qtd,
+        italianoAlmoco.qtd, italianoJantar.qtd, indianoAlmoco.qtd, indianoJantar.qtd,
+        baliAlmoco.qtd, baliHappy.qtd,
+        eventosDireto.qtd, eventosHotel.qtd
+    ];
+
+    const totalRevenueSemCI = allRevenueComponentsValor.reduce((sum, current) => sum + current, 0);
+    const totalQtdSemCI = allRevenueComponentsQtd.reduce((sum, current) => sum + current, 0);
+
     const grandTotalComCI = {
-        valor: cafeHospedes.valor + cafeAvulsos.valor + breakfast.valor + italianoAlmoco.valor + italianoJantar.valor + indianoAlmoco.valor + indianoJantar.valor + baliAlmoco.valor + baliHappy.valor + eventosDireto.valor + eventosHotel.valor + rsMadrugada.valor + turnoAlmocoPT.valor + turnoAlmocoST.valor + turnoJantar.valor + totalCI.valor,
-        qtd: cafeHospedes.qtd + cafeAvulsos.qtd + breakfast.qtd + italianoAlmoco.qtd + italianoJantar.qtd + indianoAlmoco.qtd + indianoJantar.qtd + baliAlmoco.qtd + baliHappy.qtd + eventosDireto.qtd + eventosHotel.qtd + rsMadrugada.qtdPedidos + turnoAlmocoPT.qtd + turnoAlmocoST.qtd + turnoJantar.qtd + totalCI.qtd,
+        valor: totalRevenueSemCI + totalCI.valor + totalReajusteCI,
+        qtd: totalQtdSemCI + totalCI.qtd,
     };
     const grandTotalSemCI = {
-        valor: grandTotalComCI.valor - totalCI.valor - totalReajusteCI,
-        qtd: grandTotalComCI.qtd - totalCI.qtd,
+        valor: totalRevenueSemCI,
+        qtd: totalQtdSemCI,
     };
     
     // --- 3. RETURN: Provide all the calculated parts for consumers ---
@@ -243,11 +221,6 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
         // Combined totals for display
         almoco: almocoTotal,
         jantar: jantarTotal,
-        turnos: { 
-            almocoPT: turnoAlmocoPT,
-            almocoST: turnoAlmocoST,
-            jantar: turnoJantar,
-        },
         roomServiceTotal,
         totalCI,
         totalReajusteCI,

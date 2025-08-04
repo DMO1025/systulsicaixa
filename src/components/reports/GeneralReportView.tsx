@@ -21,9 +21,41 @@ const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleStrin
 const formatQty = (value: number) => (value || 0).toLocaleString('pt-BR');
 
 const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ data, visiblePeriods }, ref) => {
-    const ticketMedio = (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd > 0)
-        ? data.summary.grandTotalSemCI / (data.summary.grandTotalQtd - data.summary.grandTotalCIQtd)
-        : 0;
+    const { 
+        ticketMedioGeral, 
+        ticketMedioRS, 
+        ticketMedioAlmoco, 
+        ticketMedioJantar, 
+        ticketMedioFrigobar 
+    } = useMemo(() => {
+        const summary = data.summary;
+        const tmGeral = (summary.grandTotalQtd - summary.grandTotalCIQtd > 0)
+            ? summary.grandTotalSemCI / (summary.grandTotalQtd - summary.grandTotalCIQtd)
+            : 0;
+        
+        const rsTotal = summary.periodTotals.roomService || { qtd: 0, valor: 0 };
+        const tmRS = rsTotal.qtd > 0 ? rsTotal.valor / rsTotal.qtd : 0;
+        
+        const almocoPT = summary.periodTotals.almocoPrimeiroTurno || { qtd: 0, valor: 0 };
+        const almocoST = summary.periodTotals.almocoSegundoTurno || { qtd: 0, valor: 0 };
+        const almocoQtd = almocoPT.qtd + almocoST.qtd;
+        const almocoValor = almocoPT.valor + almocoST.valor;
+        const tmAlmoco = almocoQtd > 0 ? almocoValor / almocoQtd : 0;
+
+        const jantarTotal = summary.periodTotals.jantar || { qtd: 0, valor: 0 };
+        const tmJantar = jantarTotal.qtd > 0 ? jantarTotal.valor / jantarTotal.qtd : 0;
+
+        const frigobarTotal = summary.periodTotals.frigobar || { qtd: 0, valor: 0 };
+        const tmFrigobar = frigobarTotal.qtd > 0 ? frigobarTotal.valor / frigobarTotal.qtd : 0;
+
+        return {
+            ticketMedioGeral: tmGeral,
+            ticketMedioRS: tmRS,
+            ticketMedioAlmoco: tmAlmoco,
+            ticketMedioJantar: tmJantar,
+            ticketMedioFrigobar: tmFrigobar,
+        };
+    }, [data.summary]);
     
     // Filter out 'madrugada', control periods, and add a custom 'roomService' definition for the header
     const reportablePeriods = useMemo(() => {
@@ -98,7 +130,7 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
 
     return (
         <div className="space-y-6" ref={ref}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Receita Total (com CI)</CardTitle>
@@ -125,14 +157,26 @@ const GeneralReportView = forwardRef<HTMLDivElement, GeneralReportViewProps>(({ 
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Ticket Médio (sem CI)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Ticket Médio Serviços Restaurante</CardTitle>
                         <ReceiptText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(ticketMedio)}</div>
-                        <p className="text-xs text-muted-foreground">
-                            Valor médio por item
-                        </p>
+                    <CardContent className="space-y-1 pt-2">
+                        <div className="flex justify-between items-baseline">
+                            <span className="text-sm text-muted-foreground">Room Service</span>
+                            <span className="text-lg font-semibold">{formatCurrency(ticketMedioRS)}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                            <span className="text-sm text-muted-foreground">Almoço</span>
+                            <span className="text-lg font-semibold">{formatCurrency(ticketMedioAlmoco)}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                            <span className="text-sm text-muted-foreground">Jantar</span>
+                            <span className="text-lg font-semibold">{formatCurrency(ticketMedioJantar)}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                            <span className="text-sm text-muted-foreground">Frigobar</span>
+                            <span className="text-lg font-semibold">{formatCurrency(ticketMedioFrigobar)}</span>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

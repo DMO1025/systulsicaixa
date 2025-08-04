@@ -5,6 +5,7 @@ import { processEntryForTotals, calculateConsumoInternoFromItems } from './calcu
 import type { DailyLogEntry, PeriodData, EventosPeriodData, GeneralReportViewData, ReportData, PeriodId, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import { TAB_DEFINITIONS } from '@/components/reports/tabDefinitions';
 import { format, parseISO, isValid } from 'date-fns';
 
 
@@ -102,27 +103,12 @@ function extractDetailedCategoryDataForPeriod(entries: DailyLogEntry[], periodId
             });
         };
 
-        const processOldFormat = (period: PeriodData | undefined, date: string, category: 'ci-almoco-pt' | 'ci-almoco-st' | 'ci-jantar', prefix: 'apt' | 'ast' | 'jnt') => {
-            const oldCiEFaturados = period?.subTabs?.ciEFaturados?.channels;
-            if (!oldCiEFaturados) return;
-            const qtd = getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosConsumoInternoQtd.qtd`);
-            const valor = getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosTotalCI.vtotal`) - getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosReajusteCI.vtotal`);
-            if (qtd > 0 || valor > 0) {
-                addToBreakdown(category, { date, clientName: 'Consolidado (Formato Antigo)', observation: '-', qtd, valor });
-                addToSummary(category, qtd, valor);
-            }
-        };
-
         entries.forEach(entry => {
             const date = format(parseISO(String(entry.id)), 'dd/MM/yyyy');
             // Process new format
             processItems((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems, date, 'ci-almoco-pt');
             processItems((entry.almocoSegundoTurno as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems, date, 'ci-almoco-st');
             processItems((entry.jantar as PeriodData)?.subTabs?.consumoInterno?.consumoInternoItems, date, 'ci-jantar');
-            // Process old format
-            processOldFormat(entry.almocoPrimeiroTurno as PeriodData, date, 'ci-almoco-pt', 'apt');
-            processOldFormat(entry.almocoSegundoTurno as PeriodData, date, 'ci-almoco-st', 'ast');
-            processOldFormat(entry.jantar as PeriodData, date, 'ci-jantar', 'jnt');
         });
 
     } else if (periodId === 'faturado') {
@@ -134,7 +120,7 @@ function extractDetailedCategoryDataForPeriod(entries: DailyLogEntry[], periodId
                 dailyConsolidated[date] = { hotel: 0, funcionario: 0, outros: 0, hotelQtd: 0, funcionarioQtd: 0, outrosQtd: 0 };
             }
         
-            const processPeriod = (period: PeriodData | undefined, prefix: 'apt' | 'ast' | 'jnt') => {
+            const processPeriod = (period: PeriodData | undefined) => {
                 const newItems = period?.subTabs?.faturado?.faturadoItems || [];
                 newItems.forEach(item => {
                     const type = item.type || 'outros';
@@ -152,22 +138,11 @@ function extractDetailedCategoryDataForPeriod(entries: DailyLogEntry[], periodId
                         dailyConsolidated[date].outrosQtd += itemQtd;
                     }
                 });
-        
-                const oldCiEFaturadosChannels = period?.subTabs?.ciEFaturados?.channels;
-                if (oldCiEFaturadosChannels) {
-                    const hotelVal = getSafeNumericValue(oldCiEFaturadosChannels, `${prefix}CiEFaturadosValorHotel.vtotal`);
-                    const funcVal = getSafeNumericValue(oldCiEFaturadosChannels, `${prefix}CiEFaturadosValorFuncionario.vtotal`);
-                    const qtd = getSafeNumericValue(oldCiEFaturadosChannels, `${prefix}CiEFaturadosFaturadosQtd.qtd`);
-        
-                    dailyConsolidated[date].hotel += hotelVal;
-                    dailyConsolidated[date].funcionario += funcVal;
-                    dailyConsolidated[date].hotelQtd += qtd; 
-                }
             };
         
-            processPeriod(entry.almocoPrimeiroTurno as PeriodData, 'apt');
-            processPeriod(entry.almocoSegundoTurno as PeriodData, 'ast');
-            processPeriod(entry.jantar as PeriodData, 'jnt');
+            processPeriod(entry.almocoPrimeiroTurno as PeriodData);
+            processPeriod(entry.almocoSegundoTurno as PeriodData);
+            processPeriod(entry.jantar as PeriodData);
         });
         
         Object.entries(dailyConsolidated).forEach(([date, values]) => {
@@ -374,10 +349,9 @@ export function generateReportData(
         
         const dateString = format(parseISO(String(entry.id)), 'dd/MM/yyyy');
         
-        // This is the adjustment: Almoço/Jantar values are now without Room Service.
-        const almocoPTValor = (totals.almocoPrimeiroTurno?.valor || 0) - (totals.rsAlmocoPT?.valor || 0);
-        const almocoSTValor = (totals.almocoSegundoTurno?.valor || 0) - (totals.rsAlmocoST?.valor || 0);
-        const jantarValor = (totals.jantar?.valor || 0) - (totals.rsJantar?.valor || 0);
+        const almocoPTValor = totals.almoco.valor;
+        const almocoSTValor = 0;
+        const jantarValor = totals.jantar.valor;
 
         return {
             date: dateString,
@@ -385,10 +359,13 @@ export function generateReportData(
             lastModifiedAt: entry.lastModifiedAt,
             periodTotals: {
                 roomService: totals.roomServiceTotal,
-                cafeDaManha: totals.cafeDaManha,
-                almocoPrimeiroTurno: { qtd: totals.almocoPrimeiroTurno?.qtd || 0, valor: almocoPTValor },
-                almocoSegundoTurno: { qtd: totals.almocoSegundoTurno?.qtd || 0, valor: almocoSTValor },
-                jantar: { qtd: totals.jantar?.qtd || 0, valor: jantarValor },
+                cafeDaManha: { 
+                    qtd: totals.cafeHospedes.qtd + totals.cafeAvulsos.qtd,
+                    valor: totals.cafeHospedes.valor + totals.cafeAvulsos.valor
+                },
+                almocoPrimeiroTurno: { qtd: totals.almoco.qtd, valor: almocoPTValor },
+                almocoSegundoTurno: { qtd: 0, valor: almocoSTValor },
+                jantar: { qtd: totals.jantar.qtd, valor: jantarValor },
                 breakfast: totals.breakfast,
                 italianoAlmoco: totals.italianoAlmoco,
                 italianoJantar: totals.italianoJantar,
@@ -404,7 +381,7 @@ export function generateReportData(
             },
             totalComCI: totals.grandTotal.comCI.valor,
             totalSemCI: totals.grandTotal.semCI.valor,
-            totalReajusteCI: totals.reajusteCI.total,
+            totalReajusteCI: totals.totalReajusteCI,
             totalQtd: totals.grandTotal.comCI.qtd,
             totalCIQtd: totals.totalCI.qtd
         };
@@ -447,3 +424,5 @@ export function generateReportData(
       return { type: 'period', data };
   }
 }
+
+    

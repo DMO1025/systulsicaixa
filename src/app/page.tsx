@@ -1,10 +1,9 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText } from "lucide-react";
+import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText, DollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import type { DailyLogEntry, PeriodId, DashboardAnalysisInput } from '@/lib/types';
@@ -122,6 +121,8 @@ export default function DashboardPage() {
       totalAlmocoQtd: 0,
       totalJantarValor: 0,
       totalJantarQtd: 0,
+      totalFrigobarValor: 0,
+      totalFrigobarQtd: 0,
     };
   }, []);
 
@@ -204,7 +205,7 @@ export default function DashboardPage() {
           monthTotalCIJantar.valor += entryTotals.jantarCI.valor;
           
           // Accumulate for monthly table
-          accAcumulativo.roomService.pedidosQtd += entryTotals.rsMadrugada.qtdPedidos;
+          accAcumulativo.roomService.pedidosQtd += entryTotals.roomServiceTotal.qtd;
           accAcumulativo.roomService.pratosMadrugadaQtd += entryTotals.rsMadrugada.qtdPratos || 0;
           accAcumulativo.roomService.valor += entryTotals.roomServiceTotal.valor;
           accAcumulativo.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
@@ -375,6 +376,8 @@ export default function DashboardPage() {
           totalAlmocoQtd: accAcumulativo.almoco.qtd,
           totalJantarValor: accAcumulativo.jantar.valor,
           totalJantarQtd: accAcumulativo.jantar.qtd,
+          totalFrigobarValor: accAcumulativo.frigobar.valor,
+          totalFrigobarQtd: accAcumulativo.frigobar.qtd,
         });
 
       } catch (error: any) {
@@ -491,18 +494,46 @@ export default function DashboardPage() {
 
     return (
       <>
-        <SummaryCards
-            totalComCI_Qtd={dashboardData.overallTotalTransactions}
-            totalComCI_Valor={dashboardData.overallTotalRevenue}
-            totalSemCI_Qtd={dashboardData.totalGeralSemCI.qtd}
-            totalSemCI_Valor={dashboardData.totalGeralSemCI.valor}
-            totalRSValor={dashboardData.totalRSValor}
-            totalRSQtd={dashboardData.totalRSQtd}
-            totalAlmocoValor={dashboardData.totalAlmocoValor}
-            totalAlmocoQtd={dashboardData.totalAlmocoQtd}
-            totalJantarValor={dashboardData.totalJantarValor}
-            totalJantarQtd={dashboardData.totalJantarQtd}
-        />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total com CI</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                {dashboardData.overallTotalTransactions.toLocaleString('pt-BR')} Itens
+              </div>
+              <div className="text-2xl font-bold">
+                R$ {dashboardData.overallTotalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total sem CI</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                {dashboardData.totalGeralSemCI.qtd.toLocaleString('pt-BR')} Itens
+              </div>
+              <div className="text-2xl font-bold">
+                R$ {dashboardData.totalGeralSemCI.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          <SummaryCards
+              totalRSValor={dashboardData.totalRSValor}
+              totalRSQtd={dashboardData.totalRSQtd}
+              totalAlmocoValor={dashboardData.totalAlmocoValor}
+              totalAlmocoQtd={dashboardData.totalAlmocoQtd}
+              totalJantarValor={dashboardData.totalJantarValor}
+              totalJantarQtd={dashboardData.totalJantarQtd}
+              totalFrigobarValor={dashboardData.totalFrigobarValor}
+              totalFrigobarQtd={dashboardData.totalFrigobarQtd}
+          />
+        </div>
         <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
