@@ -87,7 +87,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
   const summary = useMemo(() => {
     const config = summaryConfig;
     const totals = processEntryForTotals(dailyData as DailyLogEntry);
-    
+
+    // O TOTAL FITA é a soma das categorias visíveis.
     const totalFitaValor =
       (config.rsMadrugada ? totals.rsMadrugada.valor : 0) +
       (config.avulsoAssinado ? totals.cafeAvulsos.valor : 0) +
@@ -100,7 +101,8 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
       (config.rwIndianoAlmoco ? totals.indianoAlmoco.valor : 0) +
       (config.rwIndianoJantar ? totals.indianoJantar.valor : 0) +
       (config.baliAlmoco ? totals.baliAlmoco.valor : 0) +
-      (config.baliHappy ? totals.baliHappy.valor : 0);
+      (config.baliHappy ? totals.baliHappy.valor : 0) +
+      (totals.totalReajusteCI);
     
     const totalFitaQtd =
       (config.rsMadrugada ? totals.rsMadrugada.qtdPedidos : 0) +
@@ -309,6 +311,12 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
                 <TableCell className="text-right">{formatCurrency(summary.frigobar.valor)}</TableCell>
               </TableRow>
             )}
+            <TableRow>
+                <TableCell>REAJUSTE C.I.</TableCell>
+                <TableCell className="text-right">-</TableCell>
+                <TableCell className="text-right">-</TableCell>
+                <TableCell className="text-right">{formatCurrency(summary.totalReajusteCI)}</TableCell>
+            </TableRow>
             <TableRow className="font-semibold">
               <TableCell>TOTAL FITA</TableCell>
               <TableCell className="text-right">{summary.totalFita.qtd || '0'}</TableCell>
@@ -359,7 +367,7 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
                 <TableCell className="text-right">{formatCurrency(summary.eventosHotel.valor)}</TableCell>
               </TableRow>
             )}
-
+            
             <TableRow className="font-semibold border-t-2 border-foreground">
               <TableCell>TOTAL GERAL COM CI</TableCell>
               <TableCell className="text-right">{summary.grandTotalComCI.qtd || 0}</TableCell>
@@ -390,5 +398,3 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
 };
 
 export default ResumoLateralCard;
-
-

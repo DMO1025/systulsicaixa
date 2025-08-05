@@ -16,7 +16,7 @@ import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { exportReport, getConsumptionTypeLabel } from '@/lib/reportExporter';
-import { generateReportData, processEntryForTotals } from '@/lib/reportUtils';
+import { generateReportData } from '@/lib/utils/reportGenerators';
 
 
 import ReportToolbar from '@/components/reports/ReportToolbar';

@@ -1,8 +1,8 @@
 
+
 "use client";
 
-import type { DailyLogEntry, PeriodData, EventosPeriodData } from '@/lib/types';
-import { getSafeNumericValue } from '@/lib/utils';
+import type { DailyLogEntry } from '@/lib/types';
 import { processEntryForTotals } from './calculations';
 
 export interface DashboardTotals {
@@ -27,47 +27,6 @@ export interface DashboardTotals {
   grandTotalSemCI: { qtd: number; valor: number };
   totalConsumoInternoGeral: { qtd: number; valor: number };
 }
-
-const getRestaurantAndBilledTotal = (period: PeriodData | undefined, prefix: 'apt' | 'ast' | 'jnt'): { qtd: number; valor: number } => {
-    let totalValor = 0;
-    let totalQtd = 0;
-
-    if (!period || typeof period === 'string' || !period.subTabs) {
-        return { qtd: 0, valor: 0 };
-    }
-
-    const subTabsToSum = ['hospedes', 'clienteMesa', 'delivery', 'faturado'];
-    
-    for (const subTabKey of subTabsToSum) {
-        const subTab = period.subTabs[subTabKey];
-        if (subTab?.channels) {
-            for (const channel of Object.values(subTab.channels)) {
-                totalQtd += getSafeNumericValue(channel, 'qtd');
-                totalValor += getSafeNumericValue(channel, 'vtotal');
-            }
-        }
-        if (subTab?.faturadoItems) {
-            const faturadoTotal = subTab.faturadoItems.reduce((acc, item) => {
-                acc.qtd += item.quantity || 0;
-                acc.valor += item.value || 0;
-                return acc;
-            }, { qtd: 0, valor: 0 });
-            totalQtd += faturadoTotal.qtd;
-            totalValor += faturadoTotal.valor;
-        }
-    }
-    
-    // Add old format faturado
-    const oldCiEFaturados = period.subTabs.ciEFaturados?.channels;
-    if(oldCiEFaturados) {
-        totalQtd += getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosFaturadosQtd.qtd`);
-        totalValor += getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosValorHotel.vtotal`);
-        totalValor += getSafeNumericValue(oldCiEFaturados, `${prefix}CiEFaturadosValorFuncionario.vtotal`);
-    }
-
-    return { qtd: totalQtd, valor: totalValor };
-}
-
 
 export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardTotals {
   
@@ -106,6 +65,18 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     totals.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
     totals.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
 
+    // --- Almoço (Restaurante + Faturado + CI + Reajuste + Frigobar, mas SEM RS) ---
+    const almocoSemRS = entryTotals.almoco.valor - entryTotals.rsAlmocoPT.valor - entryTotals.rsAlmocoST.valor;
+    const almocoQtdSemRS = entryTotals.almoco.qtd - entryTotals.rsAlmocoPT.qtd - entryTotals.rsAlmocoST.qtd;
+    totals.almoco.valor += almocoSemRS;
+    totals.almoco.qtd += almocoQtdSemRS;
+    
+    // --- Jantar (Restaurante + Faturado + CI + Reajuste + Frigobar, mas SEM RS) ---
+    const jantarSemRS = entryTotals.jantar.valor - entryTotals.rsJantar.valor;
+    const jantarQtdSemRS = entryTotals.jantar.qtd - entryTotals.rsJantar.qtd;
+    totals.jantar.valor += jantarSemRS;
+    totals.jantar.qtd += jantarQtdSemRS;
+    
     // --- Frigobar ---
     totals.frigobar.valor += entryTotals.frigobar.valor;
     totals.frigobar.qtd += entryTotals.frigobar.qtd;
@@ -138,16 +109,6 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     totals.baliAlmoco.qtd += entryTotals.baliAlmoco.qtd;
     totals.baliHappy.valor += entryTotals.baliHappy.valor;
     totals.baliHappy.qtd += entryTotals.baliHappy.qtd;
-
-    // --- Almoço & Jantar (Restaurante + Faturado ONLY) ---
-    const almocoPT = getRestaurantAndBilledTotal(entry.almocoPrimeiroTurno as PeriodData, 'apt');
-    const almocoST = getRestaurantAndBilledTotal(entry.almocoSegundoTurno as PeriodData, 'ast');
-    const jantar = getRestaurantAndBilledTotal(entry.jantar as PeriodData, 'jnt');
-    
-    totals.almoco.valor += almocoPT.valor + almocoST.valor;
-    totals.almoco.qtd += almocoPT.qtd + almocoST.qtd;
-    totals.jantar.valor += jantar.valor;
-    totals.jantar.qtd += jantar.qtd;
 
     // --- Grand Totals ---
     totals.grandTotalComCI.valor += entryTotals.grandTotal.comCI.valor;

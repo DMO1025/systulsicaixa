@@ -11,7 +11,7 @@ import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, GeneralRe
 import { PERIOD_DEFINITIONS } from './config/periods';
 import { EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from './config/forms';
 import { TAB_DEFINITIONS } from '@/components/reports/tabDefinitions';
-import { extractPersonTransactions } from './reportUtils';
+import { extractPersonTransactions } from './utils/reportGenerators';
 import { getSetting } from '@/services/settingsService';
 
 
@@ -590,44 +590,6 @@ const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
 
     const ws = XLSX.utils.json_to_sheet(dataForSheet);
     XLSX.utils.book_append_sheet(wb, ws, 'Resumo_Pessoas');
-};
-
-
-const exportToExcel = async (params: ExportParams) => {
-    const { filterType, entries, reportData, date, month, range, visiblePeriods, selectedClient: selectedPerson, consumptionType } = params;
-    const wb = XLSX.utils.book_new();
-    let filename = "";
-    
-    const monthYearStr = month ? format(month, 'MMMM_yyyy', { locale: ptBR }) : null;
-    const consumptionLabel = getConsumptionTypeLabel(consumptionType);
-    const rangeFilenameStr = range?.from
-      ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
-      : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
-
-    if (filterType === 'controle-cafe') {
-        filename = getFilename(['Controle_Cafe', rangeFilenameStr], 'xlsx');
-        generateControleCafeExcel(wb, entries, 'controle');
-    } else if (filterType === 'controle-cafe-no-show') {
-        filename = getFilename(['Controle_Cafe_NoShow', rangeFilenameStr], 'xlsx');
-        generateControleCafeExcel(wb, entries, 'no-show');
-    } else if (reportData?.type === 'general') {
-        filename = getFilename(['Relatorio_Geral', monthYearStr], 'xlsx');
-        generateGeneralReportExcel(wb, reportData.data, visiblePeriods);
-    } else if (reportData?.type === 'period') {
-        filename = getFilename(['Relatorio', reportData.data.reportTitle, monthYearStr], 'xlsx');
-        generatePeriodReportExcel(wb, reportData.data);
-    } else if (filterType === 'client-extract') {
-        const personName = selectedPerson && selectedPerson !== 'all' ? selectedPerson : 'Todas_as_Pessoas';
-        filename = getFilename(['Extrato_Pessoa', personName, consumptionLabel, rangeFilenameStr], 'xlsx');
-        generatePersonExtractExcel(wb, entries, consumptionType || 'all', selectedPerson);
-    } else if (filterType === 'client-summary') {
-        filename = getFilename(['Resumo_Pessoas', consumptionLabel, rangeFilenameStr], 'xlsx');
-        generatePersonSummaryExcel(wb, entries, consumptionType || 'all');
-    }
-
-    if(filename) {
-        XLSX.writeFile(wb, filename);
-    }
 };
 
 
