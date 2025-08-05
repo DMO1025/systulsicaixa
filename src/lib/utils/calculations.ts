@@ -177,7 +177,7 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // --- 2. ASSEMBLY: Combine decomposed parts into meaningful totals ---
     
     // -- TOTALS PER SHIFT (These now include all their components) --
-    const totalReajusteCI = aptCI.old.reajuste + aptCI.reajusteNew + astCI.old.reajuste + astCI.reajusteNew + jntCI.old.reajuste + jntCI.reajusteNew;
+   const totalReajusteCI = aptCI.old.reajuste + aptCI.reajusteNew + astCI.old.reajuste + astCI.reajusteNew + jntCI.old.reajuste + jntCI.reajusteNew;
     
     const turnoAlmocoPT = {
         qtd: getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + rsAlmocoPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd + frigobarPT.qtd,
@@ -201,12 +201,12 @@ export const processEntryForTotals = (entry: DailyLogEntry) => {
     // Summary Card specific totals (without Frigobar)
     const almocoTotal = {
         qtd: (getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).qtd + rsAlmocoPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd) + (getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).qtd + rsAlmocoST.qtd + astFaturado.new.qtd + astFaturado.old.qtd),
-        valor: (getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + rsAlmocoPT.valor + aptFaturado.new.valor + aptFaturado.old.valor) + (getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + rsAlmocoST.valor + astFaturado.new.valor + astFaturado.old.valor),
+        valor: (getPeriodRestaurantTotal(entry.almocoPrimeiroTurno as PeriodData).valor + aptCI.old.reajuste + aptCI.reajusteNew + astCI.old.reajuste + astCI.reajusteNew + rsAlmocoPT.valor + aptFaturado.new.valor + aptFaturado.old.valor) + (getPeriodRestaurantTotal(entry.almocoSegundoTurno as PeriodData).valor + rsAlmocoST.valor + astFaturado.new.valor + astFaturado.old.valor),
     };
 
     const jantarTotal = {
         qtd: getPeriodRestaurantTotal(entry.jantar as PeriodData).qtd + rsJantar.qtd + jntFaturado.new.qtd + jntFaturado.old.qtd,
-        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + rsJantar.valor + jntFaturado.new.valor + jntFaturado.old.valor
+        valor: getPeriodRestaurantTotal(entry.jantar as PeriodData).valor + jntCI.old.reajuste + jntCI.reajusteNew + rsJantar.valor + jntFaturado.new.valor + jntFaturado.old.valor
     };
 
 

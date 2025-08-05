@@ -311,12 +311,6 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
                 <TableCell className="text-right">{formatCurrency(summary.frigobar.valor)}</TableCell>
               </TableRow>
             )}
-            <TableRow>
-                <TableCell>REAJUSTE C.I.</TableCell>
-                <TableCell className="text-right">-</TableCell>
-                <TableCell className="text-right">-</TableCell>
-                <TableCell className="text-right">{formatCurrency(summary.totalReajusteCI)}</TableCell>
-            </TableRow>
             <TableRow className="font-semibold">
               <TableCell>TOTAL FITA</TableCell>
               <TableCell className="text-right">{summary.totalFita.qtd || '0'}</TableCell>
