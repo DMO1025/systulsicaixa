@@ -6,6 +6,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -34,6 +35,8 @@ interface ReportToolbarProps {
     datesWithEntries: Date[];
     consumptionType: string;
     setConsumptionType: (value: string) => void;
+    companyName: string;
+    setCompanyName: (value: string) => void;
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -53,7 +56,9 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     isPeriodFilterDisabled,
     datesWithEntries,
     consumptionType,
-    setConsumptionType
+    setConsumptionType,
+    companyName,
+    setCompanyName,
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -229,20 +234,36 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                     )}
 
                     {(filterType === 'client-summary' || filterType === 'client-extract') && (
-                         <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                            <Label htmlFor="consumptionType">Tipo de Consumo</Label>
-                            <Select value={consumptionType} onValueChange={setConsumptionType}>
-                                <SelectTrigger id="consumptionType" className="w-full">
-                                    <SelectValue placeholder="Selecione o tipo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
-                                    <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
-                                    <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
-                                    <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                         <div className="flex gap-4">
+                            <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
+                                <Label htmlFor="consumptionType">Tipo de Consumo</Label>
+                                <Select value={consumptionType} onValueChange={setConsumptionType}>
+                                    <SelectTrigger id="consumptionType" className="w-full">
+                                        <SelectValue placeholder="Selecione o tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todos</SelectItem>
+                                        <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
+                                        <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
+                                        <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
+                                        <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
+                                <Label htmlFor="companyName">Nome da Empresa</Label>
+                                <Select value={companyName} onValueChange={setCompanyName}>
+                                    <SelectTrigger id="companyName" className="w-full">
+                                        <SelectValue placeholder="Selecione a empresa" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Nenhuma</SelectItem>
+                                        <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
+                                        <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
+                                        <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     )}
 

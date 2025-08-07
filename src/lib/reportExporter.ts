@@ -26,6 +26,7 @@ interface ExportParams {
     visiblePeriods: PeriodDefinition[];
     selectedClient?: string;
     consumptionType?: string;
+    companyName?: string;
 }
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -51,14 +52,14 @@ const getFilename = (parts: (string | undefined | null)[], ext: string): string 
 };
 
 
-const addHeaderAndFooter = (doc: jsPDF, title: string, dateRange: string) => {
+const addHeaderAndFooter = (doc: jsPDF, title: string, dateRange: string, companyName?: string) => {
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
 
         // Header
         doc.setFontSize(14);
-        doc.text("Empresa de Exemplo LTDA", 40, 30);
+        doc.text(companyName || "Empresa de Exemplo LTDA", 40, 30);
         doc.setFontSize(10);
         doc.text(title, 40, 45);
         doc.setFontSize(9);
@@ -105,7 +106,7 @@ const getControleCafeItems = (entries: DailyLogEntry[], type: 'no-show' | 'contr
 
 // --- PDF Generation ---
 
-const generateControleCafePdf = async (doc: jsPDF, entries: DailyLogEntry[], type: 'no-show' | 'controle', dateRangeStr: string) => {
+const generateControleCafePdf = async (doc: jsPDF, entries: DailyLogEntry[], type: 'no-show' | 'controle', dateRangeStr: string, companyName?: string) => {
     const unitPrices = await getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig');
     const cafePrice = unitPrices?.cdmListaHospedes || 0;
 
@@ -120,7 +121,7 @@ const generateControleCafePdf = async (doc: jsPDF, entries: DailyLogEntry[], typ
             ? `Relatório de Controle - No-Show Café da Manhã (${dezenaLabel})`
             : `Relatório de Controle - Café da Manhã (${dezenaLabel})`;
 
-        addHeaderAndFooter(doc, title, dateRangeStr);
+        addHeaderAndFooter(doc, title, dateRangeStr, companyName);
 
         if (type === 'no-show') {
             const allItems = getControleCafeItems(dezenaEntries, 'no-show') as (CafeManhaNoShowItem & { entryDate: string })[];
@@ -350,7 +351,7 @@ const generatePersonSummaryPdf = (doc: jsPDF, entries: DailyLogEntry[], consumpt
 
 
 const exportToPdf = async (params: ExportParams) => {
-    const { filterType, entries, reportData, date, month, range, visiblePeriods, selectedClient: selectedPerson, consumptionType } = params;
+    const { filterType, entries, reportData, date, month, range, visiblePeriods, selectedClient: selectedPerson, consumptionType, companyName } = params;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     let title = "Relatório";
     let dateRangeStr = "";
@@ -376,7 +377,7 @@ const exportToPdf = async (params: ExportParams) => {
         dateRangeStr = `De: ${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`;
         filename = getFilename(['Relatorio_Geral', rangeFilenameStr], 'pdf');
         if (reportData?.type === 'general') {
-            addHeaderAndFooter(doc, title, dateRangeStr);
+            addHeaderAndFooter(doc, title, dateRangeStr, companyName);
             generateGeneralReportPdf(doc, reportData.data, visiblePeriods);
         }
     } else if (filterType === 'month' || filterType === 'period') {
@@ -384,7 +385,7 @@ const exportToPdf = async (params: ExportParams) => {
         title = `Relatório Consolidado - ${periodTitle}`;
         dateRangeStr = monthYearDisplayStr;
         filename = getFilename(['Relatorio', periodTitle, rangeFilenameStr], 'pdf');
-        addHeaderAndFooter(doc, title, dateRangeStr);
+        addHeaderAndFooter(doc, title, dateRangeStr, companyName);
         if (reportData?.type === 'general') generateGeneralReportPdf(doc, reportData.data, visiblePeriods);
         if (reportData?.type === 'period') generatePeriodReportPdf(doc, reportData.data);
     } else if (filterType === 'client-extract') {
@@ -392,20 +393,20 @@ const exportToPdf = async (params: ExportParams) => {
         title = `Extrato Detalhado - ${personName}`;
         dateRangeStr = `Período: ${rangeDisplayStr} | Tipo de Consumo: ${consumptionLabel}`;
         filename = getFilename(['Extrato_Pessoa', personName, consumptionLabel, rangeFilenameStr], 'pdf');
-        addHeaderAndFooter(doc, title, dateRangeStr);
+        addHeaderAndFooter(doc, title, dateRangeStr, companyName);
         generatePersonExtractPdf(doc, entries, consumptionType || 'all', selectedPerson);
     } else if (filterType === 'client-summary') {
         title = `Resumo por Pessoa`;
         dateRangeStr = `Período: ${rangeDisplayStr} | Tipo de Consumo: ${consumptionLabel}`;
         filename = getFilename(['Resumo_Pessoas', consumptionLabel, rangeFilenameStr], 'pdf');
-        addHeaderAndFooter(doc, title, dateRangeStr);
+        addHeaderAndFooter(doc, title, dateRangeStr, companyName);
         generatePersonSummaryPdf(doc, entries, consumptionType || 'all');
     } else if (filterType === 'controle-cafe' && range?.from) {
         filename = getFilename(['Controle_Cafe', rangeFilenameStr], 'pdf');
-        await generateControleCafePdf(doc, entries, 'controle', rangeDisplayStr);
+        await generateControleCafePdf(doc, entries, 'controle', rangeDisplayStr, companyName);
     } else if (filterType === 'controle-cafe-no-show' && range?.from) {
         filename = getFilename(['Controle_Cafe_NoShow', rangeFilenameStr], 'pdf');
-        await generateControleCafePdf(doc, entries, 'no-show', rangeDisplayStr);
+        await generateControleCafePdf(doc, entries, 'no-show', rangeDisplayStr, companyName);
     }
     
     doc.save(filename);
@@ -413,10 +414,11 @@ const exportToPdf = async (params: ExportParams) => {
 
 // --- Excel Generation ---
 
-const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], type: 'no-show' | 'controle') => {
+const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], type: 'no-show' | 'controle', companyName?: string) => {
     if (type === 'no-show') {
       const allItems = getControleCafeItems(entries, 'no-show') as (CafeManhaNoShowItem & { entryDate: string })[];
       const dataForSheet = allItems.map(item => ({
+          'Empresa': companyName,
           'Data': item.entryDate,
           'Horário': item.horario,
           'Hóspede': item.hospede,
@@ -427,6 +429,7 @@ const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], 
       }));
       const totalValor = allItems.reduce((sum, item) => sum + (item.valor || 0), 0);
       dataForSheet.push({
+        'Empresa': '',
         'Data': 'TOTAL',
         'Horário': '',
         'Hóspede': '',
@@ -440,6 +443,7 @@ const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], 
     } else {
       const allItems = getControleCafeItems(entries, 'controle') as (Partial<ControleCafeItem> & { entryDate: string })[];
       const dataForSheet = allItems.map(item => ({
+          'Empresa': companyName,
           'Data': item.entryDate,
           'Adultos': item.adultoQtd,
           'Criança 01': item.crianca01Qtd,
@@ -457,6 +461,7 @@ const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], 
         }, { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0 });
 
       dataForSheet.push({
+        'Empresa': '',
         'Data': 'TOTAL',
         'Adultos': totals.adultoQtd,
         'Criança 01': totals.crianca01Qtd,
@@ -469,12 +474,12 @@ const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], 
     }
 };
 
-const generateGeneralReportExcel = (wb: XLSX.WorkBook, data: GeneralReportViewData, visiblePeriods: PeriodDefinition[]) => {
+const generateGeneralReportExcel = (wb: XLSX.WorkBook, data: GeneralReportViewData, visiblePeriods: PeriodDefinition[], companyName?: string) => {
     const roomServiceDef = { id: 'roomService', label: 'Room Service' };
     const reportablePeriods = visiblePeriods.filter(p => p.type === 'entry' && p.id !== 'madrugada');
 
     const dataForSheet = data.dailyBreakdowns.map(row => {
-        const rowData: { [key: string]: any } = { Data: row.date };
+        const rowData: { [key: string]: any } = { 'Empresa': companyName, Data: row.date };
         
         rowData[`${roomServiceDef.label} (Qtd)`] = row.periodTotals[roomServiceDef.id]?.qtd || 0;
         rowData[`${roomServiceDef.label} (R$)`] = row.periodTotals[roomServiceDef.id]?.valor || 0;
@@ -490,7 +495,7 @@ const generateGeneralReportExcel = (wb: XLSX.WorkBook, data: GeneralReportViewDa
         return rowData;
     });
     
-    const totalsRow: { [key: string]: any } = { Data: 'TOTAL' };
+    const totalsRow: { [key: string]: any } = { 'Empresa': '', Data: 'TOTAL' };
     
     totalsRow[`${roomServiceDef.label} (Qtd)`] = data.summary.periodTotals[roomServiceDef.id]?.qtd || 0;
     totalsRow[`${roomServiceDef.label} (R$)`] = data.summary.periodTotals[roomServiceDef.id]?.valor || 0;
@@ -509,13 +514,13 @@ const generateGeneralReportExcel = (wb: XLSX.WorkBook, data: GeneralReportViewDa
     XLSX.utils.book_append_sheet(wb, ws, 'Geral');
 };
 
-const generatePeriodReportExcel = (wb: XLSX.WorkBook, data: PeriodReportViewData) => {
+const generatePeriodReportExcel = (wb: XLSX.WorkBook, data: PeriodReportViewData, companyName?: string) => {
     Object.entries(data.dailyBreakdowns).forEach(([category, items]) => {
         if (items.length > 0) {
-            const dataForSheet = [...items];
+            const dataForSheet = items.map(item => ({ 'Empresa': companyName, ...item }));
             const summary = data.summary[category];
             if (summary) {
-                const totalRow: any = { date: 'TOTAL' };
+                const totalRow: any = { 'Empresa': '', date: 'TOTAL' };
                 if (summary.total !== undefined) totalRow.total = summary.total;
                 if (summary.qtd !== undefined) totalRow.qtd = summary.qtd;
                 dataForSheet.push(totalRow);
@@ -526,12 +531,13 @@ const generatePeriodReportExcel = (wb: XLSX.WorkBook, data: PeriodReportViewData
     });
 };
 
-const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], consumptionType: string, selectedPerson?: string) => {
+const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], consumptionType: string, selectedPerson?: string, companyName?: string) => {
     let { allTransactions } = extractPersonTransactions(entries, consumptionType);
     if(selectedPerson && selectedPerson !== 'all') {
       allTransactions = allTransactions.filter(t => t.personName === selectedPerson);
     }
      const dataForSheet = allTransactions.map(t => ({
+        'Empresa': companyName,
         'Pessoa': t.personName,
         'Data': t.date,
         'Origem': t.origin,
@@ -547,6 +553,7 @@ const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
     }, { qtd: 0, valor: 0 });
 
     const totalRow = {
+        'Empresa': '',
         'Pessoa': 'TOTAL',
         'Data': '',
         'Origem': '',
@@ -560,7 +567,7 @@ const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
      XLSX.utils.book_append_sheet(wb, ws, 'Extrato_Pessoas');
 };
 
-const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], consumptionType: string) => {
+const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], consumptionType: string, companyName?: string) => {
     const { allTransactions } = extractPersonTransactions(entries, consumptionType);
     const summary: Record<string, { qtd: number; valor: number }> = {};
     allTransactions.forEach(t => {
@@ -570,6 +577,7 @@ const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
     });
 
     const dataForSheet = Object.entries(summary).map(([name, totals]) => ({
+        'Empresa': companyName,
         'Pessoa': name,
         'Total de Itens': totals.qtd,
         'Valor Total': totals.valor
@@ -582,6 +590,7 @@ const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
     }, { qtd: 0, valor: 0 });
 
     const totalRow = {
+        'Empresa': '',
         'Pessoa': 'TOTAL GERAL',
         'Total de Itens': grandTotals.qtd,
         'Valor Total': grandTotals.valor
@@ -590,6 +599,43 @@ const generatePersonSummaryExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[],
 
     const ws = XLSX.utils.json_to_sheet(dataForSheet);
     XLSX.utils.book_append_sheet(wb, ws, 'Resumo_Pessoas');
+};
+
+const exportToExcel = async (params: ExportParams) => {
+    const { filterType, entries, reportData, visiblePeriods, selectedClient, consumptionType, companyName, range, month } = params;
+    const wb = XLSX.utils.book_new();
+    let filename = "";
+    
+    const monthYearDisplayStr = month ? format(month, "MMMM 'de' yyyy", { locale: ptBR }) : '';
+    const consumptionLabel = getConsumptionTypeLabel(consumptionType);
+    const rangeDisplayStr = range?.from 
+      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
+      : monthYearDisplayStr;
+
+    const rangeFilenameStr = range?.from
+      ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
+      : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
+
+    if (filterType === 'controle-cafe' || filterType === 'controle-cafe-no-show') {
+      filename = getFilename(['Relatorio_Controle_Cafe', rangeFilenameStr, companyName], 'xlsx');
+      generateControleCafeExcel(wb, entries, filterType, companyName);
+    } else if (filterType === 'client-extract') {
+        filename = getFilename(['Relatorio_Extrato', selectedClient, consumptionLabel, rangeFilenameStr, companyName], 'xlsx');
+        generatePersonExtractExcel(wb, entries, consumptionType || 'all', selectedClient, companyName);
+    } else if (filterType === 'client-summary') {
+        filename = getFilename(['Relatorio_Resumo_Pessoas', consumptionLabel, rangeFilenameStr, companyName], 'xlsx');
+        generatePersonSummaryExcel(wb, entries, consumptionType || 'all', companyName);
+    } else if (reportData?.type === 'general') {
+        filename = getFilename(['Relatorio_Geral', rangeFilenameStr, companyName], 'xlsx');
+        generateGeneralReportExcel(wb, reportData.data, visiblePeriods, companyName);
+    } else if (reportData?.type === 'period') {
+        filename = getFilename(['Relatorio_Periodo', reportData.data.reportTitle, rangeFilenameStr, companyName], 'xlsx');
+        generatePeriodReportExcel(wb, reportData.data, companyName);
+    }
+
+    if (filename) {
+        XLSX.writeFile(wb, filename);
+    }
 };
 
 

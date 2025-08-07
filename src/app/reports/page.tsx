@@ -56,6 +56,7 @@ export default function ReportsPage() {
   const hasSetFromParams = useRef(false);
   const [consumptionType, setConsumptionType] = useState('all');
   const [selectedClient, setSelectedClient] = useState('all');
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     async function fetchInitialMetadata() {
@@ -257,6 +258,7 @@ export default function ReportsPage() {
         visiblePeriods: visiblePeriodDefinitions,
         consumptionType,
         selectedClient,
+        companyName,
     });
   };
 
@@ -413,6 +415,8 @@ export default function ReportsPage() {
         datesWithEntries={datesWithEntries}
         consumptionType={consumptionType}
         setConsumptionType={setConsumptionType}
+        companyName={companyName}
+        setCompanyName={setCompanyName}
       />
 
       {renderChart()}
