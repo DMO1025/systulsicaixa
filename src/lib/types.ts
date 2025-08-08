@@ -64,6 +64,7 @@ export interface CafeManhaNoShowItem {
 }
 
 export interface ControleCafeItem {
+  id: string;
   adultoQtd?: number;
   crianca01Qtd?: number;
   crianca02Qtd?: number;
@@ -273,6 +274,15 @@ export type ReportData = { type: 'period'; data: PeriodReportViewData } | { type
 
 // Re-export DateRange but ensure it's the one from react-day-picker
 export type DateRange = ReactDayPickerDateRange;
+
+export interface UnifiedPersonTransaction {
+  personName: string;
+  date: string;
+  origin: string;
+  observation: string;
+  quantity: number;
+  value: number;
+}
 
 
 // AI Related Types

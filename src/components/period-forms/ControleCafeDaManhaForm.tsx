@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -23,6 +24,15 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
   const ActivePeriodMainIcon = getPeriodIcon(periodId);
   const cardDescriptionText = periodConfig.description || `Registre os controles do café da manhã.`;
 
+  const handleNumericChange = (field: any, value: string) => {
+    if (value === '') {
+        field.onChange(0);
+    } else {
+        const num = parseInt(value.replace(/\D/g, ''), 10);
+        field.onChange(isNaN(num) ? 0 : num);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -43,10 +53,12 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                 <FormLabel className="flex items-center"><Users className="h-4 w-4 mr-1"/>Adulto (Qtd)</FormLabel>
                 <FormControl><Input 
                     {...field} 
-                    value={field.value ?? ''} 
-                    type="number" 
-                    placeholder="0" 
-                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    value={field.value ?? 0}
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => handleNumericChange(field, e.target.value)}
                 /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -56,10 +68,12 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                 <FormLabel className="flex items-center"><User className="h-4 w-4 mr-1"/>Criança 01 (Qtd)</FormLabel>
                 <FormControl><Input 
                     {...field} 
-                    value={field.value ?? ''} 
-                    type="number" 
+                    value={field.value ?? 0}
+                    type="number"
+                    min={0}
                     placeholder="0" 
-                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => handleNumericChange(field, e.target.value)}
                 /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -69,10 +83,12 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                 <FormLabel className="flex items-center"><User className="h-4 w-4 mr-1"/>Criança 02 (Qtd)</FormLabel>
                 <FormControl><Input 
                     {...field} 
-                    value={field.value ?? ''} 
-                    type="number" 
+                    value={field.value ?? 0}
+                    type="number"
+                    min={0}
                     placeholder="0" 
-                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => handleNumericChange(field, e.target.value)}
                 /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -82,10 +98,12 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                 <FormLabel className="flex items-center"><UserCheck className="h-4 w-4 mr-1"/>Contagem Manual</FormLabel>
                 <FormControl><Input 
                     {...field} 
-                    value={field.value ?? ''} 
-                    type="number" 
-                    placeholder="0" 
-                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    value={field.value ?? 0}
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => handleNumericChange(field, e.target.value)}
                 /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -95,10 +113,12 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                 <FormLabel className="flex items-center"><UserCheck className="h-4 w-4 mr-1"/>Sem Check-in</FormLabel>
                 <FormControl><Input 
                     {...field} 
-                    value={field.value ?? ''} 
-                    type="number" 
-                    placeholder="0" 
-                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    value={field.value ?? 0}
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => handleNumericChange(field, e.target.value)}
                 /></FormControl>
                 <FormMessage />
               </FormItem>

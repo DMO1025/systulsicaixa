@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { CalendarIcon, Loader2, List as ListIcon, DollarSign, BrainCircuit } from 'lucide-react';
+import { CalendarIcon, Loader2, List as ListIcon, DollarSign, BrainCircuit, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { DailyEntryFormData, ChannelUnitPricesConfig, PeriodId, GroupedChannelConfig } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams as useNextParams } from 'next/navigation';
@@ -66,6 +66,20 @@ const PERIOD_FORM_COMPONENTS: Record<string, React.FC<any>> = {
   breakfast: BreakfastForm,
 };
 
+const AutoSaveStatusIndicator: React.FC<{ status: 'idle' | 'saving' | 'success' | 'error'; lastSaved: Date | null }> = ({ status, lastSaved }) => {
+  if (status === 'saving') {
+    return <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>Salvando...</span></div>;
+  }
+  if (status === 'success' && lastSaved) {
+    return <div className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle2 className="h-3.5 w-3.5" /><span>Salvo às {format(lastSaved, 'HH:mm:ss')}</span></div>;
+  }
+  if (status === 'error') {
+    return <div className="flex items-center gap-1.5 text-xs text-destructive"><AlertCircle className="h-3.5 w-3.5" /><span>Erro ao salvar</span></div>;
+  }
+  return <div className="h-5">&nbsp;</div>;
+};
+
+
 export default function PeriodEntryPage() {
   const { userRole, operatorShift } = useAuth();
   const params = useNextParams(); 
@@ -73,8 +87,9 @@ export default function PeriodEntryPage() {
 
   const {
     form, isLoading, isDataLoading, unitPricesConfig, datesWithEntries, activeSubTabs, setActiveSubTabs,
-    activePeriodDefinition, activePeriodConfig, calculatePeriodTotal, calculateSubTabTotal, onSubmit, router
-  } = useDailyEntryForm(activePeriodId, operatorShift, userRole);
+    activePeriodDefinition, activePeriodConfig, calculatePeriodTotal, calculateSubTabTotal, onSubmit, router,
+    autoSaveStatus, lastSaved,
+  } = useDailyEntryForm(activePeriodId);
 
   const renderChannelInputs = useCallback((
     groupedChannels: GroupedChannelConfig[],
@@ -115,18 +130,19 @@ export default function PeriodEntryPage() {
                                 <div className="relative">
                                     <ListIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input 
-                                    type="number" 
+                                    type="number"
+                                    min={0}
                                     placeholder="0" 
                                     {...field} 
-                                    value={field.value ?? ''}
+                                    value={field.value ?? 0}
                                     onFocus={(e) => e.target.select()}
                                     onChange={e => {
-                                        const rawValue = e.target.value;
-                                        const newQty = rawValue === '' ? undefined : parseInt(rawValue, 10);
-                                        field.onChange(isNaN(newQty as number) ? undefined : newQty);
+                                        const value = e.target.value;
+                                        const newQty = value === '' ? 0 : parseInt(value, 10);
+                                        field.onChange(isNaN(newQty) ? 0 : newQty);
 
                                         if (isVtotalDisabledByUnitPrice && group.vtotal) {
-                                          const calculatedVtotal = (Number(newQty) || 0) * unitPriceForChannel;
+                                          const calculatedVtotal = (newQty || 0) * unitPriceForChannel;
                                           currentForm.setValue(`${basePath}.${group.vtotal}.vtotal` as any, calculatedVtotal, { shouldValidate: true, shouldDirty: true });
                                         }
                                     }} 
@@ -151,11 +167,15 @@ export default function PeriodEntryPage() {
                                         <div className="relative">
                                             <Input
                                                 type="number"
-                                                placeholder="0.00"
+                                                placeholder="0,00"
                                                 step="0.01"
+                                                min={0}
                                                 {...field}
-                                                value={field.value ?? ''}
-                                                onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                                value={field.value ?? 0}
+                                                onChange={e => {
+                                                    const value = e.target.value;
+                                                    field.onChange(value === '' ? 0 : parseFloat(value));
+                                                }}
                                                 onFocus={(e) => e.target.select()}
                                                 className="h-8 text-sm text-right w-full pl-7"
                                                 disabled={isVtotalDisabledByUnitPrice}
@@ -222,13 +242,16 @@ export default function PeriodEntryPage() {
           <h1 className="text-3xl font-bold tracking-tight">{pageTitle}</h1>
           <p className="text-lg text-muted-foreground pt-2">{form.getValues('date') ? format(form.getValues('date'), "PPP", { locale: ptBR }) : 'Carregando data...'}</p>
         </div>
-        <Button variant="outline" onClick={() => router.push(isControlPage ? '/controls' : '/entry')}>Voltar para Seleção</Button>
+        <div className="flex flex-col items-end gap-2">
+          <Button variant="outline" onClick={() => router.push(isControlPage ? '/controls' : '/entry')}>Voltar para Seleção</Button>
+          <AutoSaveStatusIndicator status={autoSaveStatus} lastSaved={lastSaved} />
+        </div>
       </div>
       
       <div className={cn("flex flex-col space-y-6", !isControlPage && "lg:flex-row lg:space-x-6 lg:space-y-0")}>
         <div className={cn("space-y-6", !isControlPage && "lg:w-1/2")}>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
               <div className={cn(isControlPage ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-6")}>
                  {userRole === 'administrator' && (
                   <Card>
@@ -304,10 +327,6 @@ export default function PeriodEntryPage() {
                 </Card>
               )}
               
-              <Button type="submit" className="w-full md:w-auto" disabled={isLoading || isDataLoading}>
-                {(isLoading || isDataLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar Lançamento
-              </Button>
             </form>
           </Form>
         </div>

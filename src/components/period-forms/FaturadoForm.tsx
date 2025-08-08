@@ -167,23 +167,29 @@ const FaturadoForm: React.FC<FaturadoFormProps> = ({ form, basePath }) => {
                     <Label className="text-xs flex items-center mb-1"><Hash className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Qtd</Label>
                     <Input
                         type="number"
+                        min={0}
                         placeholder="0"
-                        value={newEntry.quantity ?? ''}
-                        onChange={e => handleInputChange('quantity', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                        value={newEntry.quantity ?? 0}
+                        onFocus={(e) => e.target.select()}
+                        onChange={e => {
+                            const value = e.target.value;
+                            handleInputChange('quantity', value === '' ? 0 : parseInt(value, 10));
+                        }}
                         className="h-9 text-sm"
                     />
                 </div>
                  <div className="md:col-span-2">
                      <Label className="text-xs flex items-center mb-1"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Valor</Label>
                      <Input
-                        type="text"
+                        type="number"
+                        step="0.01"
+                        min={0}
                         placeholder="0,00"
-                        value={newEntry.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? ''}
+                        value={newEntry.value ?? 0}
+                        onFocus={(e) => e.target.select()}
                         onChange={e => {
-                            const rawValue = e.target.value;
-                            const digitsOnly = rawValue.replace(/\D/g, '');
-                            const numberValue = digitsOnly === '' ? undefined : parseInt(digitsOnly, 10) / 100;
-                            handleInputChange('value', numberValue);
+                            const value = e.target.value;
+                            handleInputChange('value', value === '' ? 0 : parseFloat(value));
                         }}
                         className="h-9 text-sm"
                      />
@@ -197,6 +203,7 @@ const FaturadoForm: React.FC<FaturadoFormProps> = ({ form, basePath }) => {
                         type="text"
                         placeholder="Opcional"
                         value={newEntry.observation ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onChange={e => handleInputChange('observation', e.target.value)}
                         className="h-9 text-sm"
                     />

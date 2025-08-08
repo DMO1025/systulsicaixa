@@ -144,8 +144,6 @@ const EventosForm: React.FC<PeriodFormProps> = ({
               <SubEventArrayComponent
                 form={form}
                 eventIndex={eventIndex}
-                triggerMainSubmit={triggerMainSubmit}
-                isMainFormLoading={isMainFormLoading}
               />
             </CardContent>
           </Card>
@@ -159,15 +157,11 @@ const EventosForm: React.FC<PeriodFormProps> = ({
 interface SubEventArrayProps {
   form: UseFormReturn<DailyEntryFormData>;
   eventIndex: number;
-  triggerMainSubmit?: () => Promise<void>;
-  isMainFormLoading?: boolean;
 }
 
 const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
   form,
   eventIndex,
-  triggerMainSubmit,
-  isMainFormLoading,
 }) => {
   const {
     fields: subEventFields,
@@ -196,18 +190,6 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
       form.setValue(`${novoSubEventoPathPrefix}.totalValue` as const, undefined, { shouldDirty: true });
       form.trigger(`${novoSubEventoPathPrefix}.totalValue` as const);
     }, 0);
-  };
-  
-
-  const handleInternalSave = () => {
-    if (triggerMainSubmit) {
-      triggerMainSubmit().catch((error) => {
-        console.error(
-          'Erro ao tentar salvar internamente o formulário de eventos:',
-          error
-        );
-      });
-    }
   };
 
   return (
@@ -296,7 +278,7 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                   render={({ field }) => (
                     <FormItem className="lg:col-span-2 xl:col-span-1 min-w-[150px]">
                       <FormLabel className="text-xs flex items-center"><Info className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Descrição (Outro)</FormLabel>
-                      <FormControl><Input placeholder="Especifique o serviço" {...field} value={field.value ?? ''} className="h-8 text-xs" onFocus={(e) => e.target.select()} /></FormControl>
+                      <FormControl><Input placeholder="Especifique o serviço" {...field} value={field.value ?? ''} className="h-8 text-sm" onFocus={(e) => e.target.select()} /></FormControl>
                       <FormMessage className="text-xs"/>
                     </FormItem>
                   )}
@@ -311,14 +293,15 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                     <FormControl>
                       <Input
                         type="number"
+                        min={0}
                         placeholder="0"
                         {...field}
-                        value={field.value ?? ''}
-                        onChange={e => {
-                          const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                          field.onChange(isNaN(val as number) ? undefined : val);
-                        }}
+                        value={field.value ?? 0}
                         onFocus={(e) => e.target.select()}
+                        onChange={e => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? 0 : parseInt(value, 10));
+                        }}
                         className="h-8 text-xs"
                       />
                     </FormControl>
@@ -329,49 +312,33 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
               <FormField
                 control={form.control}
                 name={`eventos.items.${eventIndex}.subEvents.${subEventIndex}.totalValue`}
-                render={({ field }) => {
-                    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                        const rawValue = e.target.value;
-                        const numberValue = parseFloat(rawValue);
-                        field.onChange(isNaN(numberValue) ? undefined : numberValue);
-                    };
-
-                    return (
-                        <FormItem className="min-w-[100px]">
-                          <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="0.00"
-                              step="0.01"
-                              value={field.value ?? ''}
-                              onChange={handleCurrencyChange}
-                              onFocus={(e) => e.target.select()}
-                              className="h-8 text-xs"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs"/>
-                        </FormItem>
-                    )
-                }}
+                render={({ field }) => (
+                    <FormItem className="min-w-[100px]">
+                        <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
+                        <FormControl>
+                        <Input
+                            type="number"
+                            placeholder="0,00"
+                            step="0.01"
+                            min={0}
+                            {...field}
+                            value={field.value ?? 0}
+                            onFocus={(e) => e.target.select()}
+                            onChange={e => {
+                                const value = e.target.value;
+                                field.onChange(value === '' ? 0 : parseFloat(value));
+                            }}
+                            className="h-8 text-xs"
+                        />
+                        </FormControl>
+                        <FormMessage className="text-xs"/>
+                    </FormItem>
+                )}
               />
             </div>
           </div>
           );
       })}
-        {subEventFields.length > 0 && triggerMainSubmit && (
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleInternalSave}
-                disabled={isMainFormLoading}
-                className="mt-3 w-full sm:w-auto"
-            >
-                {isMainFormLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Confirmar Serviços e Salvar Lançamento
-            </Button>
-        )}
     </div>
   );
 };

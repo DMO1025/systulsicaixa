@@ -44,28 +44,28 @@ const CafeManhaNoShowForm: React.FC<PeriodFormProps> = ({ form, periodId, period
             <FormField control={form.control} name={`cafeManhaNoShow.newItem.horario`} render={({ field }) => (
               <FormItem>
                 <FormLabel>Horário</FormLabel>
-                <FormControl><Input {...field} value={field.value ?? ''} type="time" /></FormControl>
+                <FormControl><Input {...field} value={field.value ?? ''} type="time" onFocus={(e) => e.target.select()} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name={`cafeManhaNoShow.newItem.hospede`} render={({ field }) => (
               <FormItem className="col-span-2 md:col-span-1">
                 <FormLabel>Hóspede</FormLabel>
-                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nome do hóspede" /></FormControl>
+                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nome do hóspede" onFocus={(e) => e.target.select()} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name={`cafeManhaNoShow.newItem.uh`} render={({ field }) => (
               <FormItem>
                 <FormLabel>UH</FormLabel>
-                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nº" /></FormControl>
+                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nº" onFocus={(e) => e.target.select()} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name={`cafeManhaNoShow.newItem.reserva`} render={({ field }) => (
               <FormItem>
                 <FormLabel>Reserva</FormLabel>
-                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nº" /></FormControl>
+                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Nº" onFocus={(e) => e.target.select()} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -80,11 +80,16 @@ const CafeManhaNoShowForm: React.FC<PeriodFormProps> = ({ form, periodId, period
                       <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         type="number"
-                        placeholder="0.00"
+                        placeholder="0,00"
                         step="0.01"
+                        min={0}
                         {...field}
-                        value={field.value ?? ''}
-                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                        value={field.value ?? 0}
+                        onFocus={(e) => e.target.select()}
+                        onChange={e => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? 0 : parseFloat(value));
+                        }}
                         className="pl-8"
                       />
                     </div>
@@ -95,7 +100,7 @@ const CafeManhaNoShowForm: React.FC<PeriodFormProps> = ({ form, periodId, period
             <FormField control={form.control} name={`cafeManhaNoShow.newItem.observation`} render={({ field }) => (
               <FormItem className="col-span-2">
                 <FormLabel>Observação</FormLabel>
-                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Opcional" /></FormControl>
+                <FormControl><Input {...field} value={field.value ?? ''} placeholder="Opcional" onFocus={(e) => e.target.select()} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

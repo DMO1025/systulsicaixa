@@ -39,13 +39,13 @@ const cafeManhaNoShowItemSchema = z.object({
   observation: z.string().optional(),
 });
 
-const controleCafeItemSchema = z.object({
-  id: z.string(),
+const controleCafePeriodDataSchema = z.object({
   adultoQtd: z.number().optional().nullable(),
   crianca01Qtd: z.number().optional().nullable(),
   crianca02Qtd: z.number().optional().nullable(),
   contagemManual: z.number().optional().nullable(),
   semCheckIn: z.number().optional().nullable(),
+  periodObservations: z.string().optional(),
 });
 
 
@@ -89,14 +89,6 @@ const cafeManhaNoShowPeriodDataSchema = z.object({
   newItem: cafeManhaNoShowItemSchema.optional(), // To handle the new item form fields
 });
 
-const controleCafePeriodDataSchema = z.object({
-  adultoQtd: z.number().optional().nullable(),
-  crianca01Qtd: z.number().optional().nullable(),
-  crianca02Qtd: z.number().optional().nullable(),
-  contagemManual: z.number().optional().nullable(),
-  semCheckIn: z.number().optional().nullable(),
-  periodObservations: z.string().optional(),
-});
 
 
 // Main Form Schema

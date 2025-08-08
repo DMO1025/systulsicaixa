@@ -122,23 +122,29 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
                     <Label className="text-xs flex items-center mb-1"><Hash className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Qtd</Label>
                     <Input
                         type="number"
+                        min={0}
                         placeholder="0"
-                        value={newEntry.quantity ?? ''}
-                        onChange={e => handleInputChange('quantity', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                        value={newEntry.quantity ?? 0}
+                        onFocus={(e) => e.target.select()}
+                        onChange={e => {
+                            const value = e.target.value;
+                            handleInputChange('quantity', value === '' ? 0 : parseInt(value, 10));
+                        }}
                         className="h-9 text-sm"
                     />
                  </div>
                  <div className="md:col-span-2">
                      <Label className="text-xs flex items-center mb-1"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Valor</Label>
                      <Input
-                        type="text"
+                        type="number"
+                        step="0.01"
+                        min={0}
                         placeholder="0,00"
-                        value={newEntry.value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? ''}
+                        value={newEntry.value ?? 0}
+                        onFocus={(e) => e.target.select()}
                         onChange={e => {
-                            const rawValue = e.target.value;
-                            const digitsOnly = rawValue.replace(/\D/g, '');
-                            const numberValue = digitsOnly === '' ? undefined : parseInt(digitsOnly, 10) / 100;
-                            handleInputChange('value', numberValue);
+                            const value = e.target.value;
+                            handleInputChange('value', value === '' ? 0 : parseFloat(value));
                         }}
                         className="h-9 text-sm"
                      />
@@ -151,6 +157,7 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
                         type="text"
                         placeholder="Opcional"
                         value={newEntry.observation ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onChange={e => handleInputChange('observation', e.target.value)}
                         className="h-9 text-sm"
                     />
@@ -205,44 +212,29 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
              <FormField
                 control={form.control}
                 name={`${basePath}.channels.reajusteCI.vtotal` as any}
-                render={({ field }) => {
-                    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                        const rawValue = e.target.value;
-                        const digitsOnly = rawValue.replace(/\D/g, '');
-                        if (digitsOnly === '') {
-                            field.onChange(undefined);
-                        } else {
-                            const numberValue = parseInt(digitsOnly, 10);
-                            field.onChange(numberValue / 100);
-                        }
-                    };
-
-                    const formatCurrencyForDisplay = (val: number | undefined) => {
-                        if (val === undefined || val === null) return '';
-                        return val.toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        });
-                    };
-
-                    return (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
-                           <Label className="text-sm font-semibold sm:col-span-2">VALOR ADICIONAL (REAJUSTE DE C.I)</Label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="0,00"
-                                    value={formatCurrencyForDisplay(field.value)}
-                                    onChange={handleCurrencyChange}
-                                    onFocus={(e) => e.target.select()}
-                                    className="h-9 text-sm text-right w-full pl-7"
-                                />
-                                 <FormMessage className="text-xs mt-1 text-right" />
-                            </div>
+                render={({ field }) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
+                        <Label className="text-sm font-semibold sm:col-span-2">VALOR ADICIONAL (REAJUSTE DE C.I)</Label>
+                        <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                placeholder="0,00"
+                                {...field}
+                                value={field.value ?? 0}
+                                onFocus={(e) => e.target.select()}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    field.onChange(value === '' ? 0 : parseFloat(value));
+                                }}
+                                className="h-9 text-sm text-right w-full pl-7"
+                            />
+                            <FormMessage className="text-xs mt-1 text-right" />
                         </div>
-                    )
-                }}
+                    </div>
+                )}
             />
         </div>
     </div>

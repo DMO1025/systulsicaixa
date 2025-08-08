@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format, isValid, parseISO } from 'date-fns';
@@ -18,6 +17,7 @@ import { PERIOD_FORM_CONFIG } from '@/lib/config/forms';
 import { dailyEntryFormSchema, initialDefaultValuesForAllPeriods } from '@/lib/form-schema';
 import { getSafeNumericValue } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { isEqual } from 'lodash';
 
 export function useDailyEntryForm(activePeriodId: PeriodId) {
   const { userRole, operatorShift } = useAuth();
@@ -31,9 +31,17 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
   const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
   const [activeSubTabs, setActiveSubTabs] = useState<Record<PeriodId, string>>({});
 
+  // Auto-save state
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
+  const lastSavedDataRef = useRef<DailyEntryFormData | null>(null);
+
   const form = useForm<DailyEntryFormData>({
     resolver: zodResolver(dailyEntryFormSchema),
     defaultValues: initialDefaultValuesForAllPeriods,
+    mode: 'onBlur',
   });
 
   const watchedDate = form.watch("date");
@@ -43,24 +51,11 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
 
   useEffect(() => {
     if (isDateInitialized || !userRole) return;
-
-    let initialDate: Date | undefined;
-    if (userRole === 'administrator') {
-      const storedDateStr = localStorage.getItem('entryflow-selected-date');
-      if (storedDateStr) {
-        const parsedDate = parseISO(storedDateStr);
-        if (isValid(parsedDate)) initialDate = parsedDate;
-      }
-    }
-    form.setValue('date', initialDate || new Date(), { shouldValidate: true, shouldDirty: true });
+    const initialDate = new Date();
+    form.setValue('date', initialDate, { shouldValidate: true });
     setIsDateInitialized(true);
   }, [userRole, form, isDateInitialized]);
 
-  useEffect(() => {
-    if (isDateInitialized && userRole === 'administrator' && watchedDate && isValid(watchedDate)) {
-      localStorage.setItem('entryflow-selected-date', watchedDate.toISOString());
-    }
-  }, [watchedDate, userRole, isDateInitialized]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -79,77 +74,100 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
     fetchInitialData();
   }, [toast]);
 
-  useEffect(() => {
-    const loadEntryData = async (dateToLoad: Date) => {
-      setIsDataLoading(true);
-      let dataToResetWith: DailyEntryFormData = { ...initialDefaultValuesForAllPeriods, date: dateToLoad };
+  const loadEntryData = useCallback(async (dateToLoad: Date) => {
+    if (!dateToLoad || !isValid(dateToLoad)) return;
+    setIsDataLoading(true);
+    setAutoSaveStatus('idle');
+    let dataToResetWith: DailyEntryFormData = { ...initialDefaultValuesForAllPeriods, date: dateToLoad };
 
-      try {
-        const entryForDate = await getDailyEntry(dateToLoad);
-        if (entryForDate) {
-          dataToResetWith.generalObservations = entryForDate.generalObservations || '';
-          
-          PERIOD_DEFINITIONS.forEach(pDef => {
-            const periodId = pDef.id;
-            const existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
-            if (existingPeriodData) {
-              if (periodId === 'eventos') {
-                 const eventosData = existingPeriodData as EventosPeriodData;
-                 dataToResetWith.eventos = {
-                    ...(initialDefaultValuesForAllPeriods.eventos as EventosPeriodData), ...eventosData,
-                    items: (eventosData.items || []).map(item => ({ ...item, id: item.id || uuidv4(), subEvents: (item.subEvents || []).map(sub => ({ ...sub, id: sub.id || uuidv4() })) })),
-                 };
-              } else if (periodId === 'cafeManhaNoShow') {
-                  const noShowData = existingPeriodData as CafeManhaNoShowPeriodData;
-                  dataToResetWith.cafeManhaNoShow = {
-                      ...(initialDefaultValuesForAllPeriods.cafeManhaNoShow as CafeManhaNoShowPeriodData),
-                      ...noShowData,
-                      items: (noShowData.items || []).map(item => ({ ...item, id: item.id || uuidv4()})),
-                      // newItem is kept as default to allow new entries
-                  };
-              } else if (periodId === 'controleCafeDaManha') {
-                  const controleData = existingPeriodData as ControleCafePeriodData;
-                  dataToResetWith.controleCafeDaManha = {
-                      ...(initialDefaultValuesForAllPeriods.controleCafeDaManha as ControleCafePeriodData),
-                      ...controleData,
-                      items: (controleData.items || []).map(item => ({ ...item, id: item.id || uuidv4()})),
-                  };
-              } else {
-                 const periodDefaults = initialDefaultValuesForAllPeriods[periodId] as PeriodData;
-                 const existing = existingPeriodData as PeriodData;
-                 dataToResetWith[periodId] = {
-                    ...periodDefaults, ...existing,
-                    channels: { ...(periodDefaults.channels || {}), ...(existing.channels || {}) },
-                    subTabs: {
-                        ...(periodDefaults.subTabs || {}),
-                        ...Object.keys(periodDefaults.subTabs || {}).reduce((acc, subTabKey) => {
-                            acc[subTabKey] = { ...(periodDefaults.subTabs?.[subTabKey]), ...(existing.subTabs?.[subTabKey]), channels: { ...(periodDefaults.subTabs?.[subTabKey]?.channels || {}), ...(existing.subTabs?.[subTabKey]?.channels || {}) },
-                            faturadoItems: (existing.subTabs?.[subTabKey]?.faturadoItems || []).map(item => ({...item, id: item.id || uuidv4()})),
-                            consumoInternoItems: (existing.subTabs?.[subTabKey]?.consumoInternoItems || []).map(item => ({...item, id: item.id || uuidv4()}))
-                            };
-                            return acc;
-                        }, {} as Record<string, any>),
-                    },
-                 };
-              }
-            }
-          });
-        }
-      } catch (error) {
-        toast({ title: "Erro ao Carregar Lançamento", description: (error as Error).message, variant: "destructive" });
-      } finally {
-        form.reset(dataToResetWith);
-        setIsDataLoading(false);
+    try {
+      const entryForDate = await getDailyEntry(dateToLoad);
+      if (entryForDate) {
+        dataToResetWith.generalObservations = entryForDate.generalObservations || '';
+        PERIOD_DEFINITIONS.forEach(pDef => {
+          const periodId = pDef.id;
+          const existingPeriodData = entryForDate[periodId as keyof typeof entryForDate];
+          if (existingPeriodData) {
+            dataToResetWith[periodId] = existingPeriodData as any;
+          }
+        });
       }
-    };
+    } catch (error) {
+      toast({ title: "Erro ao Carregar Lançamento", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      form.reset(dataToResetWith);
+      lastSavedDataRef.current = dataToResetWith;
+      setIsDataLoading(false);
+    }
+  }, [form, toast]);
 
-    if (isDateInitialized && watchedDateString) {
+
+  useEffect(() => {
+    if (watchedDateString) {
       const dateToLoad = parseISO(watchedDateString);
       if (isValid(dateToLoad)) loadEntryData(dateToLoad);
     } else {
       setIsDataLoading(true);
     }
-  }, [watchedDateString, form, toast, isDateInitialized]);
+  }, [watchedDateString, loadEntryData]);
+  
+  // --- AUTO-SAVE LOGIC ---
+  const triggerAutoSave = useCallback((data: DailyEntryFormData) => {
+      if (isDataLoading || isSavingRef.current) {
+          return;
+      }
+      
+      const dateToSave = userRole === 'operator' ? new Date() : data.date;
+      if (!isValid(dateToSave)) {
+          setAutoSaveStatus('error');
+          return;
+      }
+      isSavingRef.current = true;
+      setAutoSaveStatus('saving');
+      
+      saveDailyEntry(dateToSave, data).then(savedEntry => {
+          const savedDateStr = format(dateToSave, 'dd/MM/yyyy');
+          setLastSaved(new Date());
+          setAutoSaveStatus('success');
+          lastSavedDataRef.current = data; // Update last saved data
+          
+          toast({
+            title: "Sucesso!",
+            description: `Lançamento para ${savedDateStr} salvo.`,
+          });
+
+          const dateStr = format(dateToSave, 'yyyy-MM-dd');
+          if (!datesWithEntries.some(d => format(d, 'yyyy-MM-dd') === dateStr)) {
+              setDatesWithEntries(prev => [...prev, dateToSave]);
+          }
+      }).catch(error => {
+          setAutoSaveStatus('error');
+          toast({ title: "Erro no Salvamento Automático", description: (error as Error).message, variant: "destructive" });
+      }).finally(() => {
+          isSavingRef.current = false;
+      });
+
+  }, [isDataLoading, userRole, toast, datesWithEntries]);
+
+  useEffect(() => {
+      const subscription = form.watch((value, { name, type }) => {
+          if (!name || isDataLoading) return;
+          if (name === 'date' && type === 'change') return;
+          
+          if (debounceTimer.current) {
+              clearTimeout(debounceTimer.current);
+          }
+          setAutoSaveStatus('saving');
+          debounceTimer.current = setTimeout(() => {
+              triggerAutoSave(value as DailyEntryFormData);
+          }, 1500);
+      });
+      return () => {
+          subscription.unsubscribe();
+          if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      };
+  }, [form, triggerAutoSave, isDataLoading]);
+
 
   const calculateSubTabTotal = useCallback((periodId: PeriodId, subTabId: string): number => {
     const subTab = form.getValues(`${periodId}.subTabs.${subTabId}` as any);
@@ -203,48 +221,8 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
   }, [form]);
 
   const onSubmit = async (data: DailyEntryFormData) => {
-    setIsLoading(true);
-    const dateToSave = userRole === 'operator' ? new Date() : data.date;
-    if (!isValid(dateToSave)) {
-        toast({ title: "Data Inválida", description: "A data selecionada para o lançamento é inválida.", variant: "destructive" });
-        setIsLoading(false);
-        return;
-    }
-
-    // Special handling for cafeManhaNoShow newItem
-    if (data.cafeManhaNoShow && data.cafeManhaNoShow.newItem) {
-        const newItem = data.cafeManhaNoShow.newItem as CafeManhaNoShowItem;
-        if (Object.values(newItem).some(v => v !== undefined && v !== '')) {
-            const currentItems = data.cafeManhaNoShow.items || [];
-            data.cafeManhaNoShow.items = [...currentItems, { ...newItem, id: uuidv4() }];
-        }
-        data.cafeManhaNoShow.newItem = initialDefaultValuesForAllPeriods.cafeManhaNoShow?.newItem;
-    }
-    
-    // Special handling for controleCafeDaManha newItem
-    if (data.controleCafeDaManha && data.controleCafeDaManha.newItem) {
-        const newItem = data.controleCafeDaManha.newItem as ControleCafeItem;
-        if (Object.values(newItem).some(v => v !== undefined && v !== '')) {
-            const currentItems = data.controleCafeDaManha.items || [];
-            data.controleCafeDaManha.items = [...currentItems, { ...newItem, id: uuidv4() }];
-        }
-        data.controleCafeDaManha.newItem = initialDefaultValuesForAllPeriods.controleCafeDaManha?.newItem;
-    }
-
-
-    try {
-      await saveDailyEntry(dateToSave, data);
-      toast({ title: "Sucesso!", description: `Lançamento para ${format(dateToSave, 'dd/MM/yyyy')} salvo.` });
-      
-      form.reset(data);
-      
-      const newDates = await getAllEntryDates();
-      setDatesWithEntries(newDates.map(e => parseISO(e.id)).filter(isValid));
-    } catch (error) {
-      toast({ title: "Erro ao Salvar", description: (error as Error).message, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    triggerAutoSave(data);
   };
 
   const activePeriodDefinition = PERIOD_DEFINITIONS.find(p => p.id === activePeriodId)!;
@@ -263,6 +241,8 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
     calculatePeriodTotal,
     calculateSubTabTotal,
     onSubmit,
-    router
+    router,
+    autoSaveStatus,
+    lastSaved,
   };
 }
