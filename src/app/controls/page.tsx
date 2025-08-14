@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { getSetting } from '@/services/settingsService';
 import type { CardVisibilityConfig } from '@/lib/types';
+import { PATHS } from '@/lib/config/navigation';
 
 interface UICardConfig {
   id: string;
@@ -40,7 +41,7 @@ export default function DailyControlsSelectorPage() {
         .map(period => ({
           id: period.id,
           label: period.label,
-          href: `/entry/${period.id}`, // Still uses the same entry page structure
+          href: `${PATHS.ENTRY_BASE}/${period.id}`, // Still uses the same entry page structure
           icon: getPeriodIcon(period.id),
         }));
 

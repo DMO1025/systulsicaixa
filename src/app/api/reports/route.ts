@@ -2,9 +2,9 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { getAllEntries } from '@/lib/data/entries';
-import { getSetting } from '@/lib/data/settings';
-import { generateReportData } from '@/lib/reportUtils';
+import { getAllDailyEntries } from '@/lib/data/entries';
+import { generateGeneralReport } from '@/lib/reports/general/generator';
+import { generatePeriodReportData } from '@/lib/reports/period/generator';
 import type { DailyLogEntry, FilterType } from '@/lib/types';
 import { isValid, parse, format, startOfMonth } from 'date-fns';
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
             } else {
                 return NextResponse.json({ message: `Parâmetro 'date' inválido ou ausente. Use AAAA-MM-DD.` }, { status: 400 });
             }
-        } else if (filterType === 'range') {
+        } else if (filterType === 'range' || filterType.startsWith('client-')) {
             startDateStr = searchParams.get('startDate') || undefined;
             endDateStr = searchParams.get('endDate') || undefined;
             if (!startDateStr || !isValid(parse(startDateStr, 'yyyy-MM-dd', new Date()))) {
@@ -62,11 +62,16 @@ export async function GET(request: NextRequest) {
         if (filterType === 'date' && entries.length === 0) {
             return NextResponse.json({});
         }
-        
-        const periodId = searchParams.get('periodId') as any;
-        const reportData = generateReportData(entries, periodId || 'all');
 
-        return NextResponse.json(reportData);
+        const periodId = searchParams.get('periodId') as any;
+        
+        if(filterType === 'month' || filterType === 'range'){
+            const reportData = generateGeneralReport(entries);
+            return NextResponse.json({ type: 'general', data: reportData });
+        } else {
+            const reportData = generatePeriodReportData(entries, periodId || 'all');
+            return NextResponse.json({ type: 'period', data: reportData });
+        }
 
     } catch (error: any) {
         return NextResponse.json({ message: error.message || 'Erro interno do servidor.' }, { status: 500 });

@@ -11,13 +11,14 @@ let pool: Pool | null = null;
 export const DAILY_ENTRIES_TABLE_NAME = 'daily_entries';
 export const SETTINGS_TABLE_NAME = 'settings';
 export const USERS_TABLE_NAME = 'users';
+export const AUDIT_LOG_TABLE_NAME = 'audit_log';
 
 const generateSchema = (): string => {
   const dailyEntriesPeriodColumns = PERIOD_DEFINITIONS.map(p => `\`${p.id}\` JSON`).join(',\n  ');
 
   const dailyEntriesSchema = `
   CREATE TABLE IF NOT EXISTS \`${DAILY_ENTRIES_TABLE_NAME}\` (
-    id VARCHAR(10) PRIMARY KEY, -- YYYY-MM-DD
+    id VARCHAR(10) NOT NULL PRIMARY KEY,
     date DATE NOT NULL,
     generalObservations TEXT,
     ${dailyEntriesPeriodColumns},
@@ -25,7 +26,7 @@ const generateSchema = (): string => {
     lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX date_idx (date)
   );`;
-
+  
   const settingsSchema = `
   CREATE TABLE IF NOT EXISTS \`${SETTINGS_TABLE_NAME}\` (
     configId VARCHAR(255) PRIMARY KEY,
@@ -45,7 +46,16 @@ const generateSchema = (): string => {
     lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   );`;
 
-  return `${dailyEntriesSchema}\n\n${settingsSchema}\n\n${usersSchema}`;
+  const auditLogSchema = `
+  CREATE TABLE IF NOT EXISTS \`${AUDIT_LOG_TABLE_NAME}\` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    username VARCHAR(255) NOT NULL,
+    action VARCHAR(255) NOT NULL,
+    details TEXT
+  );`;
+
+  return `${dailyEntriesSchema};;${settingsSchema};;${usersSchema};;${auditLogSchema}`;
 };
 
 export const DATABASE_INIT_SCHEMA = generateSchema();

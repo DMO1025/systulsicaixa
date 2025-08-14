@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 import type { User } from '@/lib/types';
 import { updateUser, deleteUser } from '@/lib/data/users';
 import { revalidateTag } from 'next/cache';
+import { logAction } from '@/services/auditService';
+import { getCookie } from 'cookies-next';
+import { cookies } from 'next/headers';
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const userId = params.id;
@@ -10,6 +13,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const updatedData: Partial<User> = await request.json();
     const updatedUser = await updateUser(userId, updatedData);
     
+    const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+    await logAction(actorUsername, 'UPDATE_USER', `Usuário '${updatedUser.username}' (ID: ${userId}) foi atualizado.`);
+
     revalidateTag('users');
     
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -27,6 +33,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const result = await deleteUser(userId);
     
+    const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+    await logAction(actorUsername, 'DELETE_USER', `Usuário com ID: ${userId} foi removido.`);
+
     revalidateTag('users');
     
     return NextResponse.json(result);

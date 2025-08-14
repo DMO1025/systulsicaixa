@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 import type { User } from '@/lib/types';
 import { getAllUsers, createUser } from '@/lib/data/users';
 import { revalidateTag } from 'next/cache';
+import { logAction } from '@/services/auditService';
+import { getCookie } from 'cookies-next';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
     try {
@@ -27,6 +30,10 @@ export async function POST(request: NextRequest) {
         }
         
         const createdUser = await createUser(newUser);
+
+        const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+        await logAction(actorUsername, 'CREATE_USER', `Novo usuário '${createdUser.username}' foi criado.`);
+        
         revalidateTag('users');
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars

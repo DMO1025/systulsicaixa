@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble } from "lucide-react";
+import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble, Building2 } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
@@ -31,12 +31,13 @@ interface ReportToolbarProps {
     setSelectedRange: (range: DateRange | undefined) => void;
     handleExport: (format: 'pdf' | 'excel') => void;
     isDataAvailable: boolean;
-    isPeriodFilterDisabled: boolean;
     datesWithEntries: Date[];
     consumptionType: string;
     setConsumptionType: (value: string) => void;
     companyName: string;
     setCompanyName: (value: string) => void;
+    selectedDezena?: string;
+    setSelectedDezena?: (value: string) => void;
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -53,12 +54,13 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     setSelectedRange,
     handleExport,
     isDataAvailable,
-    isPeriodFilterDisabled,
     datesWithEntries,
     consumptionType,
     setConsumptionType,
     companyName,
     setCompanyName,
+    selectedDezena,
+    setSelectedDezena,
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -110,39 +112,14 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Filtros de Relatório</CardTitle>
-                <CardDescription>Selecione os filtros para gerar e exportar os relatórios.</CardDescription>
+                <CardTitle>Filtros</CardTitle>
+                <CardDescription>Selecione os parâmetros para gerar e exportar os relatórios.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-4 md:space-y-0 md:flex md:flex-wrap md:gap-4 items-end">
-                    <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                        <Label htmlFor="filterType">Tipo de Filtro</Label>
-                        <Select value={filterType} onValueChange={(value) => {
-                            setFilterType(value as FilterType)
-                            if (isPeriodFilterDisabled) {
-                                const newUrl = new URL(window.location.href);
-                                newUrl.searchParams.delete('filterFocus');
-                                window.history.replaceState({}, '', newUrl);
-                            }
-                        }}>
-                        <SelectTrigger id="filterType" className="w-full">
-                            <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="date"><div className="flex items-center gap-2"><CalendarIcon className="h-4 w-4"/>Por Data Específica</div></SelectItem>
-                            <SelectItem value="range"><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4"/>Por Intervalo de Datas</div></SelectItem>
-                            <SelectItem value="period"><div className="flex items-center gap-2"><ListFilter className="h-4 w-4"/>Por Período (dentro do Mês)</div></SelectItem>
-                            <SelectItem value="month"><div className="flex items-center gap-2"><BarChartBig className="h-4 w-4"/>Geral (Mês Inteiro)</div></SelectItem>
-                            <SelectItem value="client-extract"><div className="flex items-center gap-2"><UserSquare className="h-4 w-4"/>Por Pessoa (Extrato Detalhado)</div></SelectItem>
-                            <SelectItem value="client-summary"><div className="flex items-center gap-2"><Users className="h-4 w-4"/>Por Pessoa (Resumo Mensal)</div></SelectItem>
-                            <SelectItem value="controle-cafe"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4"/>Controle Café da Manhã</div></SelectItem>
-                            <SelectItem value="controle-cafe-no-show"><div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4"/>Controle No-Show Café da Manhã</div></SelectItem>
-                        </SelectContent>
-                        </Select>
-                    </div>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6 items-end">
+                    
                     {filterType === 'date' && (
-                        <div className="space-y-2 min-w-full md:min-w-[240px] flex-grow md:flex-grow-0">
+                        <div className="space-y-2">
                             <Label htmlFor="date">Data Específica</Label>
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -166,46 +143,77 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
                     
-                    {(filterType === 'range' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) && (
-                        <div className="space-y-2 min-w-full md:min-w-[280px] flex-grow md:flex-grow-0">
-                            <Label htmlFor="date-range">Intervalo de Datas</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button id="date-range" variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {selectedRange?.from ? (
-                                    selectedRange.to ? (
-                                        <>
-                                        {format(selectedRange.from, "LLL dd, y", {locale: ptBR})} -{" "}
-                                        {format(selectedRange.to, "LLL dd, y", {locale: ptBR})}
-                                        </>
-                                    ) : (
-                                        format(selectedRange.from, "LLL dd, y", {locale: ptBR})
-                                    )
-                                    ) : (
-                                    <span>Escolha um intervalo</span>
-                                    )}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={selectedRange?.from}
-                                    selected={selectedRange}
-                                    onSelect={setSelectedRange}
-                                    numberOfMonths={2}
-                                    locale={ptBR}
-                                    modifiers={modifiers}
-                                    modifiersClassNames={modifiersClassNames}
-                                />
-                                </PopoverContent>
-                            </Popover>
+                    {(filterType === 'range' || filterType.startsWith('client-')) && (
+                       <div className="space-y-2">
+                         <Label htmlFor="date-range">Intervalo de Datas</Label>
+                            <Popover>
+                            <PopoverTrigger asChild>
+                            <Button id="date-range" variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {selectedRange?.from ? (
+                                selectedRange.to ? (
+                                    <>
+                                    {format(selectedRange.from, "LLL dd, y", {locale: ptBR})} -{" "}
+                                    {format(selectedRange.to, "LLL dd, y", {locale: ptBR})}
+                                    </>
+                                ) : (
+                                    format(selectedRange.from, "LLL dd, y", {locale: ptBR})
+                                )
+                                ) : (
+                                <span>Escolha um intervalo</span>
+                                )}
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={selectedRange?.from}
+                                selected={selectedRange}
+                                onSelect={setSelectedRange}
+                                numberOfMonths={2}
+                                locale={ptBR}
+                                modifiers={modifiers}
+                                modifiersClassNames={modifiersClassNames}
+                            />
+                            </PopoverContent>
+                        </Popover>
+                       </div>
+                    )}
+
+                    {(filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe')) && (
+                        <div className="flex gap-4">
+                            <div className="space-y-2 flex-1">
+                                <Label htmlFor="month-picker">Mês</Label>
+                                <Select value={selectedMonthIndex.toString()} onValueChange={handleMonthChange}>
+                                    <SelectTrigger id="month-picker" className="w-full">
+                                        <SelectValue placeholder="Selecione o Mês" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {months.map(month => (
+                                            <SelectItem key={month.value} value={month.value.toString()}>{month.label.charAt(0).toUpperCase() + month.label.slice(1)}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2 w-[120px]">
+                                <Label htmlFor="year-picker">Ano</Label>
+                                <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+                                    <SelectTrigger id="year-picker" className="w-full">
+                                        <SelectValue placeholder="Selecione o Ano" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(year => (
+                                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     )}
 
                     {filterType === 'period' && (
-                        <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
+                        <div className="space-y-2">
                         <Label htmlFor="period">Período</Label>
                         <Select value={String(selectedPeriod)} onValueChange={(value) => setSelectedPeriod(value as any)}>
                             <SelectTrigger id="period" className="w-full">
@@ -233,82 +241,61 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
 
-                    {(filterType === 'client-summary' || filterType === 'client-extract') && (
-                         <div className="flex gap-4">
-                            <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                                <Label htmlFor="consumptionType">Tipo de Consumo</Label>
-                                <Select value={consumptionType} onValueChange={setConsumptionType}>
-                                    <SelectTrigger id="consumptionType" className="w-full">
-                                        <SelectValue placeholder="Selecione o tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todos</SelectItem>
-                                        <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
-                                        <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
-                                        <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
-                                        <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2 min-w-full md:min-w-[200px] flex-grow md:flex-grow-0">
-                                <Label htmlFor="companyName">Nome da Empresa</Label>
-                                <Select value={companyName} onValueChange={setCompanyName}>
-                                    <SelectTrigger id="companyName" className="w-full">
-                                        <SelectValue placeholder="Selecione a empresa" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Nenhuma</SelectItem>
-                                        <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
-                                        <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
-                                        <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    {filterType.startsWith('client-') && (
+                        <div className="space-y-2">
+                            <Label htmlFor="consumptionType">Tipo de Consumo</Label>
+                            <Select value={consumptionType} onValueChange={setConsumptionType}>
+                                <SelectTrigger id="consumptionType" className="w-full">
+                                    <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
+                                    <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
+                                    <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
+                                    <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     )}
 
-
-                    {(filterType === 'month' || filterType === 'period') && (
-                        <>
-                            <div className="space-y-2 min-w-full md:min-w-[150px] flex-grow md:flex-grow-0">
-                                <Label htmlFor="month-picker">Mês</Label>
-                                <Select
-                                    value={selectedMonthIndex.toString()}
-                                    onValueChange={handleMonthChange}
-                                    disabled={isPeriodFilterDisabled && filterType === 'period'}
-                                >
-                                    <SelectTrigger id="month-picker" className="w-full">
-                                        <SelectValue placeholder="Selecione o Mês" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {months.map(month => (
-                                            <SelectItem key={month.value} value={month.value.toString()}>{month.label.charAt(0).toUpperCase() + month.label.slice(1)}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2 min-w-full md:min-w-[120px] flex-grow md:flex-grow-0">
-                                <Label htmlFor="year-picker">Ano</Label>
-                                <Select
-                                    value={selectedYear.toString()}
-                                    onValueChange={handleYearChange}
-                                    disabled={isPeriodFilterDisabled && filterType === 'period'}
-                                >
-                                    <SelectTrigger id="year-picker" className="w-full">
-                                        <SelectValue placeholder="Selecione o Ano" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {years.map(year => (
-                                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </>
+                    {(setSelectedDezena && (filterType === 'controle-cafe' || filterType === 'controle-cafe-no-show')) && (
+                        <div className="space-y-2">
+                            <Label htmlFor="dezena-select">Imprimir Dezena (PDF)</Label>
+                            <Select value={selectedDezena} onValueChange={setSelectedDezena}>
+                                <SelectTrigger id="dezena-select" className="w-full">
+                                    <SelectValue placeholder="Selecione a dezena" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas as Dezenas</SelectItem>
+                                    <SelectItem value="1">1ª Dezena</SelectItem>
+                                    <SelectItem value="2">2ª Dezena</SelectItem>
+                                    <SelectItem value="3">3ª Dezena</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     )}
+
+                     {filterType !== 'date' && (
+                        <div className="space-y-2">
+                            <Label htmlFor="companyName" className="flex items-center gap-1.5"><Building2 className="h-4 w-4 text-muted-foreground"/>Empresa</Label>
+                            <Select value={companyName} onValueChange={setCompanyName}>
+                                <SelectTrigger id="companyName" className="w-full">
+                                    <SelectValue placeholder="Selecione a empresa" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Padrão (Avalon)</SelectItem>
+                                    <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
+                                    <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
+                                    <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
                 </div>
-                <div className="pt-4 mt-4 border-t flex flex-col md:flex-row md:items-center justify-end gap-4">
-                    <div className="flex space-x-2 w-full md:w-auto">
+                <div className="pt-4 mt-4 border-t flex items-center justify-end">
+                    <div className="flex space-x-2">
                         <Button variant="outline" onClick={() => handleExport('pdf')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> PDF</Button>
                         <Button variant="outline" onClick={() => handleExport('excel')} className="flex-1 md:flex-none" disabled={!isDataAvailable}><Download className="mr-2 h-4 w-4" /> Excel</Button>
                     </div>

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -112,7 +111,6 @@ export default function UnitPricesSettingsPage() {
                   id={`price-${channelId}`}
                   type="number"
                   step="0.01"
-                  min={0}
                   placeholder="Ex: 25.00"
                   value={channelUnitPrices[channelId] ?? ''}
                   onChange={(e) => handleUnitPriceChange(channelId, e.target.value)}

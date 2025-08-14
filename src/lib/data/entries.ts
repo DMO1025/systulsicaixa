@@ -73,11 +73,20 @@ export async function getAllEntries(
         const selectFields = fields === 'id' ? 'id' : '*';
         let query = `SELECT ${selectFields} FROM \`${DAILY_ENTRIES_TABLE_NAME}\``;
         const params: string[] = [];
+
         if (startDate && endDate) {
-            query += ' WHERE id BETWEEN ? AND ?';
+            query += ' WHERE date BETWEEN ? AND ?';
             params.push(startDate, endDate);
+        } else if (startDate) {
+            query += ' WHERE date >= ?';
+            params.push(startDate);
+        } else if (endDate) {
+            query += ' WHERE date <= ?';
+            params.push(endDate);
         }
+        
         query += ' ORDER BY id ASC';
+        
         const [rows] = await pool!.query<mysql.RowDataPacket[]>(query, params);
         
         if (fields === 'id') return rows as Partial<DailyLogEntry>[];
@@ -115,14 +124,15 @@ export async function saveEntry(
     }
 
     try {
-        const columnsForInsert: string[] = ['id', 'date', 'generalObservations'];
+        const columnsForInsert: string[] = ['id', 'date', 'generalObservations', 'createdAt'];
         const valuesForInsert: (string | null | Date)[] = [
             entryId, 
             dateForDb, 
             entryData.generalObservations || null,
+            new Date() // Set createdAt for new records
         ];
         
-        const onUpdateFragments: string[] = ['`date` = VALUES(`date`)', '`generalObservations` = VALUES(`generalObservations`)'];
+        const onUpdateFragments: string[] = ['`date` = VALUES(`date`)', '`generalObservations` = VALUES(`generalObservations`)', '`lastModifiedAt` = NOW()'];
         
         PERIOD_DEFINITIONS.forEach(pDef => {
             columnsForInsert.push(pDef.id); 
@@ -130,12 +140,6 @@ export async function saveEntry(
             valuesForInsert.push(safeStringify(periodValue)); 
             onUpdateFragments.push(`\`${pDef.id}\` = VALUES(\`${pDef.id}\`)`);
         });
-
-        const [existingRows] = await pool!.query<mysql.RowDataPacket[]>(`SELECT id FROM \`${DAILY_ENTRIES_TABLE_NAME}\` WHERE id = ?`, [entryId]);
-        if (existingRows.length === 0) {
-            columnsForInsert.push('createdAt');
-            valuesForInsert.push(new Date()); 
-        }
 
         const sql = `
             INSERT INTO \`${DAILY_ENTRIES_TABLE_NAME}\` (${columnsForInsert.map(c => `\`${c}\``).join(', ')}) 

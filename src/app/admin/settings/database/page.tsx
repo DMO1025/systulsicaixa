@@ -137,7 +137,7 @@ export default function DatabaseSettingsPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="mysql-port">Porta</Label>
-              <Input id="mysql-port" name="port" type="text" value={mysqlConfig.port || ''} onChange={handleMysqlConfigChange} placeholder="3306" />
+              <Input id="mysql-port" name="port" type="number" value={mysqlConfig.port || ''} onChange={handleMysqlConfigChange} placeholder="3306" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="mysql-user">Usuário</Label>

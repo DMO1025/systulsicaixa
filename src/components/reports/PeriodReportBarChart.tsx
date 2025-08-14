@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { ChartConfig } from '@/lib/types';
-import { parseISO, format } from 'date-fns';
+import { parseISO, format, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 
 
@@ -37,11 +36,12 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
                 tickMargin={8}
                 fontSize={12}
                 tickFormatter={(value, index) => {
+                    if (typeof value !== 'string') return '';
                     try {
                         const date = parseISO(value);
                         if (!isValid(date)) return value;
                         if (index % 2 === 0) { // Show every other label to prevent crowding
-                            return format(date, "dd/MM", { timeZone: 'UTC', locale: ptBR });
+                            return format(date, "dd/MM", { locale: ptBR });
                         }
                     } catch(e) {
                         return value;
@@ -81,10 +81,11 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
                         );
                     }}
                     labelFormatter={(label) => {
+                       if (typeof label !== 'string') return '';
                       try {
                           const date = parseISO(label);
                           if (!isValid(date)) return label;
-                          return format(date, "PPP", { timeZone: 'UTC', locale: ptBR });
+                          return format(date, "PPP", { locale: ptBR });
                       } catch(e) {
                           return label;
                       }

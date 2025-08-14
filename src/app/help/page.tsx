@@ -8,6 +8,7 @@ import { HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { PATHS } from '@/lib/config/navigation';
 
 async function getManualContent(): Promise<string> {
   try {
@@ -42,7 +43,7 @@ export default async function HelpPage() {
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Manual de Uso</h1>
         <Button asChild variant="outline">
-          <Link href="/">Voltar para o Dashboard</Link>
+          <Link href={PATHS.DASHBOARD}>Voltar para o Dashboard</Link>
         </Button>
       </div>
       <Card>

@@ -60,12 +60,12 @@
     "eventosDireto": true,
     "eventosHotel": true
   },
-   "mysqlConnectionConfig": {
-    "host": "186.202.152.74",
+  "mysqlConnectionConfig": {
+    "host": "186.202.152.196",
     "port": 3306,
-    "user": "vercel",
+    "user": "agendat",
     "password": "Tulsi@123",
-    "database": "vercel"
+    "database": "agendat"
   },
   "billedClients": [
     {

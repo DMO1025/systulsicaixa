@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import type { UserRole, OperatorShift, PageId } from '@/lib/types';
+import { PATH_TO_PAGE_ID, PAGE_ID_TO_PATH, PATHS } from '@/lib/config/navigation';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -17,14 +18,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
-  '/': 'dashboard',
-  '/entry': 'entry',
-  '/controls': 'controls',
-  '/reports': 'reports',
-  '/help': 'help',
-  '/admin': 'admin',
-};
 
 // Helper function to set a cookie
 function setCookie(name: string, value: string, days: number) {
@@ -91,16 +84,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isLoading) return;
 
-    if (!isAuthenticated && pathname !== '/login') {
-      router.push('/login');
+    if (!isAuthenticated && pathname !== PATHS.LOGIN) {
+      router.push(PATHS.LOGIN);
       return;
     }
 
     if (isAuthenticated) {
       const primaryPageId = allowedPages?.[0] || (userRole === 'administrator' ? 'dashboard' : 'entry');
-      const primaryRedirectPath = Object.entries(PATH_TO_PAGE_ID).find(([_, pageId]) => pageId === primaryPageId)?.[0] || '/';
+      const primaryRedirectPath = PAGE_ID_TO_PATH[primaryPageId] || PATHS.HOME;
 
-      if (pathname === '/login') {
+      if (pathname === PATHS.LOGIN) {
         router.push(primaryRedirectPath);
         return;
       }
@@ -148,8 +141,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       eraseCookie('operatorShift');
     }
 
-    const primaryPage = pagesToStore[0] || (role === 'administrator' ? 'dashboard' : 'entry');
-    const redirectTo = Object.entries(PATH_TO_PAGE_ID).find(([_, pageId]) => pageId === primaryPage)?.[0] || '/';
+    const primaryPageId = pagesToStore[0] || (role === 'administrator' ? 'dashboard' : 'entry');
+    const redirectTo = PAGE_ID_TO_PATH[primaryPageId] || PATHS.HOME;
     router.push(redirectTo);
   };
 
@@ -161,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     eraseCookie('userRole');
     eraseCookie('operatorShift');
     eraseCookie('allowedPages');
-    router.push('/login');
+    router.push(PATHS.LOGIN);
   };
 
   return (

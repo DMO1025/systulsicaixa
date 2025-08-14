@@ -5,6 +5,10 @@ import { z } from 'zod';
 import type { Settings } from '@/lib/types';
 import { getSetting, saveSetting } from '@/lib/data/settings';
 import { revalidateTag } from 'next/cache';
+import { getCookie } from 'cookies-next';
+import { cookies } from 'next/headers';
+import { logAction } from '@/services/auditService';
+
 
 const validConfigIds = z.enum([
   'cardVisibilityConfig', 
@@ -64,8 +68,11 @@ export async function POST(request: NextRequest, { params }: { params: { configI
   const configValue = requestBody.config as Settings[ValidConfigId];
 
   try {
+    const username = getCookie('username', { cookies }) || 'desconhecido';
     await saveSetting(validatedConfigId, configValue);
     
+    await logAction(username, 'SAVE_SETTING', `Configuração '${validatedConfigId}' foi salva.`);
+
     revalidateTag('settings');
     revalidateTag(`setting-${validatedConfigId}`);
 

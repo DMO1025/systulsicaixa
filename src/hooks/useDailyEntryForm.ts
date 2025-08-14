@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -103,16 +104,25 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
 
 
   useEffect(() => {
+    if (activePeriodId.startsWith('controle')) {
+        setIsDataLoading(false);
+        return;
+    }
     if (watchedDateString) {
       const dateToLoad = parseISO(watchedDateString);
       if (isValid(dateToLoad)) loadEntryData(dateToLoad);
     } else {
       setIsDataLoading(true);
     }
-  }, [watchedDateString, loadEntryData]);
+  }, [watchedDateString, loadEntryData, activePeriodId]);
   
   // --- AUTO-SAVE LOGIC ---
   const triggerAutoSave = useCallback((data: DailyEntryFormData) => {
+      // Do not auto-save for control pages.
+      if (activePeriodId.startsWith('controle')) {
+          return;
+      }
+      
       if (isDataLoading || isSavingRef.current) {
           return;
       }
@@ -147,7 +157,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
           isSavingRef.current = false;
       });
 
-  }, [isDataLoading, userRole, toast, datesWithEntries]);
+  }, [isDataLoading, userRole, toast, datesWithEntries, activePeriodId]);
 
   useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {

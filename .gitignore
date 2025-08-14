@@ -39,7 +39,13 @@ next-env.d.ts
 
 .genkit/*
 .env*
+BCK/
 
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# pastas específicas
+src/app/(main)
+app/data
+data/

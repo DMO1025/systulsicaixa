@@ -12,10 +12,10 @@ import { PlusCircle, Trash2, User, DollarSign, Hash, MessageSquare, Info } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { DailyEntryFormData, BilledClient, FaturadoItem as ConsumoInternoItem } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
-import { Combobox } from '@/components/ui/combobox';
 import { getSetting } from '@/services/settingsService';
 import { FormField, FormControl, FormMessage } from '@/components/ui/form';
 import { getSafeNumericValue } from '@/lib/utils';
+import { Combobox } from '@/components/ui/combobox';
 
 
 const createDefaultConsumoInternoItem = (): ConsumoInternoItem => ({
@@ -110,12 +110,13 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
             <h4 className="text-sm font-semibold mb-3">Adicionar Novo Item de Consumo Interno</h4>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                 <div className="md:col-span-8">
-                    <Label className="text-xs flex items-center mb-1"><User className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Pessoa/Setor</Label>
+                    <Label htmlFor="consumo-client-name" className="text-xs flex items-center mb-1"><User className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Pessoa/Setor</Label>
                     <Combobox
-                        options={clientOptions}
-                        value={newEntry.clientName}
-                        onChange={(value) => handleInputChange('clientName', value)}
-                        placeholder="Selecione ou digite"
+                      options={clientOptions}
+                      value={newEntry.clientName}
+                      onChange={(value) => handleInputChange('clientName', value)}
+                      placeholder="Selecione ou digite o nome"
+                      emptyMessage="Nenhum setor encontrado."
                     />
                 </div>
                  <div className="md:col-span-2">

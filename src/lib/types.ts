@@ -55,6 +55,7 @@ export interface ConsumoInternoItem {
 
 export interface CafeManhaNoShowItem {
   id: string;
+  data?: Date; // Added date field
   horario?: string;
   hospede?: string;
   uh?: string;
@@ -205,12 +206,23 @@ export interface Settings {
   apiAccessConfig?: ApiAccessConfig;
 }
 
+// Audit Log Type
+export interface AuditLog {
+    id: number;
+    timestamp: string | Date;
+    username: string;
+    action: string;
+    details: string;
+}
+
 // Dashboard Page Specific Types
 export interface ProcessedDailyTotal {
   id: string;
   date: string;
   totalQtd: number;
   totalValor: number;
+  createdAt?: string | Date;
+  lastModifiedAt?: string | Date;
 }
 
 export interface AcumulativoMensalItem {
@@ -234,7 +246,7 @@ export interface MonthlyEvolutionDataItem {
 export type EvolutionChartConfig = ShadCNChartConfig;
 
 // Reports Page Specific Types
-export type FilterType = 'date' | 'period' | 'month' | 'range' | 'client-extract' | 'client-summary' | 'controle-cafe-no-show' | 'controle-cafe';
+export type FilterType = 'date' | 'period' | 'month' | 'range' | 'client-extract' | 'client-summary' | 'controle-cafe-no-show' | 'controle-cafe' | 'history';
 
 export interface DailyCategoryDataItem { date: string; [key: string]: any; }
 export interface PeriodReportViewData {

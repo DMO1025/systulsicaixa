@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { getSetting } from '@/services/settingsService'; // For loading visibility config
 import type { CardVisibilityConfig } from '@/lib/types';
+import { PATHS } from '@/lib/config/navigation';
 
 
 interface UICardConfig { // Renamed from CardConfig to avoid conflict
@@ -42,7 +43,7 @@ export default function DailyEntrySelectorPage() {
         .map(period => ({
           id: period.id,
           label: period.label,
-          href: `/entry/${period.id}`,
+          href: `${PATHS.ENTRY_BASE}/${period.id}`,
           icon: getPeriodIcon(period.id),
           type: 'period',
         }));

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { GeneralReportDailyItem } from '@/lib/types';
-import { parseISO, format } from 'date-fns';
+import { parseISO, format, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 
 interface ReportLineChartProps {
@@ -47,8 +47,14 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
                 tickMargin={8}
                 fontSize={12}
                 tickFormatter={(value) => {
-                  const date = parseISO(value);
-                  return format(date, "dd/MM", { timeZone: 'UTC', locale: ptBR });
+                  if (typeof value !== 'string') return '';
+                  try {
+                    const date = parseISO(value);
+                    if (!isValid(date)) return value;
+                    return format(date, "dd/MM", { locale: ptBR });
+                  } catch(e) {
+                    return value;
+                  }
                 }}
               />
               <YAxis
@@ -83,8 +89,14 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
                         );
                     }}
                      labelFormatter={(label) => {
-                      const date = parseISO(label);
-                      return format(date, "PPP", { timeZone: 'UTC', locale: ptBR });
+                      if (typeof label !== 'string') return '';
+                      try {
+                          const date = parseISO(label);
+                          if (!isValid(date)) return label;
+                          return format(date, "PPP", { locale: ptBR });
+                      } catch(e) {
+                          return label;
+                      }
                     }}
                     />
                 }

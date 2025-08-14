@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,6 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from "@/component
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
 import { Textarea } from '@/components/ui/textarea';
 import { useDailyEntryForm } from '@/hooks/useDailyEntryForm';
+import { PATHS } from '@/lib/config/navigation';
 
 // Import all period form components
 import AlmocoPrimeiroTurnoForm from '@/components/period-forms/AlmocoPrimeiroTurnoForm';
@@ -130,23 +130,23 @@ export default function PeriodEntryPage() {
                                 <div className="relative">
                                     <ListIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input 
-                                    type="number"
-                                    min={0}
-                                    placeholder="0" 
-                                    {...field} 
-                                    value={field.value ?? 0}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={e => {
-                                        const value = e.target.value;
-                                        const newQty = value === '' ? 0 : parseInt(value, 10);
-                                        field.onChange(isNaN(newQty) ? 0 : newQty);
+                                        type="number"
+                                        min={0}
+                                        placeholder="0" 
+                                        {...field} 
+                                        value={field.value ?? 0}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={e => {
+                                            const value = e.target.value;
+                                            const newQty = value === '' ? 0 : parseInt(value, 10);
+                                            field.onChange(isNaN(newQty) ? 0 : newQty);
 
-                                        if (isVtotalDisabledByUnitPrice && group.vtotal) {
-                                          const calculatedVtotal = (newQty || 0) * unitPriceForChannel;
-                                          currentForm.setValue(`${basePath}.${group.vtotal}.vtotal` as any, calculatedVtotal, { shouldValidate: true, shouldDirty: true });
-                                        }
-                                    }} 
-                                    className="h-8 text-sm text-right w-full pl-7" 
+                                            if (isVtotalDisabledByUnitPrice && group.vtotal) {
+                                            const calculatedVtotal = (newQty || 0) * unitPriceForChannel;
+                                            currentForm.setValue(`${basePath}.${group.vtotal}.vtotal` as any, calculatedVtotal, { shouldValidate: true, shouldDirty: true });
+                                            }
+                                        }} 
+                                        className="h-8 text-sm text-right w-full pl-7" 
                                     />
                                 </div>
                                 </FormControl>
@@ -218,10 +218,12 @@ export default function PeriodEntryPage() {
   const PeriodSpecificFormComponent = PERIOD_FORM_COMPONENTS[activePeriodId];
   const isControlPage = activePeriodDefinition.type === 'control';
   const pageTitle = isControlPage ? `Controle Diário: ${activePeriodDefinition.label}` : `Lançamento Diário: ${activePeriodDefinition.label}`;
-  
+  const displayDate = form.getValues('date');
+  const [selectedMonth, setSelectedMonth] = useState(displayDate || new Date());
+
   const formPropsForComponent: GenericPeriodFormProps | EventosSpecificFormProps | CafeManhaNoShowSpecificFormProps | ControleCafeSpecificFormProps = {
     form,
-    periodId: activePeriodId as any, // Cast as any to satisfy specific props like EventosForm
+    periodId: activePeriodId as any,
     periodDefinition: activePeriodDefinition,
     periodConfig: activePeriodConfig,
     unitPricesConfig,
@@ -233,27 +235,36 @@ export default function PeriodEntryPage() {
     calculateSubTabTotal,
     triggerMainSubmit: form.handleSubmit(onSubmit),
     isMainFormLoading: isLoading || isDataLoading,
+    selectedMonth,
+    setSelectedMonth,
   };
   
+  const showMainDateSelector = userRole === 'administrator' && !isControlPage;
+  const showGeneralObservations = !isControlPage;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{pageTitle}</h1>
-          <p className="text-lg text-muted-foreground pt-2">{form.getValues('date') ? format(form.getValues('date'), "PPP", { locale: ptBR }) : 'Carregando data...'}</p>
+           {!isControlPage && (
+            <p className="text-lg text-muted-foreground pt-2">
+              {displayDate ? format(displayDate, "PPP", { locale: ptBR }) : 'Carregando data...'}
+            </p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2">
-          <Button variant="outline" onClick={() => router.push(isControlPage ? '/controls' : '/entry')}>Voltar para Seleção</Button>
+          <Button variant="outline" onClick={() => router.push(isControlPage ? PATHS.CONTROLS_BASE : PATHS.ENTRY_BASE)}>Voltar para Seleção</Button>
           <AutoSaveStatusIndicator status={autoSaveStatus} lastSaved={lastSaved} />
         </div>
       </div>
       
       <div className={cn("flex flex-col space-y-6", !isControlPage && "lg:flex-row lg:space-x-6 lg:space-y-0")}>
-        <div className={cn("space-y-6", !isControlPage && "lg:w-1/2")}>
+        <div className={cn("space-y-6", !isControlPage ? "lg:w-1/2" : "w-full")}>
           <Form {...form}>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-              <div className={cn(isControlPage ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-6")}>
-                 {userRole === 'administrator' && (
+              <div className={cn((showMainDateSelector || showGeneralObservations) && "grid grid-cols-1 md:grid-cols-2 gap-6")}>
+                 {showMainDateSelector && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Data do Lançamento</CardTitle>
@@ -294,26 +305,28 @@ export default function PeriodEntryPage() {
                   </Card>
                 )}
 
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <BrainCircuit className="h-6 w-6 text-primary" />
-                      <CardTitle>Observações Gerais</CardTitle>
-                    </div>
-                     <CardDescription>Notas sobre o dia que não pertençam a um período específico.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <FormField control={form.control} name="generalObservations" render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea placeholder="Descreva aqui as observações gerais do dia..." className="resize-y min-h-[100px]" {...field} value={field.value ?? ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                </Card>
+                {showGeneralObservations && (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                            <BrainCircuit className="h-6 w-6 text-primary" />
+                            <CardTitle>Observações Gerais</CardTitle>
+                            </div>
+                            <CardDescription>Notas sobre o dia que não pertençam a um período específico.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <FormField control={form.control} name="generalObservations" render={({ field }) => (
+                                <FormItem>
+                                <FormControl>
+                                    <Textarea placeholder="Descreva aqui as observações gerais do dia..." className="resize-y min-h-[100px]" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
               </div>
 
               {isDataLoading ? (

@@ -174,7 +174,10 @@ const ResumoLateralCard: React.FC<ResumoLateralCardProps> = ({ dailyData }) => {
   }, [summary.dateToDisplay]);
 
 
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatCurrency = (value: number) => {
+      const formatted = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      return formatted.length > 18 ? value.toLocaleString('pt-BR') : formatted;
+  }
 
   return (
     <Card className="mt-8 lg:mt-0" ref={cardRef}>

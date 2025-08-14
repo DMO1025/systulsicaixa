@@ -31,6 +31,7 @@ const consumoInternoItemSchema = z.object({
 
 const cafeManhaNoShowItemSchema = z.object({
   id: z.string(),
+  data: z.date().optional(),
   horario: z.string().optional(),
   hospede: z.string().optional(),
   uh: z.string().optional(),
@@ -127,7 +128,7 @@ export const initialDefaultValuesForAllPeriods = (() => {
         defaults.cafeManhaNoShow = { 
             items: [], 
             periodObservations: '',
-            newItem: { id: '', horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
+            newItem: { id: '', data: undefined, horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
         };
       } else if (periodId === 'controleCafeDaManha') {
         defaults.controleCafeDaManha = { 
@@ -169,7 +170,7 @@ export const initialDefaultValuesForAllPeriods = (() => {
         defaults.cafeManhaNoShow = {
              items: [], 
              periodObservations: '',
-             newItem: { id: '', horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
+             newItem: { id: '', data: undefined, horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
         };
     } else if (periodId === 'controleCafeDaManha') {
         defaults.controleCafeDaManha = { 

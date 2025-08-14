@@ -54,9 +54,17 @@ async function ensureTables(): Promise<NextResponse> {
       if (!pool || !(await isMysqlConnected(pool))) {
         return NextResponse.json({ message: 'Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.' }, { status: 500 });
       }
-      const statements = DATABASE_INIT_SCHEMA.split(';').filter(s => s.trim().length > 0);
+      // Split by double semicolon to handle multi-statement SQL for creation and alteration
+      const statements = DATABASE_INIT_SCHEMA.split(';;').filter(s => s.trim().length > 0);
       for (const statement of statements) {
-          await pool.query(statement);
+          try {
+            await pool.query(statement);
+          } catch(err: any) {
+              // Ignore "Duplicate key name" error which happens if PRIMARY KEY already exists.
+              if(err.code !== 'ER_DUP_KEYNAME') {
+                  throw err;
+              }
+          }
       }
       return NextResponse.json({ message: 'Tabelas do banco de dados (lançamentos, usuários, configurações) verificadas/criadas com sucesso!' });
     } catch (error: any) {

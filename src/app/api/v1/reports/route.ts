@@ -1,7 +1,8 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAllEntries } from '@/lib/data/entries';
-import { generateApiReportData } from '@/lib/api/reportUtils'; // Updated import
+import { generateGeneralReport } from '@/lib/reports/general/generator';
+import { generatePeriodReportData } from '@/lib/reports/period/generator';
 import type { DailyLogEntry, FilterType } from '@/lib/types';
 import { isValid, parse, format, startOfMonth } from 'date-fns';
 
@@ -64,9 +65,14 @@ export async function GET(request: NextRequest) {
         }
         
         const periodId = searchParams.get('periodId') as any;
-        const reportData = generateApiReportData(entries, periodId || 'all');
-
-        return NextResponse.json(reportData, { headers: CORS_HEADERS });
+        
+        if (filterType === 'month' || filterType === 'range') {
+            const reportData = generateGeneralReport(entries);
+            return NextResponse.json({ type: 'general', data: reportData }, { headers: CORS_HEADERS });
+        } else {
+            const reportData = generatePeriodReportData(entries, periodId || 'all');
+            return NextResponse.json({ type: 'period', data: reportData }, { headers: CORS_HEADERS });
+        }
 
     } catch (error: any) {
         return NextResponse.json({ message: error.message || 'Erro interno do servidor.' }, { status: 500, headers: CORS_HEADERS });

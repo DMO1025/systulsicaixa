@@ -5,6 +5,10 @@ import { z } from 'zod';
 import { getEntry, saveEntry } from '@/lib/data/entries';
 import type { DailyLogEntry } from '@/lib/types';
 import { unstable_cache as cache, revalidateTag } from 'next/cache';
+import { getCookie } from 'cookies-next';
+import { cookies } from 'next/headers';
+import { logAction } from '@/services/auditService';
+
 
 const DateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "A data deve estar no formato AAAA-MM-DD");
 
@@ -59,7 +63,14 @@ export async function POST(request: NextRequest, { params }: { params: { date: s
   }
   
   try {
+    const username = getCookie('username', { cookies }) || 'desconhecido';
+    const existingEntry = await getEntry(entryIdFromUrl);
+    const actionType = existingEntry ? 'UPDATE_ENTRY' : 'CREATE_ENTRY';
+    
     const { savedEntry, source } = await saveEntry(entryIdFromUrl, newEntryData);
+    
+    // Log the action after successful save
+    await logAction(username, actionType, `Lançamento para ${entryIdFromUrl} foi ${existingEntry ? 'atualizado' : 'criado'}.`);
     
     revalidateTag('entries');
     revalidateTag(`entry-${entryIdFromUrl}`);

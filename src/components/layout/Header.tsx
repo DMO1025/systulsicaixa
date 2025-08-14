@@ -12,39 +12,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  LogOut,
-  User,
-  Settings,
-  MenuIcon,
-  LayoutDashboard,
-  FileText,
-  CalendarPlus,
-  HelpCircle,
-  ClipboardCheck,
-} from 'lucide-react';
+import { LogOut, User, Settings, MenuIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { usePathname, useRouter } from 'next/navigation';
-import { ThemeToggleButton } from './ThemeToggleButton';
+import { ThemeToggleButton } from '../layout/ThemeToggleButton';
 import type { PageId } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
-
-const baseNavItems = [
-  { id: 'dashboard', href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'entry', href: '/entry', label: 'Lançamento Diário', icon: CalendarPlus },
-  { id: 'controls', href: '/controls', label: 'Controles Diários', icon: ClipboardCheck },
-  { id: 'reports', href: '/reports', label: 'Relatórios', icon: FileText },
-  { id: 'help', href: '/help', label: 'Ajuda', icon: HelpCircle },
-];
+import { BASE_NAV_ITEMS, PATHS, ADMIN_SETTINGS_PATHS } from '@/lib/config/navigation';
 
 export default function Header() {
   const { userRole, logout, allowedPages } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
-  const navItems = baseNavItems.filter(item => {
+  const navItems = BASE_NAV_ITEMS.filter(item => {
     if (item.id === 'help') return true; // Help is always visible
 
     if (userRole === 'administrator') {
@@ -57,17 +40,22 @@ export default function Header() {
   });
 
   const getIsActive = (href: string) => {
-    // Exact match for homepage
-    if (href === '/') {
+    if (href === PATHS.DASHBOARD && pathname === PATHS.HOME) {
+        return true;
+    }
+    if (href === PATHS.HOME) {
+        return pathname === href;
+    }
+     if (href === PATHS.HOME) {
         return pathname === href;
     }
     // Handle the /entry/ and /controls/ paths
-    if (pathname.startsWith('/entry/')) {
+    if (pathname.startsWith(PATHS.ENTRY_BASE)) {
         const periodId = pathname.split('/')[2];
         const periodDef = PERIOD_DEFINITIONS.find(p => p.id === periodId);
         if (periodDef) {
-            if (periodDef.type === 'control' && href === '/controls') return true;
-            if (periodDef.type === 'entry' && href === '/entry') return true;
+            if (periodDef.type === 'control' && href === PATHS.CONTROLS_BASE) return true;
+            if (periodDef.type === 'entry' && href === PATHS.ENTRY_BASE) return true;
         }
         return false; // Fallback if no specific period matches
     }
@@ -96,7 +84,7 @@ export default function Header() {
           </SheetTrigger>
           <SheetContent side="left">
             <SheetHeader className="mb-4">
-               <Link href="/" className="flex items-center gap-2 text-left">
+               <Link href={PATHS.DASHBOARD} className="flex items-center gap-2 text-left">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                 </svg>
@@ -123,7 +111,7 @@ export default function Header() {
       </div>
       
       <div className="hidden md:flex items-center gap-2">
-         <Link href="/" className="flex items-center gap-2 mr-6">
+         <Link href={PATHS.DASHBOARD} className="flex items-center gap-2 mr-6">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
           </svg>
@@ -169,11 +157,11 @@ export default function Header() {
             <DropdownMenuSeparator />
             {userRole === 'administrator' && (
               <>
-                <DropdownMenuItem onClick={() => router.push('/admin/settings/users')}>
+                <DropdownMenuItem onClick={() => router.push(ADMIN_SETTINGS_PATHS.USERS)}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Perfil & Operadores</span>
                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+                 <DropdownMenuItem onClick={() => router.push(PATHS.ADMIN_SETTINGS_BASE)}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>

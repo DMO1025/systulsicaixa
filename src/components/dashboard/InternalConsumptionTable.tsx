@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ListChecks } from "lucide-react";
 import { cn } from '@/lib/utils';
+import { REPORTS_PATHS } from '@/lib/config/navigation';
 
 interface InternalConsumptionTableProps {
   ciAlmoco: { qtd: number; valor: number };
@@ -29,7 +30,7 @@ const InternalConsumptionTable: React.FC<InternalConsumptionTableProps> = ({
     
     // O relatório de Consumo Interno é consolidado, então o link é sempre para `consumoInterno`
     // No futuro, poderíamos adicionar um sub-filtro se necessário, mas por agora o link principal é suficiente.
-    router.push(`/reports?filterType=period&periodId=consumoInterno&filterFocus=item&month=${monthStr}`);
+    router.push(`${REPORTS_PATHS.PERIOD}?periodId=consumoInterno&filterFocus=item&month=${monthStr}`);
   };
 
   return (

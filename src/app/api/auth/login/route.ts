@@ -2,6 +2,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import type { OperatorShift } from '@/lib/types';
 import { findUser } from '@/lib/data/users';
+import { logAction } from '@/services/auditService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Usuário ou senha inválidos.' }, { status: 401 });
     }
     
+    // Log successful login
+    await logAction(username, 'LOGIN_SUCCESS', `Usuário '${username}' logado com sucesso.`);
+
     if (user.role === 'operator') {
       if (!selectedShift) {
         return NextResponse.json({ message: 'Turno é obrigatório para operadores.' }, { status: 400 });

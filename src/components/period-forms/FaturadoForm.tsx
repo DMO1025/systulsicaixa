@@ -13,10 +13,11 @@ import { PlusCircle, Trash2, Hotel, User, DollarSign, Hash, Info, MessageSquare 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { DailyEntryFormData, FaturadoItem, BilledClient } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
-import { Combobox } from '@/components/ui/combobox';
 import { getSetting } from '@/services/settingsService';
 import { getSafeNumericValue } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { Combobox } from '@/components/ui/combobox';
+
 
 const createDefaultFaturadoItem = (): FaturadoItem => ({
   id: uuidv4(),
@@ -144,12 +145,13 @@ const FaturadoForm: React.FC<FaturadoFormProps> = ({ form, basePath }) => {
             <h4 className="text-sm font-semibold mb-3">Adicionar Novo Lançamento Faturado</h4>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                 <div className="md:col-span-5">
-                    <Label className="text-xs flex items-center mb-1"><User className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Pessoa</Label>
+                    <Label htmlFor="faturado-client-name" className="text-xs flex items-center mb-1"><User className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Pessoa</Label>
                     <Combobox
-                        options={clientOptions}
-                        value={newEntry.clientName}
-                        onChange={(value) => handleInputChange('clientName', value)}
-                        placeholder="Selecione ou digite"
+                      options={clientOptions}
+                      value={newEntry.clientName}
+                      onChange={(value) => handleInputChange('clientName', value)}
+                      placeholder="Selecione ou digite o nome"
+                      emptyMessage="Nenhuma pessoa encontrada."
                     />
                 </div>
                  <div className="md:col-span-3">
