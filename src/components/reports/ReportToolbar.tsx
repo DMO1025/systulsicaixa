@@ -143,7 +143,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
                     
-                    {(filterType === 'range' || filterType.startsWith('client-')) && (
+                    {(filterType === 'range') && (
                        <div className="space-y-2">
                          <Label htmlFor="date-range">Intervalo de Datas</Label>
                             <Popover>
@@ -181,7 +181,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                        </div>
                     )}
 
-                    {(filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe')) && (
+                    {(filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) && (
                         <div className="flex gap-4">
                             <div className="space-y-2 flex-1">
                                 <Label htmlFor="month-picker">Mês</Label>

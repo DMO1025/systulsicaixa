@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,7 +9,7 @@ import type { DailyEntryFormData, DailyLogEntry, ControleCafeItem, ChannelUnitPr
 import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
 import type { PeriodId } from '@/lib/config/periods';
 import { type IndividualPeriodConfig as PeriodConfig } from '@/lib/config/forms';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isValid, getDate, getMonth, getYear, addMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isValid, getDate, getMonth, getYear, addMonths, setDate } from 'date-fns';
 import { getAllDailyEntries, saveDailyEntry } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +17,8 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import { Table, TableBody, TableCell, TableRow, TableFooter, TableHead, TableHeader } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import ControleCafeFiscalSummary from './ControleCafeFiscalSummary';
+import ControleCafeFiscalSummary from '../reports/controle-cafe/ControleCafeFiscalSummary';
+import { cn } from '@/lib/utils';
 
 
 export interface PeriodFormProps {
@@ -54,11 +54,25 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
     label: format(new Date(2000, i), 'MMMM', { locale: ptBR }),
   }));
 
+  const daysForControl = useMemo(() => {
+    const startDate = setDate(startOfMonth(selectedMonth), 2);
+    const nextMonth = addMonths(selectedMonth, 1);
+    const endDate = setDate(startOfMonth(nextMonth), 1);
+    
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [selectedMonth]);
+
+
   useEffect(() => {
     const fetchMonthData = async () => {
         setIsLoading(true);
-        const startDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-        const endDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+        if (daysForControl.length === 0) {
+            setIsLoading(false);
+            return;
+        }
+
+        const startDate = format(daysForControl[0], 'yyyy-MM-dd');
+        const endDate = format(daysForControl[daysForControl.length - 1], 'yyyy-MM-dd');
         
         try {
             const [entries, prices] = await Promise.all([
@@ -84,49 +98,54 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
         }
     };
     fetchMonthData();
-  }, [selectedMonth]);
-
-  const daysInMonth = useMemo(() => eachDayOfInterval({
-    start: startOfMonth(selectedMonth),
-    end: endOfMonth(selectedMonth),
-  }), [selectedMonth]);
-
-   const dezenas = useMemo(() => {
+  }, [selectedMonth, daysForControl]);
+  
+  const filterByDezena = (date: Date, dezena: string) => {
     const mesSelecionado = getMonth(selectedMonth);
     const anoSelecionado = getYear(selectedMonth);
     const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
     const mesDoProximoMes = getMonth(proximoMes);
     const anoDoProximoMes = getYear(proximoMes);
+    
+    const dia = getDate(date);
+    const mes = getMonth(date);
+    const ano = getYear(date);
 
-    const filterByDezena = (date: Date, dezena: string) => {
-        const dia = getDate(date);
-        const mes = getMonth(date);
-        const ano = getYear(date);
+    if (dezena === '1') return dia >= 2 && dia <= 11;
+    if (dezena === '2') return dia >= 12 && dia <= 21;
+    if (dezena === '3') {
+        if (mes === mesSelecionado && ano === anoSelecionado && dia >= 22) return true;
+        if (mes === mesDoProximoMes && ano === anoDoProximoMes && dia === 1) return true;
+    }
+    return false;
+};
 
-        if (dezena === '1') return dia >= 2 && dia <= 11;
-        if (dezena === '2') return dia >= 12 && dia <= 21;
-        if (dezena === '3') {
-            if (mes === mesSelecionado && ano === anoSelecionado && dia >= 22) return true;
-            if (mes === mesDoProximoMes && ano === anoDoProximoMes && dia === 1) return true;
-        }
-        return false;
-    };
-
+   const dezenas = useMemo(() => {
     return [
-        { label: '1ª Dezena', days: daysInMonth.filter(d => filterByDezena(d, '1')) },
-        { label: '2ª Dezena', days: daysInMonth.filter(d => filterByDezena(d, '2')) },
-        { label: '3ª Dezena', days: daysInMonth.filter(d => filterByDezena(d, '3')) },
+        { label: '1ª Dezena', days: daysForControl.filter(d => filterByDezena(d, '1')) },
+        { label: '2ª Dezena', days: daysForControl.filter(d => filterByDezena(d, '2')) },
+        { label: '3ª Dezena', days: daysForControl.filter(d => filterByDezena(d, '3')) },
     ];
-  }, [daysInMonth, selectedMonth]);
+  }, [daysForControl, selectedMonth]);
+
+  const dezenaColors = ["bg-blue-50 dark:bg-blue-950", "bg-green-50 dark:bg-green-950", "bg-orange-50 dark:bg-orange-950"];
+  
+  const getDayDezenaColor = (day: Date) => {
+      if (filterByDezena(day, '1')) return dezenaColors[0];
+      if (filterByDezena(day, '2')) return dezenaColors[1];
+      if (filterByDezena(day, '3')) return dezenaColors[2];
+      return "";
+  };
+
 
   useEffect(() => {
-    inputRefs.current = inputRefs.current.slice(0, daysInMonth.length);
-  }, [daysInMonth]);
+    inputRefs.current = inputRefs.current.slice(0, daysForControl.length);
+  }, [daysForControl]);
 
   const cafePrice = unitPricesConfig?.cdmListaHospedes || 0;
 
   const monthTotals = useMemo(() => {
-    return daysInMonth.reduce((acc, day) => {
+    return daysForControl.reduce((acc, day) => {
       const dateString = format(day, 'yyyy-MM-dd');
       const entry = dailyStates[dateString];
       if (!entry) return acc;
@@ -149,7 +168,7 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
 
       return acc;
     }, { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0, totalPessoas: 0, totalValor: 0 });
-  }, [daysInMonth, dailyStates, cafePrice]);
+  }, [daysForControl, dailyStates, cafePrice]);
 
   const handleInputChange = (dateString: string, fieldName: keyof ControleCafeItem, value: string) => {
     const numericValue = value === '' ? 0 : parseInt(value, 10);
@@ -240,8 +259,15 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
         ) : (
         <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {dezenas.map(dezena => (
-                    <ControleCafeFiscalSummary key={dezena.label} title={dezena.label} days={dezena.days} dailyStates={dailyStates} unitPrice={cafePrice} />
+                {dezenas.map((dezena, index) => (
+                    <ControleCafeFiscalSummary 
+                        key={dezena.label} 
+                        title={dezena.label} 
+                        days={dezena.days} 
+                        dailyStates={dailyStates} 
+                        unitPrice={cafePrice}
+                        className={dezenaColors[index]}
+                    />
                 ))}
             </div>
 
@@ -261,7 +287,7 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {daysInMonth.map((day, index) => {
+                        {daysForControl.map((day, index) => {
                         const dateString = format(day, 'yyyy-MM-dd');
                         const dayState = dailyStates[dateString] || {};
                         
@@ -278,20 +304,20 @@ const ControleCafeDaManhaForm: React.FC<PeriodFormProps> = ({ form, periodId, pe
                         const isSaving = savingStates[dateString];
 
                         return (
-                            <TableRow key={dateString}>
+                            <TableRow key={dateString} className={getDayDezenaColor(day)}>
                                 <TableCell className="font-semibold text-sm py-2">{format(day, 'dd/MM (eee)', {locale: ptBR})}</TableCell>
                                 <TableCell className="p-1">
                                     <Input 
                                         type="number" min={0} value={adultoQtd} 
                                         onChange={(e) => handleInputChange(dateString, 'adultoQtd', e.target.value)} 
-                                        className="h-8"
+                                        className={cn("h-8", adultoQtd > 0 && getDayDezenaColor(day))}
                                         ref={el => (inputRefs.current[index] = el)}
                                     />
                                 </TableCell>
-                                <TableCell className="p-1"><Input type="number" min={0} value={crianca01Qtd} onChange={(e) => handleInputChange(dateString, 'crianca01Qtd', e.target.value)} className="h-8"/></TableCell>
-                                <TableCell className="p-1"><Input type="number" min={0} value={crianca02Qtd} onChange={(e) => handleInputChange(dateString, 'crianca02Qtd', e.target.value)} className="h-8"/></TableCell>
-                                <TableCell className="p-1"><Input type="number" min={0} value={contagemManual} onChange={(e) => handleInputChange(dateString, 'contagemManual', e.target.value)} className="h-8"/></TableCell>
-                                <TableCell className="p-1"><Input type="number" min={0} value={semCheckIn} onChange={(e) => handleInputChange(dateString, 'semCheckIn', e.target.value)} className="h-8"/></TableCell>
+                                <TableCell className="p-1"><Input type="number" min={0} value={crianca01Qtd} onChange={(e) => handleInputChange(dateString, 'crianca01Qtd', e.target.value)} className={cn("h-8", crianca01Qtd > 0 && getDayDezenaColor(day))}/></TableCell>
+                                <TableCell className="p-1"><Input type="number" min={0} value={crianca02Qtd} onChange={(e) => handleInputChange(dateString, 'crianca02Qtd', e.target.value)} className={cn("h-8", crianca02Qtd > 0 && getDayDezenaColor(day))}/></TableCell>
+                                <TableCell className="p-1"><Input type="number" min={0} value={contagemManual} onChange={(e) => handleInputChange(dateString, 'contagemManual', e.target.value)} className={cn("h-8", contagemManual > 0 && getDayDezenaColor(day))}/></TableCell>
+                                <TableCell className="p-1"><Input type="number" min={0} value={semCheckIn} onChange={(e) => handleInputChange(dateString, 'semCheckIn', e.target.value)} className={cn("h-8", semCheckIn > 0 && getDayDezenaColor(day))}/></TableCell>
                                 <TableCell className="text-right text-sm font-bold align-middle">{totalPessoas}</TableCell>
                                 <TableCell className="text-right text-sm font-bold align-middle">{formatCurrency(totalValor)}</TableCell>
                                 <TableCell className="p-1 text-center">

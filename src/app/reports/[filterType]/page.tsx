@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -34,7 +35,6 @@ import { TAB_DEFINITIONS } from '@/components/reports/tabDefinitions';
 import NoShowClientList from '@/components/reports/controle-cafe/NoShowClientList';
 import { cn } from '@/lib/utils';
 import { getAuditLogs } from '@/services/auditService';
-import AuditLogView from '@/components/reports/audit/AuditLogView';
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
 import ClientReportSummary from '@/components/reports/person/ClientReportSummary';
 
@@ -43,7 +43,6 @@ export default function ReportsPage() {
   const params = useParams();
   const { toast } = useToast();
 
-  const [allEntries, setAllEntries] = useState<DailyLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
@@ -56,7 +55,6 @@ export default function ReportsPage() {
   const [visibilityConfig, setVisibilityConfig] = useState<DashboardItemVisibilityConfig>({});
   const [unitPricesConfig, setUnitPricesConfig] = useState<ChannelUnitPricesConfig>({});
   const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
-  const hasSetFromParams = useRef(false);
   const [consumptionType, setConsumptionType] = useState('all');
   const [selectedClient, setSelectedClient] = useState('all');
   const [companyName, setCompanyName] = useState('');
@@ -68,46 +66,85 @@ export default function ReportsPage() {
   const reportInfo = useMemo(() => {
     return REPORTS_GROUPS.flatMap(g => g.items).find(item => item.id === filterType);
   }, [filterType]);
-
+  
+  // Effect for fetching static metadata and all entry dates for the calendar
   useEffect(() => {
     async function fetchInitialMetadata() {
-      setIsLoading(true);
       try {
-        const promises: any[] = [
-          getAllDailyEntries(undefined, undefined, undefined),
+        const [visibility, prices, allEntryDates] = await Promise.all([
           getSetting<DashboardItemVisibilityConfig>('dashboardItemVisibilityConfig'),
           getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig'),
-        ];
-        
-        if (filterType === 'history') {
-            promises.push(getAuditLogs());
-        }
+          getAllDailyEntries(undefined, undefined, undefined, 'id'),
+        ]);
 
-        const [allDbEntries, visibility, prices, fetchedAuditLogs] = await Promise.all(promises);
-        
-        const validEntries = allDbEntries.filter(e => e.id).map(e => e as DailyLogEntry);
-        setAllEntries(validEntries);
+        setVisibilityConfig(visibility || {});
         setUnitPricesConfig(prices || {});
 
-        const dates = validEntries
-          .map(entry => entry.id ? parseISO(String(entry.id)) : null)
-          .filter((date): date is Date => date !== null && isValid(date));
-        
-        setDatesWithEntries(dates);
-        setVisibilityConfig(visibility || {});
-        if (fetchedAuditLogs) {
-            setAuditLogs(fetchedAuditLogs);
+        if (Array.isArray(allEntryDates)) {
+             const dates = allEntryDates
+                .map(entry => entry.id ? parseISO(String(entry.id)) : null)
+                .filter((date): date is Date => date !== null && isValid(date));
+            setDatesWithEntries(dates);
         }
       } catch (error) {
-        console.error("Falha ao carregar metadados para os relatórios:", error);
-        toast({ title: "Erro ao Carregar Dados", description: "Não foi possível carregar os metadados dos registros.", variant: "destructive" });
-      } finally {
-        setIsLoading(false);
+        console.error("Falha ao carregar metadados iniciais:", error);
+        toast({ title: "Erro ao Carregar Metadados", description: (error as Error).message, variant: "destructive" });
       }
     }
     fetchInitialMetadata();
-  }, [toast, filterType]);
+  }, [toast]);
   
+  // Effect for fetching the actual report data based on current filters
+  useEffect(() => {
+    async function fetchReportData() {
+        setIsLoading(true);
+
+        let startDateStr: string | undefined;
+        let endDateStr: string | undefined;
+
+        if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
+            startDateStr = endDateStr = format(selectedDate, 'yyyy-MM-dd');
+        } else if (filterType === 'range' && selectedRange?.from && isValid(selectedRange.from)) {
+            startDateStr = format(selectedRange.from, 'yyyy-MM-dd');
+            endDateStr = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : startDateStr;
+        } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) {
+            if (isValid(selectedMonth)) {
+                startDateStr = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+                endDateStr = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+            }
+        } else if (filterType === 'history') {
+            try {
+                const fetchedAuditLogs = await getAuditLogs();
+                setAuditLogs(fetchedAuditLogs);
+            } catch (error) {
+                 toast({ title: "Erro ao Carregar Histórico", description: (error as Error).message, variant: "destructive" });
+            } finally {
+                setIsLoading(false);
+            }
+            return; // Exit early for history filter
+        }
+
+        if (!startDateStr) {
+            setFilteredEntries([]);
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const entries = await getAllDailyEntries(startDateStr, endDateStr);
+            setFilteredEntries(entries as DailyLogEntry[]);
+        } catch (error) {
+            console.error("Falha ao buscar dados do relatório:", error);
+            toast({ title: "Erro ao Carregar Relatório", description: (error as Error).message, variant: "destructive" });
+            setFilteredEntries([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    fetchReportData();
+  }, [filterType, selectedDate, selectedMonth, selectedRange, toast]);
+
+
   const visiblePeriodDefinitions = useMemo(() => {
     return PERIOD_DEFINITIONS.filter(pDef => {
         if (pDef.type !== 'entry') return false;
@@ -123,38 +160,11 @@ export default function ReportsPage() {
     });
   }, [visibilityConfig]);
 
-  useEffect(() => {
-    if (isLoading || filterType === 'history') return;
-
-    let finalFilteredEntries: DailyLogEntry[] = [];
-    
-    if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
-        const targetId = format(selectedDate, 'yyyy-MM-dd');
-        finalFilteredEntries = allEntries.filter(entry => entry.id === targetId);
-    } else if ((filterType === 'range' || filterType.startsWith('client-')) && selectedRange?.from && isValid(selectedRange.from)) {
-        const fromId = format(selectedRange.from, 'yyyy-MM-dd');
-        const toId = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : fromId;
-        finalFilteredEntries = allEntries.filter(entry => {
-            if (typeof entry.id !== 'string') return false;
-            return entry.id >= fromId && entry.id <= toId;
-        });
-    } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe')) {
-        if (isValid(selectedMonth)) {
-            const targetMonthStr = format(selectedMonth, 'yyyy-MM');
-            finalFilteredEntries = allEntries.filter(entry => {
-                if (typeof entry.id !== 'string') return false;
-                return entry.id.startsWith(targetMonthStr);
-            });
-        }
-    }
-    setFilteredEntries(finalFilteredEntries);
-  }, [filterType, selectedDate, selectedMonth, selectedRange, allEntries, isLoading]);
-
   const reportData = useMemo((): ReportData | null => {
-    if (filterType === 'date' || filterType.startsWith('client-') || filterType.startsWith('controle-cafe') || filterType === 'history') return null;
+    if (isLoading || filterType === 'date' || filterType.startsWith('client-') || filterType.startsWith('controle-cafe') || filterType === 'history') return null;
     const periodForReport = (filterType === 'range' || filterType === 'month') ? 'all' : selectedPeriod;
     return generateReportData(filteredEntries, periodForReport);
-  }, [filteredEntries, selectedPeriod, filterType]);
+  }, [filteredEntries, selectedPeriod, filterType, isLoading]);
 
   const { periodChartData, periodChartConfig, hasPeriodChartData } = useMemo(() => {
     if (!reportData || reportData.type !== 'period') {

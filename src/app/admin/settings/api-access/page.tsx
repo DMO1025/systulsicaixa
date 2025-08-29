@@ -161,6 +161,18 @@ const exampleApiResponseByFilter: Record<FilterType, { description: string; json
     "valor": 45.00
   }
 }`
+    },
+    'controle-cafe': {
+      description: 'Retorna os dados do controle de café da manhã.',
+      json: `[]`
+    },
+    'controle-cafe-no-show': {
+      description: 'Retorna os dados de no-show do café da manhã.',
+      json: `[]`
+    },
+    'history': {
+        description: 'Este filtro não é acessível via API no momento.',
+        json: `{ "message": "Endpoint não disponível." }`
     }
 };
 
@@ -172,7 +184,7 @@ export default function ApiAccessSettingsPage() {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [apiDomain, setApiDomain] = useState<string>('https://somenteteste.vercel.app');
+  const [apiDomain, setApiDomain] = useState<string>('');
 
   // State for API query builder
   const [filterType, setFilterType] = useState<FilterType>('month');
@@ -185,6 +197,10 @@ export default function ApiAccessSettingsPage() {
 
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setApiDomain(window.location.origin);
+    }
+
     if (!authLoading) {
       if (userRole !== 'administrator') {
         toast({ title: "Acesso Negado", description: "Você não tem permissão para acessar esta página.", variant: "destructive" });
@@ -228,7 +244,7 @@ export default function ApiAccessSettingsPage() {
 
   const handleCopyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copiado!", description: "A chave de API foi copiada para a área de transferência." });
+    toast({ title: "Copiado!", description: "O texto foi copiado para a área de transferência." });
   };
 
   const { exampleUrl, curlExample } = useMemo(() => {
@@ -326,8 +342,8 @@ export default function ApiAccessSettingsPage() {
                     id="domain-input"
                     type="text"
                     value={apiDomain}
-                    onChange={(e) => setApiDomain(e.target.value)}
-                    placeholder="https://seu-dominio.com"
+                    readOnly
+                    className="text-muted-foreground"
                 />
             </div>
              <div>
@@ -421,7 +437,12 @@ export default function ApiAccessSettingsPage() {
             </div>
             <div>
                 <Label className="flex items-center gap-2 mb-1"><Server className="h-4 w-4"/>Endpoint da API</Label>
-                <CodeBlock code={`GET ${exampleUrl}`} />
+                <div className="flex items-center gap-2">
+                    <Input readOnly value={`GET ${exampleUrl}`} className="font-mono text-xs"/>
+                    <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(exampleUrl)}>
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
              <div>
                 <Label className="mb-1">Autenticação</Label>
@@ -432,14 +453,19 @@ export default function ApiAccessSettingsPage() {
             </div>
              <div>
                 <Label className="mb-1">Exemplo de Requisição (cURL)</Label>
-                <CodeBlock code={curlExample} />
+                <div className="flex items-center gap-2">
+                    <Input readOnly value={curlExample} className="font-mono text-xs"/>
+                     <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(curlExample)}>
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
             <div>
                 <Label className="mb-1">Exemplo de Saída (JSON)</Label>
                  <p className="text-sm text-muted-foreground mb-2">
-                    {exampleApiResponseByFilter[filterType]?.description}
+                    {exampleApiResponseByFilter[filterType]?.description || "Selecione um filtro para ver um exemplo."}
                 </p>
-                <CodeBlock code={exampleApiResponseByFilter[filterType]?.json} />
+                <CodeBlock code={exampleApiResponseByFilter[filterType]?.json || "{}"} />
             </div>
         </CardContent>
       </Card>
@@ -447,4 +473,3 @@ export default function ApiAccessSettingsPage() {
     </div>
   );
 }
-
