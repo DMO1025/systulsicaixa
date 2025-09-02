@@ -1,9 +1,10 @@
 
 
+"use client";
+
 import { getSafeNumericValue } from '@/lib/utils';
 import type { DailyLogEntry, PeriodData } from '@/lib/types';
 import { calculateFaturadoFromItems } from './faturado';
-import { calculateConsumoInternoFromItems } from './consumoInterno';
 
 const getRestaurantTotal = (period: PeriodData | undefined): { qtd: number; valor: number } => {
     let totalValor = 0;
@@ -43,18 +44,6 @@ export function calculateAlmocoTotals(entry: DailyLogEntry) {
             valor: getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, 'aptCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, 'aptCiEFaturadosValorFuncionario.vtotal')
         }
     };
-    const aptCI = {
-        new: calculateConsumoInternoFromItems(aptData?.subTabs?.consumoInterno?.consumoInternoItems),
-        old: {
-            qtd: getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, 'aptCiEFaturadosConsumoInternoQtd.qtd'),
-            valor: getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, 'aptCiEFaturadosTotalCI.vtotal') - getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, 'aptCiEFaturadosReajusteCI.vtotal')
-        }
-    };
-    const reajusteCIPT = getSafeNumericValue(aptData?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal') + getSafeNumericValue(aptData?.subTabs?.ciEFaturados?.channels, `aptCiEFaturadosReajusteCI.vtotal`);
-    const frigobarPT = {
-        valor: getSafeNumericValue(aptData, 'subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue(aptData, 'subTabs.frigobar.channels.frgPTPagHotel.vtotal'),
-        qtd: getSafeNumericValue(aptData, 'subTabs.frigobar.channels.frgPTTotalQuartos.qtd'),
-    };
     
     // --- SEGUNDO TURNO (AST) ---
      const rsAlmocoST = {
@@ -69,28 +58,16 @@ export function calculateAlmocoTotals(entry: DailyLogEntry) {
             valor: getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, 'astCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, 'astCiEFaturadosValorFuncionario.vtotal')
         }
     };
-    const astCI = {
-        new: calculateConsumoInternoFromItems(astData?.subTabs?.consumoInterno?.consumoInternoItems),
-        old: {
-            qtd: getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, 'astCiEFaturadosConsumoInternoQtd.qtd'),
-            valor: getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, 'astCiEFaturadosTotalCI.vtotal') - getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, 'astCiEFaturadosReajusteCI.vtotal')
-        }
-    };
-    const reajusteCIST = getSafeNumericValue(astData?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal') + getSafeNumericValue(astData?.subTabs?.ciEFaturados?.channels, `astCiEFaturadosReajusteCI.vtotal`);
-    const frigobarST = {
-        valor: getSafeNumericValue(astData, 'subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue(astData, 'subTabs.frigobar.channels.frgSTPagHotel.vtotal'),
-        qtd: getSafeNumericValue(astData, 'subTabs.frigobar.channels.frgSTTotalQuartos.qtd'),
-    };
     
-    // --- COMBINED TOTALS ---
+    // --- COMBINED TOTALS (Excluding Room Service, CI, and Frigobar from this level) ---
     const almocoPTTotal = {
-        valor: restaurantePT.valor + rsAlmocoPT.valor + aptFaturado.new.valor + aptFaturado.old.valor + aptCI.new.valor + aptCI.old.valor + frigobarPT.valor + reajusteCIPT,
-        qtd: restaurantePT.qtd + rsAlmocoPT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd + aptCI.new.qtd + aptCI.old.qtd + frigobarPT.qtd,
+        valor: restaurantePT.valor + aptFaturado.new.valor + aptFaturado.old.valor,
+        qtd: restaurantePT.qtd + aptFaturado.new.qtd + aptFaturado.old.qtd,
         rs: rsAlmocoPT,
     };
      const almocoSTTotal = {
-        valor: restauranteST.valor + rsAlmocoST.valor + astFaturado.new.valor + astFaturado.old.valor + astCI.new.valor + astCI.old.valor + frigobarST.valor + reajusteCIST,
-        qtd: restauranteST.qtd + rsAlmocoST.qtd + astFaturado.new.qtd + astFaturado.old.qtd + astCI.new.qtd + astCI.old.qtd + frigobarST.qtd,
+        valor: restauranteST.valor + astFaturado.new.valor + astFaturado.old.valor,
+        qtd: restauranteST.qtd + astFaturado.new.qtd + astFaturado.old.qtd,
         rs: rsAlmocoST,
     };
 

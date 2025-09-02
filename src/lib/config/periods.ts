@@ -20,6 +20,7 @@ export const PERIOD_DEFINITIONS = [
   { id: "baliAlmoco", label: "Bali Almoço", icon: Sun, type: 'entry' },
   { id: "baliHappy", label: "Bali Happy Hour", icon: Martini, type: 'entry' },
   { id: "eventos", label: "Eventos", icon: CalendarDays, type: 'entry' },
+  { id: "frigobar", label: "Frigobar", icon: Refrigerator, type: 'entry'},
 ] as const;
 
 export type PeriodId = typeof PERIOD_DEFINITIONS[number]['id'];

@@ -3,7 +3,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAllEntries } from '@/lib/data/entries';
-import type { DailyLogEntry, FilterType, PeriodId, PeriodData, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, UnifiedPersonTransaction } from '@/lib/types';
+import type { DailyLogEntry, FilterType, PeriodId, PeriodData, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, UnifiedPersonTransaction, EventosPeriodData } from '@/lib/types';
 import { isValid, parse, format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
@@ -34,39 +34,57 @@ const getSafeNumericValue = (data: any, path: string, defaultValue: number = 0):
 };
 
 const processEntryForApiTotals = (entry: DailyLogEntry) => {
+    let grandTotalComCI = 0;
+    let grandTotalQtd = 0;
+    let totalCI = 0;
+    let totalCIQtd = 0;
+    let reajusteCI = 0;
+
+    const periodTotals: Record<string, { qtd: number, valor: number }> = {};
+    PERIOD_DEFINITIONS.forEach(pDef => periodTotals[pDef.id] = { qtd: 0, valor: 0 });
+
+    // 1. Madrugada
     const rsMadrugada = {
         valor: getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServicePagDireto.vtotal') + getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceValorServico.vtotal'),
         qtd: getSafeNumericValue(entry, 'madrugada.channels.madrugadaRoomServiceQtdPedidos.qtd'),
     };
-    const rsAlmocoPT = {
-        valor: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServiceValorServico.vtotal'),
-        qtd: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServiceQtdPedidos.qtd'),
-    };
-    const rsAlmocoST = {
-        valor: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServiceValorServico.vtotal'),
-        qtd: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServiceQtdPedidos.qtd'),
-    };
-    const rsJantar = {
-        valor: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServiceValorServico.vtotal'),
-        qtd: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServiceQtdPedidos.qtd'),
-    };
+    periodTotals['madrugada'] = rsMadrugada;
+    grandTotalComCI += rsMadrugada.valor;
+    grandTotalQtd += rsMadrugada.qtd;
 
-    const roomServiceTotal = { valor: rsMadrugada.valor + rsAlmocoPT.valor + rsAlmocoST.valor + rsJantar.valor, qtd: rsMadrugada.qtd + rsAlmocoPT.qtd + rsAlmocoST.qtd + rsJantar.qtd };
+    // 2. Eventos
+    const eventosData = entry.eventos as EventosPeriodData | undefined;
+    if (eventosData?.items) {
+        eventosData.items.forEach(item => {
+            (item.subEvents || []).forEach(subEvent => {
+                periodTotals['eventos'].qtd += subEvent.quantity || 0;
+                periodTotals['eventos'].valor += subEvent.totalValue || 0;
+            });
+        });
+    }
+    grandTotalComCI += periodTotals['eventos'].valor;
+    grandTotalQtd += periodTotals['eventos'].qtd;
     
-    let grandTotalComCI = roomServiceTotal.valor;
-    let grandTotalQtd = roomServiceTotal.qtd;
-    let totalCI = 0;
-    let reajusteCI = 0;
+    // 3. Frigobar
+    const frigobarPT = getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData), 'subTabs.frigobar.channels.frgPTPagRestaurante.vtotal') + getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData), 'subTabs.frigobar.channels.frgPTPagHotel.vtotal');
+    const frigobarST = getSafeNumericValue((entry.almocoSegundoTurno as PeriodData), 'subTabs.frigobar.channels.frgSTPagRestaurante.vtotal') + getSafeNumericValue((entry.almocoSegundoTurno as PeriodData), 'subTabs.frigobar.channels.frgSTPagHotel.vtotal');
+    const frigobarJantar = getSafeNumericValue((entry.jantar as PeriodData), 'subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue((entry.jantar as PeriodData), 'subTabs.frigobar.channels.frgJNTPagHotel.vtotal');
+    const frigobarQtd = getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData), 'subTabs.frigobar.channels.frgPTTotalQuartos.qtd') + getSafeNumericValue((entry.almocoSegundoTurno as PeriodData), 'subTabs.frigobar.channels.frgSTTotalQuartos.qtd') + getSafeNumericValue((entry.jantar as PeriodData), 'subTabs.frigobar.channels.frgJNTTotalQuartos.qtd');
+    
+    periodTotals['frigobar'] = { qtd: frigobarQtd, valor: frigobarPT + frigobarST + frigobarJantar };
+    grandTotalComCI += periodTotals['frigobar'].valor;
+    grandTotalQtd += periodTotals['frigobar'].qtd;
 
-    const periodTotals: Record<string, { qtd: number, valor: number }> = { roomService: roomServiceTotal };
 
+    // 4. Outros períodos (Almoço, Jantar, etc.)
     PERIOD_DEFINITIONS.forEach(pDef => {
-        if (pDef.id === 'madrugada') return;
-        const periodData = entry[pDef.id as keyof DailyLogEntry] as PeriodData;
+        if (pDef.id === 'madrugada' || pDef.id === 'eventos' || pDef.id === 'frigobar') return;
+        
+        const periodData = entry[pDef.id as keyof DailyLogEntry] as PeriodData | undefined;
         if (!periodData) return;
 
-        let periodQtd = 0;
         let periodValor = 0;
+        let periodQtd = 0;
 
         if (periodData.channels) {
             Object.values(periodData.channels).forEach(channel => {
@@ -76,7 +94,8 @@ const processEntryForApiTotals = (entry: DailyLogEntry) => {
         }
         if (periodData.subTabs) {
             Object.values(periodData.subTabs).forEach(subTab => {
-                if(subTab.channels) {
+                // Exclude room service, frigobar as they are handled separately or part of turn total
+                if (subTab.channels && subTab !== (periodData.subTabs as any)?.roomService && subTab !== (periodData.subTabs as any)?.frigobar) {
                     Object.values(subTab.channels).forEach(channel => {
                         periodQtd += getSafeNumericValue(channel, 'qtd');
                         periodValor += getSafeNumericValue(channel, 'vtotal');
@@ -90,22 +109,39 @@ const processEntryForApiTotals = (entry: DailyLogEntry) => {
                 }
                 if(subTab.consumoInternoItems) {
                     subTab.consumoInternoItems.forEach(item => {
-                        periodQtd += item.quantity || 0;
-                        periodValor += item.value || 0;
-                        totalCI += item.value || 0;
+                        const ciQtd = item.quantity || 0;
+                        const ciValor = item.value || 0;
+                        periodQtd += ciQtd;
+                        periodValor += ciValor;
+                        totalCI += ciValor;
+                        totalCIQtd += ciQtd;
                     });
                 }
             });
         }
-        
-        reajusteCI += getSafeNumericValue(periodData, 'subTabs.consumoInterno.channels.reajusteCI.vtotal');
-        
+
+        const reajuste = getSafeNumericValue(periodData, 'subTabs.consumoInterno.channels.reajusteCI.vtotal');
+        reajusteCI += reajuste;
+        periodValor += reajuste;
+
+        periodTotals[pDef.id] = { qtd: periodQtd, valor: periodValor };
         grandTotalComCI += periodValor;
         grandTotalQtd += periodQtd;
-        periodTotals[pDef.id] = { qtd: periodQtd, valor: periodValor };
     });
+
+    // 5. Room Service Diurno (Almoço + Jantar)
+    const rsAlmocoPT = { valor: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServiceValorServico.vtotal'), qtd: getSafeNumericValue((entry.almocoPrimeiroTurno as PeriodData)?.subTabs?.roomService?.channels, 'aptRoomServiceQtdPedidos.qtd') };
+    const rsAlmocoST = { valor: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServiceValorServico.vtotal'), qtd: getSafeNumericValue((entry.almocoSegundoTurno as PeriodData)?.subTabs?.roomService?.channels, 'astRoomServiceQtdPedidos.qtd') };
+    const rsJantar = { valor: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServicePagDireto.vtotal') + getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServiceValorServico.vtotal'), qtd: getSafeNumericValue((entry.jantar as PeriodData)?.subTabs?.roomService?.channels, 'jntRoomServiceQtdPedidos.qtd') };
+
+    periodTotals['roomService'] = {
+        valor: rsAlmocoPT.valor + rsAlmocoST.valor + rsJantar.valor,
+        qtd: rsAlmocoPT.qtd + rsAlmocoST.qtd + rsJantar.qtd,
+    };
+    grandTotalComCI += periodTotals['roomService'].valor;
+    grandTotalQtd += periodTotals['roomService'].qtd;
     
-    return { periodTotals, grandTotalComCI, grandTotalQtd, totalCI, reajusteCI };
+    return { periodTotals, grandTotalComCI, grandTotalQtd, totalCI, totalCIQtd, reajusteCI };
 };
 
 const generateGeneralReportForApi = (entries: DailyLogEntry[]): GeneralReportViewData => {
@@ -119,14 +155,15 @@ const generateGeneralReportForApi = (entries: DailyLogEntry[]): GeneralReportVie
         grandTotalReajusteCI: 0,
     };
     
-    PERIOD_DEFINITIONS.forEach(p => summary.periodTotals[p.id] = {qtd: 0, valor: 0});
-    summary.periodTotals.roomService = { qtd: 0, valor: 0 };
+    const allPossiblePeriodKeys = [...PERIOD_DEFINITIONS.map(p => p.id), 'roomService', 'frigobar'];
+    
+    allPossiblePeriodKeys.forEach(key => {
+        summary.periodTotals[key as PeriodId] = { qtd: 0, valor: 0 };
+    });
 
     entries.forEach(entry => {
-        const { periodTotals, grandTotalComCI, grandTotalQtd, totalCI, reajusteCI } = processEntryForApiTotals(entry);
+        const { periodTotals, grandTotalComCI, grandTotalQtd, totalCI, totalCIQtd, reajusteCI } = processEntryForApiTotals(entry);
         
-        const ciQtd = 0; // Simplified for now, as detailed CI quantity isn't needed for this total.
-
         dailyBreakdowns.push({
             date: format(parseISO(String(entry.id)), 'dd/MM/yyyy'),
             periodTotals: periodTotals,
@@ -134,13 +171,13 @@ const generateGeneralReportForApi = (entries: DailyLogEntry[]): GeneralReportVie
             totalSemCI: grandTotalComCI - totalCI - reajusteCI,
             totalReajusteCI: reajusteCI,
             totalQtd: grandTotalQtd,
-            totalCIQtd: ciQtd,
+            totalCIQtd: totalCIQtd,
         });
 
         summary.grandTotalComCI += grandTotalComCI;
         summary.grandTotalQtd += grandTotalQtd;
         summary.grandTotalReajusteCI += reajusteCI;
-        summary.grandTotalCIQtd += ciQtd;
+        summary.grandTotalCIQtd += totalCIQtd;
         summary.grandTotalSemCI += (grandTotalComCI - totalCI - reajusteCI);
         
         Object.entries(periodTotals).forEach(([key, value]) => {
@@ -360,7 +397,11 @@ export async function GET(request: NextRequest) {
 
         if (filterType === 'client-extract') {
             const consumptionType = searchParams.get('consumptionType') || 'all';
-            const allTransactions = extractPersonTransactions(entries, consumptionType);
+            const personName = searchParams.get('personName') || undefined;
+            let allTransactions = extractPersonTransactions(entries, consumptionType);
+            if(personName) {
+                allTransactions = allTransactions.filter(t => t.personName === personName);
+            }
             return NextResponse.json(allTransactions, { headers: CORS_HEADERS });
         }
 
@@ -395,3 +436,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: error.message || 'Erro interno do servidor.' }, { status: 500, headers: CORS_HEADERS });
     }
 }
+
+    
+
+    

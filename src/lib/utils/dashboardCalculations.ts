@@ -18,8 +18,7 @@ export interface DashboardTotals {
   baliAlmoco: { qtd: number; valor: number };
   baliHappy: { qtd: number; valor: number };
   frigobar: { qtd: number; valor: number };
-  eventosDireto: { qtd: number; valor: number };
-  eventosHotel: { qtd: number; valor: number };
+  eventos: { qtd: number; valor: number };
   totalCIAlmoco: { qtd: number; valor: number };
   totalCIJantar: { qtd: number; valor: number };
   totalReajusteCI: number;
@@ -43,8 +42,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     baliAlmoco: { qtd: 0, valor: 0 },
     baliHappy: { qtd: 0, valor: 0 },
     frigobar: { qtd: 0, valor: 0 },
-    eventosDireto: { qtd: 0, valor: 0 },
-    eventosHotel: { qtd: 0, valor: 0 },
+    eventos: { qtd: 0, valor: 0 },
     totalCIAlmoco: { qtd: 0, valor: 0 },
     totalCIJantar: { qtd: 0, valor: 0 },
     totalReajusteCI: 0,
@@ -65,27 +63,27 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     totals.cafeDaManha.valor += entryTotals.cafeHospedes.valor + entryTotals.cafeAvulsos.valor;
     totals.cafeDaManha.qtd += entryTotals.cafeHospedes.qtd + entryTotals.cafeAvulsos.qtd;
 
-    // --- Almoço (Restaurante + Faturado + CI + Reajuste + Frigobar, mas SEM RS) ---
-    const almocoSemRS = entryTotals.almoco.valor - entryTotals.rsAlmocoPT.valor - entryTotals.rsAlmocoST.valor;
-    const almocoQtdSemRS = entryTotals.almoco.qtd - entryTotals.rsAlmocoPT.qtd - entryTotals.rsAlmocoST.qtd;
-    totals.almoco.valor += almocoSemRS;
-    totals.almoco.qtd += almocoQtdSemRS;
+    // --- Almoço (Restaurante + Faturado + CI + Reajuste, mas SEM RS e Frigobar) ---
+    const almocoSemRSF = entryTotals.almoco.valor - entryTotals.rsAlmocoPT.valor - entryTotals.rsAlmocoST.valor;
+    const almocoQtdSemRSF = entryTotals.almoco.qtd - entryTotals.rsAlmocoPT.qtd - entryTotals.rsAlmocoST.qtd;
+    totals.almoco.valor += almocoSemRSF;
+    totals.almoco.qtd += almocoQtdSemRSF;
     
-    // --- Jantar (Restaurante + Faturado + CI + Reajuste + Frigobar, mas SEM RS) ---
-    const jantarSemRS = entryTotals.jantar.valor - entryTotals.rsJantar.valor;
-    const jantarQtdSemRS = entryTotals.jantar.qtd - entryTotals.rsJantar.qtd;
-    totals.jantar.valor += jantarSemRS;
-    totals.jantar.qtd += jantarQtdSemRS;
+    // --- Jantar (Restaurante + Faturado + CI + Reajuste, mas SEM RS e Frigobar) ---
+    const jantarSemRSF = entryTotals.jantar.valor - entryTotals.rsJantar.valor;
+    const jantarQtdSemRSF = entryTotals.jantar.qtd - entryTotals.rsJantar.qtd;
+    totals.jantar.valor += jantarSemRSF;
+    totals.jantar.qtd += jantarQtdSemRSF;
     
     // --- Frigobar ---
     totals.frigobar.valor += entryTotals.frigobar.valor;
     totals.frigobar.qtd += entryTotals.frigobar.qtd;
     
     // --- Eventos ---
-    totals.eventosDireto.valor += entryTotals.eventos.direto.valor;
-    totals.eventosDireto.qtd += entryTotals.eventos.direto.qtd;
-    totals.eventosHotel.valor += entryTotals.eventos.hotel.valor;
-    totals.eventosHotel.qtd += entryTotals.eventos.hotel.qtd;
+    const eventosTotal = entryTotals.eventos.direto.valor + entryTotals.eventos.hotel.valor;
+    const eventosQtd = entryTotals.eventos.direto.qtd + entryTotals.eventos.hotel.qtd;
+    totals.eventos.valor += eventosTotal;
+    totals.eventos.qtd += eventosQtd;
     
     // --- C.I. & Reajuste ---
     totals.totalCIAlmoco.valor += entryTotals.almocoCI.valor;

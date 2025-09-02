@@ -1,9 +1,10 @@
 
 
+"use client";
+
 import { getSafeNumericValue } from '@/lib/utils';
 import type { DailyLogEntry, PeriodData } from '@/lib/types';
 import { calculateFaturadoFromItems } from './faturado';
-import { calculateConsumoInternoFromItems } from './consumoInterno';
 
 const getRestaurantTotal = (period: PeriodData | undefined): { qtd: number; valor: number } => {
     let totalValor = 0;
@@ -43,25 +44,11 @@ export function calculateJantarTotals(entry: DailyLogEntry) {
             valor: getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, 'jntCiEFaturadosValorHotel.vtotal') + getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, 'jntCiEFaturadosValorFuncionario.vtotal')
         }
     };
-    
-    const ciJantar = {
-      new: calculateConsumoInternoFromItems(jantarData?.subTabs?.consumoInterno?.consumoInternoItems),
-      old: {
-        qtd: getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, `jntCiEFaturadosConsumoInternoQtd.qtd`),
-        valor: getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, `jntCiEFaturadosTotalCI.vtotal`) - getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, `jntCiEFaturadosReajusteCI.vtotal`)
-      }
-    };
-    
-    const reajusteCIJantar = getSafeNumericValue(jantarData?.subTabs?.consumoInterno?.channels, 'reajusteCI.vtotal') + getSafeNumericValue(jantarData?.subTabs?.ciEFaturados?.channels, `jntCiEFaturadosReajusteCI.vtotal`);
 
-    const frigobarJantar = {
-        valor: getSafeNumericValue(jantarData, 'subTabs.frigobar.channels.frgJNTPagRestaurante.vtotal') + getSafeNumericValue(jantarData, 'subTabs.frigobar.channels.frgJNTPagHotel.vtotal'),
-        qtd: getSafeNumericValue(jantarData, 'subTabs.frigobar.channels.frgJNTTotalQuartos.qtd'),
-    };
-
+    // Total now excludes Room Service, Frigobar, and Consumo Interno
     const turnoJantarTotal = {
-        valor: restauranteJantar.valor + rsJantar.valor + faturadoJantar.new.valor + faturadoJantar.old.valor + frigobarJantar.valor + (ciJantar.new.valor + ciJantar.old.valor) + reajusteCIJantar,
-        qtd: restauranteJantar.qtd + rsJantar.qtd + faturadoJantar.new.qtd + faturadoJantar.old.qtd + ciJantar.new.qtd + ciJantar.old.qtd + frigobarJantar.qtd,
+        valor: restauranteJantar.valor + faturadoJantar.new.valor + faturadoJantar.old.valor,
+        qtd: restauranteJantar.qtd + faturadoJantar.new.qtd + faturadoJantar.old.qtd,
     };
 
     return {

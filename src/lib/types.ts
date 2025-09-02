@@ -195,18 +195,6 @@ export interface ApiAccessConfig {
     apiKey: string;
 }
 
-export interface Settings {
-  cardVisibilityConfig?: CardVisibilityConfig;
-  channelUnitPricesConfig?: ChannelUnitPricesConfig;
-  mysqlConnectionConfig?: MysqlConnectionConfig;
-  dashboardItemVisibilityConfig?: DashboardItemVisibilityConfig;
-  summaryCardItemsConfig?: SummaryCardItemsConfig;
-  billedClients?: BilledClient[];
-  noShowClients?: BilledClient[];
-  apiAccessConfig?: ApiAccessConfig;
-}
-
-// Audit Log Type
 export interface AuditLog {
     id: number;
     timestamp: string | Date;
@@ -267,6 +255,7 @@ export interface GeneralReportDailyItem {
     totalReajusteCI: number;
     totalQtd: number;
     totalCIQtd: number;
+    totalCIValor: number;
 }
 export interface GeneralReportSummary {
     periodTotals: Partial<Record<PeriodId | 'roomService', { qtd: number; valor: number }>>;

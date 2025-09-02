@@ -11,7 +11,6 @@ import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from '
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
 import ReactMarkdown from 'react-markdown';
-import { processEntryForTotals } from '@/lib/utils/calculations';
 import { processEntriesForDashboard } from '@/lib/utils/dashboardCalculations';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { PATHS, REPORTS_PATHS } from '@/lib/config/navigation';
@@ -173,6 +172,7 @@ export default function DashboardPage() {
         const monthTotals = processEntriesForDashboard(entriesForMonth);
         
         const dailyTotalsData = entriesForMonth.map(entry => {
+          const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import to avoid server/client issues
           const entryTotals = processEntryForTotals(entry);
           let formattedDate = "Data Inválida";
           if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -228,6 +228,7 @@ export default function DashboardPage() {
                 const entryMonthKey = `${entryYearUTC}-${String(entryMonthUTC + 1).padStart(2, '0')}`;
         
                 if (monthlyAggregates[entryMonthKey]) {
+                    const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import
                     const entryTotals = processEntryForTotals(entry);
                     monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
                     monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
@@ -284,8 +285,7 @@ export default function DashboardPage() {
                 case "BALI ALMOÇO": return { ...item, qtdDisplay: monthTotals.baliAlmoco.qtd.toString(), valorTotal: monthTotals.baliAlmoco.valor };
                 case "BALI HAPPY HOUR": return { ...item, qtdDisplay: monthTotals.baliHappy.qtd.toString(), valorTotal: monthTotals.baliHappy.valor };
                 case "FRIGOBAR": return { ...item, qtdDisplay: monthTotals.frigobar.qtd.toString(), valorTotal: monthTotals.frigobar.valor };
-                case "EVENTOS DIRETO": return { ...item, qtdDisplay: monthTotals.eventosDireto.qtd.toString(), valorTotal: monthTotals.eventosDireto.valor };
-                case "EVENTOS HOTEL": return { ...item, qtdDisplay: monthTotals.eventosHotel.qtd.toString(), valorTotal: monthTotals.eventosHotel.valor };
+                case "EVENTOS": return { ...item, qtdDisplay: monthTotals.eventos.qtd.toString(), valorTotal: monthTotals.eventos.valor };
                 default: return item;
             }
         });

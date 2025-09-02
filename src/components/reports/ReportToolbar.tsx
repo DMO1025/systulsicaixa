@@ -95,7 +95,6 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     const sortedPeriodOptions = React.useMemo(() => {
         const specialPeriods = [
             { id: 'roomService', label: 'Room Service', icon: BedDouble },
-            { id: 'frigobar', label: 'Frigobar', icon: Refrigerator },
             { id: 'consumoInterno', label: 'Consumo Interno', icon: FileCheck2 },
             { id: 'faturado', label: 'Faturado', icon: Wallet },
         ];
