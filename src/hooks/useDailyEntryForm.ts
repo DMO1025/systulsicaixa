@@ -37,6 +37,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
+  const lastSavedDataRef = useRef<DailyEntryFormData | null>(null);
 
   const form = useForm<DailyEntryFormData>({
     resolver: zodResolver(dailyEntryFormSchema),
@@ -96,6 +97,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
       toast({ title: "Erro ao Carregar Lançamento", description: (error as Error).message, variant: "destructive" });
     } finally {
       form.reset(dataToResetWith);
+      lastSavedDataRef.current = dataToResetWith;
       setIsDataLoading(false);
     }
   }, [form, toast]);
@@ -134,8 +136,10 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
       setAutoSaveStatus('saving');
       
       saveDailyEntry(dateToSave, data).then(savedEntry => {
+          const savedDateStr = format(dateToSave, 'dd/MM/yyyy');
           setLastSaved(new Date());
           setAutoSaveStatus('success');
+          toast({ title: "Salvo com sucesso!", description: `Dados para ${savedDateStr} salvos.` });
           
           if (!datesWithEntries.some(d => format(d, 'yyyy-MM-dd') === format(dateToSave, 'yyyy-MM-dd'))) {
               setDatesWithEntries(prev => [...prev, dateToSave]);
@@ -160,7 +164,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
           setAutoSaveStatus('saving');
           debounceTimer.current = setTimeout(() => {
               triggerAutoSave(value as DailyEntryFormData);
-          }, 1000); 
+          }, 1500);
       });
       return () => {
           subscription.unsubscribe();
