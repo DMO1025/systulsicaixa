@@ -97,6 +97,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
             { id: 'roomService', label: 'Room Service', icon: BedDouble },
             { id: 'consumoInterno', label: 'Consumo Interno', icon: FileCheck2 },
             { id: 'faturado', label: 'Faturado', icon: Wallet },
+            { id: 'frigobar', label: 'Frigobar', icon: Refrigerator },
         ];
         
         const regularPeriods = visiblePeriodDefinitions
@@ -142,7 +143,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
                     
-                    {(filterType === 'range') && (
+                    {(filterType === 'range' || filterType.startsWith('controle-cafe')) && (
                        <div className="space-y-2">
                          <Label htmlFor="date-range">Intervalo de Datas</Label>
                             <Popover>
@@ -180,7 +181,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                        </div>
                     )}
 
-                    {(filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) && (
+                    {(filterType === 'month' || filterType === 'period' || filterType.startsWith('client-')) && (
                         <div className="flex gap-4">
                             <div className="space-y-2 flex-1">
                                 <Label htmlFor="month-picker">Mês</Label>
@@ -283,9 +284,8 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                     <SelectValue placeholder="Selecione a empresa" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">Padrão (Avalon)</SelectItem>
-                                    <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
                                     <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
+                                    <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
                                     <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
                                 </SelectContent>
                             </Select>

@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useMemo } from 'react';
@@ -25,42 +24,39 @@ const NoShowClientList: React.FC<NoShowClientListProps> = ({ entries, unitPrices
     
     const mesSelecionado = entries.length > 0 ? getMonth(parseISO(String(entries[0].id))) : new Date().getMonth();
     const anoSelecionado = entries.length > 0 ? getYear(parseISO(String(entries[0].id))) : new Date().getFullYear();
-    const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
-    const mesDoProximoMes = getMonth(proximoMes);
-    const anoDoProximoMes = getYear(proximoMes);
     
     const isNoShowReport = type === 'controle-cafe-no-show';
 
     const dezenas = useMemo(() => {
-        const primeiraDezenaEntries = entries.filter(e => {
-            const dia = getDate(parseISO(String(e.id)));
-            return isNoShowReport ? (dia >= 1 && dia <= 10) : (dia >= 2 && dia <= 11);
-        });
+        const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
+        const mesDoProximoMes = getMonth(proximoMes);
+        const anoDoProximoMes = getYear(proximoMes);
 
-        const segundaDezenaEntries = entries.filter(e => {
-            const dia = getDate(parseISO(String(e.id)));
-             return isNoShowReport ? (dia >= 11 && dia <= 20) : (dia >= 12 && dia <= 21);
-        });
-
-        const terceiraDezenaEntries = entries.filter(e => {
-            const dataLancamento = parseISO(String(e.id));
-            const mesLancamento = getMonth(dataLancamento);
-            const anoLancamento = getYear(dataLancamento);
+        const filterByDezena = (entry: DailyLogEntry, dezena: string) => {
+            const dataLancamento = parseISO(String(entry.id));
             const dia = getDate(dataLancamento);
+            const mes = getMonth(dataLancamento);
+            const ano = getYear(dataLancamento);
             
-            if (isNoShowReport) {
-                return dia >= 21;
-            }
-
-            if (mesLancamento === mesSelecionado && anoLancamento === anoSelecionado && dia >= 22) {
-                return true;
-            }
-            if (mesLancamento === mesDoProximoMes && anoLancamento === anoDoProximoMes && dia === 1) {
-                return true;
+             if (isNoShowReport) {
+                if (dezena === '1') return dia >= 1 && dia <= 10;
+                if (dezena === '2') return dia >= 11 && dia <= 20;
+                if (dezena === '3') return dia >= 21;
+            } else { // Controle Café (dia 2 a dia 1 do proximo mes)
+                if (dezena === '1') return dia >= 2 && dia <= 11;
+                if (dezena === '2') return dia >= 12 && dia <= 21;
+                if (dezena === '3') {
+                    if (mes === mesSelecionado && ano === anoSelecionado && dia >= 22) return true;
+                    if (mes === mesDoProximoMes && ano === anoDoProximoMes && dia === 1) return true;
+                }
             }
             return false;
-        });
+        };
         
+        const primeiraDezenaEntries = entries.filter(e => filterByDezena(e, '1'));
+        const segundaDezenaEntries = entries.filter(e => filterByDezena(e, '2'));
+        const terceiraDezenaEntries = entries.filter(e => filterByDezena(e, '3'));
+
         const calculateNoShowTotals = (dezenaEntries: DailyLogEntry[]) => {
             const allItems = dezenaEntries.flatMap(entry => (entry.cafeManhaNoShow as any)?.items || []);
             const valorTotal = allItems.reduce((sum: number, item: CafeManhaNoShowItem) => sum + (item.valor || 0), 0);
@@ -99,7 +95,7 @@ const NoShowClientList: React.FC<NoShowClientListProps> = ({ entries, unitPrices
             terceira: calculateTotals(terceiraDezenaEntries),
         };
 
-    }, [entries, unitPrices, type, mesSelecionado, anoSelecionado, proximoMes, anoDoProximoMes, isNoShowReport]);
+    }, [entries, unitPrices, type, mesSelecionado, anoSelecionado, isNoShowReport]);
 
     const totalGeral = {
       pessoas: dezenas.primeira.pessoas + dezenas.segunda.pessoas + dezenas.terceira.pessoas,
@@ -166,6 +162,3 @@ const NoShowClientList: React.FC<NoShowClientListProps> = ({ entries, unitPrices
 };
 
 export default NoShowClientList;
-
-
-

@@ -1,8 +1,9 @@
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO, getDate, getMonth, getYear, addMonths, lastDayOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import type { ExportParams, ControleCafeItem, ChannelUnitPricesConfig } from '../types';
+import type { ExportParams, ControleCafeItem, ChannelUnitPricesConfig, DailyLogEntry, CafeManhaNoShowItem } from '../types';
 import { getControleCafeItems } from '../exportUtils';
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -32,15 +33,14 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
 
     if (companyName === 'Rubi Restaurante e Eventos Ltda') {
         autoTable(doc, {
-            body: [
-                ['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'],
-                ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],
-            ],
-            startY: finalY,
-            theme: 'plain',
-            styles: { fontSize: 8, cellPadding: 1 },
+            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
         });
-        finalY = (doc as any).lastAutoTable.finalY;
+    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+         autoTable(doc, {
+            body: [['FAVORECIDO: AVALON RESTAURANTE E EVENTOS LTDA',  'BANCO: BRADESCO (237)'], ['CNPJ: 08.439.825/0001-19', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+        });
     }
     
     doc.setFontSize(8);
@@ -49,40 +49,37 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
     }
     doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
     
-    return finalY;
+    return (doc as any).lastAutoTable.finalY || finalY;
 };
 
 export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) => {
-    const { entries, month, selectedDezena, companyName, unitPrices } = params;
+    const { entries, range, selectedDezena, companyName, unitPrices } = params;
 
     const cafePrice = unitPrices?.cdmListaHospedes || 0;
-    const monthStart = month ? new Date(month.getFullYear(), month.getMonth(), 1) : new Date();
-    const dateRangeStr = format(monthStart, "MMMM 'de' yyyy", { locale: ptBR });
+    const dateRangeStr = range?.from 
+      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
+      : "Período não definido";
     const title = 'Relatório de Controle - Café da Manhã';
     
-    const mesSelecionado = getMonth(monthStart);
-    const anoSelecionado = getYear(monthStart);
+    const mesSelecionado = range?.from ? getMonth(range.from) : new Date().getMonth();
+    const anoSelecionado = range?.from ? getYear(range.from) : new Date().getFullYear();
     
     const allItemsForMonth = getControleCafeItems(entries, 'controle') as (Partial<ControleCafeItem> & {entryDate: string})[];
 
     const filterByDezena = (itemDateStr: string, dezena: string) => {
         const itemDate = parseISO(itemDateStr.split('/').reverse().join('-'));
         const dia = getDate(itemDate);
+        const mes = getMonth(itemDate);
+        const ano = getYear(itemDate);
         const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
         const mesDoProximoMes = getMonth(proximoMes);
         const anoDoProximoMes = getYear(proximoMes);
-        const mesLancamento = getMonth(itemDate);
-        const anoLancamento = getYear(itemDate);
         
         if (dezena === '1') return dia >= 2 && dia <= 11;
         if (dezena === '2') return dia >= 12 && dia <= 21;
         if (dezena === '3') {
-            if (mesLancamento === mesSelecionado && anoLancamento === anoSelecionado && dia >= 22) {
-                return true;
-            }
-            if (mesLancamento === mesDoProximoMes && anoLancamento === anoDoProximoMes && dia === 1) {
-                return true;
-            }
+            if (mes === mesSelecionado && ano === anoSelecionado && dia >= 22) return true;
+            if (mes === mesDoProximoMes && ano === anoDoProximoMes && dia === 1) return true;
         }
         return false;
     };
@@ -155,6 +152,7 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
                 ['Total Crianças', formatQty(totalCriancas)],
                 ['Total Contagem Manual', formatQty(dezenaTotals.contagemManual)],
                 ['Total Sem Check-in', formatQty(dezenaTotals.semCheckIn)],
+                [{ content: 'Total de Pessoas', styles: { fontStyle: 'bold' } }, { content: formatQty(dezenaTotals.totalGeral), styles: { fontStyle: 'bold' } }],
                 [{ content: 'Valor Total (R$)', styles: { fontStyle: 'bold' } }, { content: formatCurrency(dezenaTotals.totalValor), styles: { fontStyle: 'bold' } }],
             ],
             startY: (doc as any).lastAutoTable.finalY + 15,

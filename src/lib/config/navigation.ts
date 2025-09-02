@@ -54,10 +54,6 @@ export const ADMIN_SETTINGS_PATHS = {
 } as const;
 
 export const REPORTS_PATHS = {
-  MONTH: `${PATHS.REPORTS_BASE}/month`,
-  DATE: `${PATHS.REPORTS_BASE}/date`,
-  RANGE: `${PATHS.REPORTS_BASE}/range`,
-  PERIOD: `${PATHS.REPORTS_BASE}/period`,
   CLIENT_EXTRACT: `${PATHS.REPORTS_BASE}/client-extract`,
   CLIENT_SUMMARY: `${PATHS.REPORTS_BASE}/client-summary`,
   CONTROLE_CAFE: `${PATHS.REPORTS_BASE}/controle-cafe`,
@@ -77,7 +73,7 @@ export const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
 export const PAGE_ID_TO_PATH: Record<PageId, string> = {
     dashboard: PATHS.DASHBOARD,
     entry: PATHS.ENTRY_BASE,
-    reports: REPORTS_PATHS.MONTH,
+    reports: REPORTS_PATHS.CLIENT_EXTRACT, // Default to client extract now
     controls: PATHS.CONTROLS_BASE,
 };
 
@@ -116,15 +112,6 @@ export const ADMIN_SETTINGS_GROUPS = [
 ];
 
 export const REPORTS_GROUPS = [
-  {
-    title: 'Relatórios de Vendas',
-    items: [
-      { id: 'month', title: 'Geral (Mês Inteiro)', href: REPORTS_PATHS.MONTH, icon: BarChartBig },
-      { id: 'date', title: 'Por Data Específica', href: REPORTS_PATHS.DATE, icon: CalendarDays },
-      { id: 'range', title: 'Por Intervalo de Datas', href: REPORTS_PATHS.RANGE, icon: CalendarRange },
-      { id: 'period', title: 'Por Período (no Mês)', href: REPORTS_PATHS.PERIOD, icon: ListFilter },
-    ]
-  },
   {
     title: 'Relatórios de Pessoas',
     items: [

@@ -1,4 +1,5 @@
 
+
 import type { jsPDF as jsPDFType } from 'jspdf';
 import { format } from 'date-fns';
 import { getFilename } from '../exportUtils';
@@ -27,7 +28,9 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     let dateRangeFilenameStr = '';
     
     if (filterType.startsWith('controle-cafe')) {
-        dateRangeFilenameStr = month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
+        dateRangeFilenameStr = range?.from 
+            ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
+            : 'periodo_indefinido';
     } else if (filterType === 'date' && date) {
         dateRangeFilenameStr = format(date, 'yyyy-MM-dd');
     } else if (filterType === 'range' && range?.from) {

@@ -1,20 +1,18 @@
 
-
 "use client";
 
 import React, { useMemo } from 'react';
-import type { DailyLogEntry, CafeManhaNoShowItem, ControleCafeItem, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyLogEntry, CafeManhaNoShowItem, ControleCafeItem } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { format, parseISO, getDate, getMonth, getYear, lastDayOfMonth, addMonths } from 'date-fns';
+import { format, parseISO, getDate, getMonth, getYear, addMonths } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ControleCafeReportViewProps {
   entries: DailyLogEntry[];
   type: 'no-show' | 'controle';
-  unitPrices: ChannelUnitPricesConfig;
 }
 
-const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries, type, unitPrices }) => {
+const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries, type }) => {
 
     const formatCurrency = (value?: number) => {
         return (value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -28,7 +26,8 @@ const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries
           entryMap.set(entry.id, entry);
         }
       }
-      return Array.from(entryMap.values()).sort((a,b) => a.id.localeCompare(b.id));
+      // Sort by ID (which is YYYY-MM-DD) to ensure chronological order.
+      return Array.from(entryMap.values()).sort((a, b) => a.id.localeCompare(b.id));
     }, [entries]);
 
 
@@ -37,55 +36,44 @@ const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries
             return [];
         }
         
-        const mesSelecionado = getMonth(parseISO(String(consolidatedEntries[0].id)));
-        const anoSelecionado = getYear(parseISO(String(consolidatedEntries[0].id)));
-        const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
-        const mesDoProximoMes = getMonth(proximoMes);
-        const anoDoProximoMes = getYear(proximoMes);
+        const firstEntryDate = parseISO(String(consolidatedEntries[0].id));
+        const mesSelecionado = getMonth(firstEntryDate);
+        const anoSelecionado = getYear(firstEntryDate);
         
         const isNoShowReport = type === 'no-show';
 
-        const primeiraDezenaEntries = consolidatedEntries.filter(e => {
-            const dataLancamento = parseISO(String(e.id));
+        const filterByDezena = (entry: DailyLogEntry, dezena: string) => {
+            const dataLancamento = parseISO(String(entry.id));
             const dia = getDate(dataLancamento);
-            return isNoShowReport ? (dia >= 1 && dia <= 10) : (dia >= 2 && dia <= 11);
-        });
-
-        const segundaDezenaEntries = consolidatedEntries.filter(e => {
-            const dataLancamento = parseISO(String(e.id));
-            const dia = getDate(dataLancamento);
-             return isNoShowReport ? (dia >= 11 && dia <= 20) : (dia >= 12 && dia <= 21);
-        });
-
-        const terceiraDezenaEntries = consolidatedEntries.filter(e => {
-            const dataLancamento = parseISO(String(e.id));
-            const mesLancamento = getMonth(dataLancamento);
-            const anoLancamento = getYear(dataLancamento);
-            const dia = getDate(dataLancamento);
-
+            const mes = getMonth(dataLancamento);
+            const ano = getYear(dataLancamento);
+            const proximoMes = addMonths(new Date(anoSelecionado, mesSelecionado, 1), 1);
+            const mesDoProximoMes = getMonth(proximoMes);
+            const anoDoProximoMes = getYear(proximoMes);
+            
             if (isNoShowReport) {
-                return dia >= 21;
-            }
-
-            if (mesLancamento === mesSelecionado && anoLancamento === anoSelecionado && dia >= 22) {
-                return true;
-            }
-            if (mesLancamento === mesDoProximoMes && anoLancamento === anoDoProximoMes && dia === 1) {
-                return true;
+                if (dezena === '1') return dia >= 1 && dia <= 10;
+                if (dezena === '2') return dia >= 11 && dia <= 20;
+                if (dezena === '3') return dia >= 21;
+            } else { // Controle Café (dia 2 a dia 1 do proximo mes)
+                if (dezena === '1') return dia >= 2 && dia <= 11;
+                if (dezena === '2') return dia >= 12 && dia <= 21;
+                if (dezena === '3') {
+                    if (mes === mesSelecionado && ano === anoSelecionado && dia >= 22) return true;
+                    if (mes === mesDoProximoMes && ano === anoDoProximoMes && dia === 1) return true;
+                }
             }
             return false;
-        });
+        };
+
 
         return [
-            { label: '1ª Dezena', entries: primeiraDezenaEntries },
-            { label: '2ª Dezena', entries: segundaDezenaEntries },
-            { label: '3ª Dezena', entries: terceiraDezenaEntries },
+            { label: '1ª Dezena', entries: consolidatedEntries.filter(e => filterByDezena(e, '1')) },
+            { label: '2ª Dezena', entries: consolidatedEntries.filter(e => filterByDezena(e, '2')) },
+            { label: '3ª Dezena', entries: consolidatedEntries.filter(e => filterByDezena(e, '3')) },
         ];
     }, [consolidatedEntries, type]);
     
-    const cafeNoShowPrice = unitPrices?.cdmNoShow || 0;
-    const cafePrice = unitPrices?.cdmListaHospedes || 0;
-
     const getControleCafeItems = (entries: DailyLogEntry[], type: 'no-show' | 'controle'): (CafeManhaNoShowItem & { entryDate: string })[] | (Partial<ControleCafeItem> & { entryDate: string })[] => {
         if (type === 'no-show') {
           const items: (CafeManhaNoShowItem & { entryDate: string })[] = [];
@@ -101,11 +89,9 @@ const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries
               }
           });
           return items.sort((a, b) => {
-            const dateA = a.data ? parseISO(String(a.data)) : new Date(0);
-            const dateB = b.data ? parseISO(String(b.data)) : new Date(0);
-            if (dateA.getTime() !== dateB.getTime()) {
-                return dateA.getTime() - dateB.getTime();
-            }
+            const dateA = a.data ? (a.data instanceof Date ? a.data : parseISO(String(a.data))) : new Date(0);
+            const dateB = b.data ? (b.data instanceof Date ? b.data : parseISO(String(b.data))) : new Date(0);
+            if (dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
             return (a.horario || "").localeCompare(b.horario || "");
           });
         } else {
@@ -119,7 +105,7 @@ const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries
                     });
                 }
             });
-            return items.sort((a,b) => a.entryDate.localeCompare(b.entryDate));
+            return items.sort((a,b) => parseISO(a.entryDate.split('/').reverse().join('-')).getTime() - parseISO(b.entryDate.split('/').reverse().join('-')).getTime());
         }
     };
 
@@ -195,8 +181,10 @@ const ControleCafeReportView: React.FC<ControleCafeReportViewProps> = ({ entries
             </div>
         );
     }
-
+    
     return null;
 };
 
 export default ControleCafeReportView;
+
+    

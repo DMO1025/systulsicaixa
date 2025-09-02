@@ -24,17 +24,16 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
     doc.text(dateStr, 40, finalY);
     finalY += 13;
     
-    if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+     if (companyName === 'Rubi Restaurante e Eventos Ltda') {
         autoTable(doc, {
-            body: [
-                ['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'],
-                ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],
-            ],
-            startY: finalY,
-            theme: 'plain',
-            styles: { fontSize: 8, cellPadding: 1 },
+            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
         });
-        finalY = (doc as any).lastAutoTable.finalY;
+    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+        autoTable(doc, {
+            body: [['FAVORECIDO: AVALON RESTAURANTE E EVENTOS LTDA',  'BANCO: BRADESCO (237)'], ['CNPJ: 08.439.825/0001-19', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+        });
     }
     
     doc.setFontSize(8);
@@ -43,14 +42,16 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
     }
     doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
     
-    return finalY;
+    return (doc as any).lastAutoTable.finalY || finalY;
 };
 
 export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
-    const { entries, month, selectedDezena, companyName } = params;
+    const { entries, range, selectedDezena, companyName } = params;
 
-    const monthStart = month ? new Date(month.getFullYear(), month.getMonth(), 1) : new Date();
-    const dateRangeStr = format(monthStart, "MMMM 'de' yyyy", { locale: ptBR });
+    const dateRangeStr = range?.from 
+      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
+      : "Período não definido";
+      
     const title = 'Relatório de No-Show - Café da Manhã';
     
     const allItemsForMonth = getControleCafeItems(entries, 'no-show') as (CafeManhaNoShowItem & {entryDate: string})[];
@@ -103,11 +104,11 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
             columnStyles: {
                 0: { cellWidth: 55 }, 
                 1: { cellWidth: 40 },
-                2: { cellWidth: 'auto' }, 
+                2: { cellWidth: 120 }, // Hóspede
                 3: { cellWidth: 30 }, 
-                4: { cellWidth: 45 },
+                4: { cellWidth: 65 }, // Reserva - increased
                 5: { cellWidth: 50, halign: 'right' },
-                6: { cellWidth: 'auto' }, 
+                6: { cellWidth: 'auto' }, // Obs
             }
         });
 
@@ -115,7 +116,7 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
         autoTable(doc, {
             body: [
                 [{ content: 'RESUMO NO-SHOW', colSpan: 2, styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }],
-                ['Total de Itens', dezenaTotals.items.toLocaleString('pt-BR')],
+                ['Total de Pessoas/Itens', dezenaTotals.items.toLocaleString('pt-BR')],
                 ['Valor Total', formatCurrency(dezenaTotals.valor)],
             ],
             startY: (doc as any).lastAutoTable.finalY + 15,

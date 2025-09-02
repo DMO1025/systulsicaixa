@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { generatePdf } from './pdf/pdfGenerator';
@@ -58,7 +59,7 @@ export const getControleCafeItems = (entries: DailyLogEntry[], type: 'no-show' |
                 });
             }
         });
-        return items.sort((a,b) => a.entryDate.localeCompare(b.entryDate));
+        return items.sort((a,b) => parseISO(a.entryDate.split('/').reverse().join('-')).getTime() - parseISO(b.entryDate.split('/').reverse().join('-')).getTime());
     }
 };
 

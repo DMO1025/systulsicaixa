@@ -61,18 +61,18 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
             doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, finalY);
             finalY += 13;
             
-            if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+             if (companyName === 'Rubi Restaurante e Eventos Ltda') {
                 autoTable(doc, {
-                    body: [
-                        ['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'],
-                        ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],
-                    ],
-                    startY: finalY,
-                    theme: 'plain',
-                    styles: { fontSize: 8, cellPadding: 1 },
+                    body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+                });
+            } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+                 autoTable(doc, {
+                    body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
                 });
             }
-            
+
             doc.setFontSize(8);
             const pageCount = doc.internal.pages.length - 1;
             doc.text(`Página ${data.pageNumber} de ${pageCount}`, doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 20);

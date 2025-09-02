@@ -18,7 +18,7 @@ import { PERIOD_FORM_CONFIG } from '@/lib/config/forms';
 import { dailyEntryFormSchema, initialDefaultValuesForAllPeriods } from '@/lib/form-schema';
 import { getSafeNumericValue } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { isEqual } from 'lodash';
+
 
 export function useDailyEntryForm(activePeriodId: PeriodId) {
   const { userRole, operatorShift } = useAuth();
@@ -37,7 +37,6 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
-  const lastSavedDataRef = useRef<DailyEntryFormData | null>(null);
 
   const form = useForm<DailyEntryFormData>({
     resolver: zodResolver(dailyEntryFormSchema),
@@ -97,7 +96,6 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
       toast({ title: "Erro ao Carregar Lançamento", description: (error as Error).message, variant: "destructive" });
     } finally {
       form.reset(dataToResetWith);
-      lastSavedDataRef.current = dataToResetWith;
       setIsDataLoading(false);
     }
   }, [form, toast]);
@@ -136,18 +134,10 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
       setAutoSaveStatus('saving');
       
       saveDailyEntry(dateToSave, data).then(savedEntry => {
-          const savedDateStr = format(dateToSave, 'dd/MM/yyyy');
           setLastSaved(new Date());
           setAutoSaveStatus('success');
-          lastSavedDataRef.current = data; // Update last saved data
           
-          toast({
-            title: "Sucesso!",
-            description: `Lançamento para ${savedDateStr} salvo.`,
-          });
-
-          const dateStr = format(dateToSave, 'yyyy-MM-dd');
-          if (!datesWithEntries.some(d => format(d, 'yyyy-MM-dd') === dateStr)) {
+          if (!datesWithEntries.some(d => format(d, 'yyyy-MM-dd') === format(dateToSave, 'yyyy-MM-dd'))) {
               setDatesWithEntries(prev => [...prev, dateToSave]);
           }
       }).catch(error => {
@@ -170,7 +160,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
           setAutoSaveStatus('saving');
           debounceTimer.current = setTimeout(() => {
               triggerAutoSave(value as DailyEntryFormData);
-          }, 1500);
+          }, 1000); 
       });
       return () => {
           subscription.unsubscribe();

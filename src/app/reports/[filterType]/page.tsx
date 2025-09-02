@@ -57,7 +57,7 @@ export default function ReportsPage() {
   const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
   const [consumptionType, setConsumptionType] = useState('all');
   const [selectedClient, setSelectedClient] = useState('all');
-  const [companyName, setCompanyName] = useState('');
+  const [companyName, setCompanyName] = useState('Avalon Restaurante e Eventos Ltda');
   const [selectedDezena, setSelectedDezena] = useState('all');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -104,10 +104,10 @@ export default function ReportsPage() {
 
         if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
             startDateStr = endDateStr = format(selectedDate, 'yyyy-MM-dd');
-        } else if (filterType === 'range' && selectedRange?.from && isValid(selectedRange.from)) {
+        } else if ((filterType === 'range' || filterType.startsWith('controle-cafe')) && selectedRange?.from && isValid(selectedRange.from)) {
             startDateStr = format(selectedRange.from, 'yyyy-MM-dd');
             endDateStr = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : startDateStr;
-        } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('controle-cafe') || filterType.startsWith('client-')) {
+        } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('client-')) {
             if (isValid(selectedMonth)) {
                 startDateStr = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
                 endDateStr = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
@@ -313,11 +313,11 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'controle-cafe-no-show') {
-      return <ControleCafeReportView entries={filteredEntries} type="no-show" unitPrices={unitPricesConfig} />;
+      return <ControleCafeReportView entries={filteredEntries} type="no-show" />;
     }
     
     if (filterType === 'controle-cafe') {
-      return <ControleCafeReportView entries={filteredEntries} type="controle" unitPrices={unitPricesConfig} />;
+      return <ControleCafeReportView entries={filteredEntries} type="controle" />;
     }
 
     if (filterType === 'client-extract') {

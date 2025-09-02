@@ -2,23 +2,29 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
-import { Users, User, UserCheck, Loader2, Save } from 'lucide-react';
-import type { DailyEntryFormData, DailyLogEntry, ControleCafeItem, ChannelUnitPricesConfig } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarIcon, PlusCircle, Trash2, History, Loader2, Save } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import type { DailyEntryFormData, CafeManhaNoShowItem, DailyLogEntry, ChannelUnitPricesConfig } from '@/lib/types';
 import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
 import type { PeriodId } from '@/lib/config/periods';
 import { type IndividualPeriodConfig as PeriodConfig } from '@/lib/config/forms';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isValid, getDate, getMonth, getYear, addMonths, setDate } from 'date-fns';
-import { getAllDailyEntries, saveDailyEntry } from '@/services/dailyEntryService';
-import { getSetting } from '@/services/settingsService';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { v4 as uuidv4 } from 'uuid';
+import { format, startOfMonth, endOfMonth, isValid, parseISO, getDate, getMonth, getYear, addMonths, setDate, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { Table, TableBody, TableCell, TableRow, TableFooter, TableHead, TableHeader } from "@/components/ui/table";
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import ControleCafeFiscalSummary from '../reports/controle-cafe/ControleCafeFiscalSummary';
 import { cn } from '@/lib/utils';
+import { getAllDailyEntries, getDailyEntry, saveDailyEntry } from '@/services/dailyEntryService';
+import { Calendar } from '@/components/ui/calendar';
+import { useToast } from '@/hooks/use-toast';
+import { getSetting } from '@/services/settingsService';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import type { ControleCafeItem } from '@/lib/types';
+import ControleCafeFiscalSummary from '@/components/reports/controle-cafe/ControleCafeFiscalSummary';
 
 
 export interface PeriodFormProps {
