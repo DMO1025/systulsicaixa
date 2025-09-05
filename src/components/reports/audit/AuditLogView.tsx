@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import type { AuditLog } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,19 @@ interface AuditLogViewProps {
 }
 
 const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
+  
+  const formatTimestamp = (timestamp: string | Date) => {
+    try {
+      const date = typeof timestamp === 'string' ? parseISO(timestamp) : timestamp;
+      if (isValid(date)) {
+        return format(date, "dd/MM/yyyy HH:mm:ss", { locale: ptBR });
+      }
+      return "Data inválida";
+    } catch (e) {
+      return "Data inválida";
+    }
+  };
+
   return (
     <Card>
       <CardContent>
@@ -28,7 +41,7 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
             {logs.length > 0 ? logs.map((log) => (
               <TableRow key={log.id}>
                 <TableCell className="text-sm font-medium">
-                  {format(parseISO(String(log.timestamp)), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                  {formatTimestamp(log.timestamp)}
                 </TableCell>
                 <TableCell className="text-sm">{log.username}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{log.action}</TableCell>

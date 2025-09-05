@@ -9,35 +9,44 @@ const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).t
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams, dateRangeStr: string) => {
-    const { reportData, companyName } = params;
+    const { reportData, companyName, includeCompanyData } = params;
     if (reportData?.type !== 'period') return;
     const data = reportData.data;
     
     let finalY = 30;
-    
-    doc.setFontSize(14);
-    doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-    finalY += 15;
-    doc.setFontSize(10);
-    doc.text(`Relatório Por Período: ${data.reportTitle}`, 40, finalY);
-    finalY += 13;
-    doc.setFontSize(9);
-    doc.text(dateRangeStr, 40, finalY);
-    finalY += 13;
 
-     if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
-    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-         autoTable(doc, {
-            body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
+    if (includeCompanyData) {
+        doc.setFontSize(14);
+        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+        finalY += 15;
+        doc.setFontSize(10);
+        doc.text(`Relatório Por Período: ${data.reportTitle}`, 40, finalY);
+        finalY += 13;
+        doc.setFontSize(9);
+        doc.text(dateRangeStr, 40, finalY);
+        finalY += 13;
+
+        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+             autoTable(doc, {
+                body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        }
+        finalY = (doc as any).lastAutoTable.finalY || finalY;
+    } else {
+        doc.setFontSize(12);
+        doc.text(`Relatório Por Período: ${data.reportTitle}`, 40, finalY);
+        finalY += 15;
+        doc.setFontSize(9);
+        doc.text(dateRangeStr, 40, finalY);
+        finalY += 5;
     }
-
-    finalY = (doc as any).lastAutoTable.finalY || finalY;
+    
     finalY += 10;
     
     Object.entries(data.dailyBreakdowns).forEach(([categoryId, items], index) => {
@@ -103,8 +112,8 @@ export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams, dateRa
     const ticketMedio = data.subtotalGeralSemCI.qtd > 0 ? grandTotalSemCI / data.subtotalGeralSemCI.qtd : 0;
     
     const summary = data.summary;
-    const rsTotal = summary['rsMadrugada']?.total || 0 + summary['rsAlmocoPT']?.total || 0 + summary['rsAlmocoST']?.total || 0 + summary['rsJantar']?.total || 0;
-    const rsQtd = summary['rsMadrugada']?.qtd || 0 + summary['rsAlmocoPT']?.qtd || 0 + summary['rsAlmocoST']?.qtd || 0 + summary['rsJantar']?.qtd || 0;
+    const rsTotal = (summary['rsMadrugada']?.total || 0) + (summary['rsAlmocoPT']?.total || 0) + (summary['rsAlmocoST']?.total || 0) + (summary['rsJantar']?.total || 0);
+    const rsQtd = (summary['rsMadrugada']?.qtd || 0) + (summary['rsAlmocoPT']?.qtd || 0) + (summary['rsAlmocoST']?.qtd || 0) + (summary['rsJantar']?.qtd || 0);
     const tmRS = rsQtd > 0 ? rsTotal / rsQtd : 0;
 
     const almocoQtd = (summary['mesa']?.qtd ?? 0) + (summary['hospedes']?.qtd ?? 0); // Simplified for now

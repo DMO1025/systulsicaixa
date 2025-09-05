@@ -16,7 +16,7 @@ import { generateNoShowPdf } from './noShowPdf';
 
 export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { formatType: 'pdf' }) => {
     const { default: jsPDF } = await import('jspdf');
-    const { filterType, date, month, range } = params;
+    const { filterType, date, month, range, includeCompanyData } = params;
 
     const isSalesReport = filterType === 'month' || filterType === 'range' || filterType === 'period';
     const orientation = isSalesReport ? 'landscape' : 'portrait';

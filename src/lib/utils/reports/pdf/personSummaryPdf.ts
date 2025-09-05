@@ -9,7 +9,7 @@ const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).t
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
-    const { entries, consumptionType, range, month, companyName } = params;
+    const { entries, consumptionType, range, month, companyName, includeCompanyData } = params;
 
     const { allTransactions } = extractPersonTransactions(entries, consumptionType || 'all');
     const summary: Record<string, { qtd: number, valor: number }> = {};
@@ -46,32 +46,39 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
         head: [['Pessoa', 'Total de Itens', 'Valor Total']],
         body: body,
         foot: footer,
-        startY: 95,
+        startY: includeCompanyData ? 95 : 40,
         theme: 'striped',
         headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
         footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
         didDrawPage: (data) => {
-            let finalY = 30;
-            doc.setFontSize(14);
-            doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-            finalY += 15;
-            doc.setFontSize(10);
-            doc.text('Resumo de Consumo por Pessoa', 40, finalY);
-            finalY += 13;
-            doc.setFontSize(9);
-            doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, finalY);
-            finalY += 13;
-            
-             if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-                autoTable(doc, {
-                    body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                });
-            } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-                 autoTable(doc, {
-                    body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                });
+            if (includeCompanyData) {
+                let finalY = 30;
+                doc.setFontSize(14);
+                doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+                finalY += 15;
+                doc.setFontSize(10);
+                doc.text('Resumo de Consumo por Pessoa', 40, finalY);
+                finalY += 13;
+                doc.setFontSize(9);
+                doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, finalY);
+                finalY += 13;
+                
+                 if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+                    autoTable(doc, {
+                        body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+                    });
+                } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+                     autoTable(doc, {
+                        body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+                    });
+                }
+            } else {
+                 doc.setFontSize(12);
+                doc.text('Resumo de Consumo por Pessoa', 40, 30);
+                doc.setFontSize(9);
+                doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, 45);
             }
 
             doc.setFontSize(8);

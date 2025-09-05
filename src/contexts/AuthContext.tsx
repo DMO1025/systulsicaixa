@@ -9,9 +9,10 @@ import { PATH_TO_PAGE_ID, PAGE_ID_TO_PATH, PATHS } from '@/lib/config/navigation
 interface AuthContextType {
   isAuthenticated: boolean;
   userRole: UserRole | null;
+  username: string | null;
   operatorShift: OperatorShift | null;
   allowedPages: PageId[] | null;
-  login: (role: UserRole, shift?: OperatorShift, allowedPages?: PageId[]) => void;
+  login: (username: string, role: UserRole, shift?: OperatorShift, allowedPages?: PageId[]) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -49,6 +50,7 @@ function eraseCookie(name: string) {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [operatorShift, setOperatorShift] = useState<OperatorShift | null>(null);
   const [allowedPages, setAllowedPages] = useState<PageId[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,12 +59,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const storedRole = getCookie('userRole') as UserRole | null;
+    const storedUsername = getCookie('username');
     const storedShift = getCookie('operatorShift') as OperatorShift | null;
     const storedPagesJSON = getCookie('allowedPages');
     
-    if (storedRole) {
+    if (storedRole && storedUsername) {
       setIsAuthenticated(true);
       setUserRole(storedRole);
+      setUsername(storedUsername);
       if (storedRole === 'operator' && storedShift) {
         setOperatorShift(storedShift);
       }
@@ -124,10 +128,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isAuthenticated, isLoading, pathname, router, userRole, allowedPages]);
 
-  const login = (role: UserRole, shift?: OperatorShift, pages?: PageId[]) => {
+  const login = (username: string, role: UserRole, shift?: OperatorShift, pages?: PageId[]) => {
     setIsAuthenticated(true);
     setUserRole(role);
+    setUsername(username);
     setCookie('userRole', role, 1);
+    setCookie('username', username, 1);
 
     const pagesToStore = role === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls'] : (pages || []);
     setAllowedPages(pagesToStore);
@@ -149,16 +155,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setIsAuthenticated(false);
     setUserRole(null);
+    setUsername(null);
     setOperatorShift(null);
     setAllowedPages(null);
     eraseCookie('userRole');
+    eraseCookie('username');
     eraseCookie('operatorShift');
     eraseCookie('allowedPages');
     router.push(PATHS.LOGIN);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userRole, operatorShift, login, logout, isLoading, allowedPages }}>
+    <AuthContext.Provider value={{ isAuthenticated, userRole, username, operatorShift, login, logout, isLoading, allowedPages }}>
       {children}
     </AuthContext.Provider>
   );

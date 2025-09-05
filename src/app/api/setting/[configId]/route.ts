@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { configI
   const configValue = requestBody.config as Settings[ValidConfigId];
 
   try {
-    const username = getCookie('username', { cookies }) || 'desconhecido';
+    const username = getCookie('username', { cookies }) || 'sistema';
     await saveSetting(validatedConfigId, configValue);
     
     await logAction(username, 'SAVE_SETTING', `Configuração '${validatedConfigId}' foi salva.`);

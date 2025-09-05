@@ -3,12 +3,13 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import type { ExportParams } from '../types';
+import { getPeriodIcon } from '@/lib/config/periods';
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams, dateRangeStr: string) => {
-    const { reportData, visiblePeriods, companyName } = params;
+    const { reportData, visiblePeriods, companyName, includeCompanyData } = params;
 
     if (reportData?.type !== 'general') return;
     const data = reportData.data;
@@ -30,7 +31,7 @@ export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams, dateR
     const allHeaders = [roomServiceDef, ...reportablePeriods];
     
     const head = [
-        ['Data', ...allHeaders.map(h => h.label), 'Total GERAL', 'Reajuste C.I', 'Total LÍQUIDO']
+        ['Data', ...allHeaders.map(h => h.label), 'TOTAL GERAL', 'REAJUSTE C.I', 'TOTAL LÍQUIDO']
     ];
     
     const body = data.dailyBreakdowns.map(row => {
@@ -73,33 +74,35 @@ export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams, dateR
         head: head,
         body: body,
         foot: footer,
-        startY: 95,
+        startY: includeCompanyData ? 95 : 40,
         theme: 'striped',
         styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', halign: 'center', valign: 'middle' },
         headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
         footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', fontSize: 7, halign: 'center' },
         didDrawPage: (data) => {
-            let finalY = 30;
-            doc.setFontSize(14);
-            doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-            finalY += 15;
-            doc.setFontSize(10);
-            doc.text(`Relatório Geral - ${reportData.data.reportTitle}`, 40, finalY);
-            finalY += 13;
-            doc.setFontSize(9);
-            doc.text(dateRangeStr, 40, finalY);
-            finalY += 13;
-            
-            if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-                autoTable(doc, {
-                    body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                });
-            } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-                 autoTable(doc, {
-                    body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                    startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                });
+            if (includeCompanyData) {
+                let finalY = 30;
+                doc.setFontSize(14);
+                doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+                finalY += 15;
+                doc.setFontSize(10);
+                doc.text(`Relatório Geral - ${reportData.data.reportTitle}`, 40, finalY);
+                finalY += 13;
+                doc.setFontSize(9);
+                doc.text(dateRangeStr, 40, finalY);
+                finalY += 13;
+                
+                if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+                    autoTable(doc, {
+                        body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+                    });
+                } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+                     autoTable(doc, {
+                        body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+                    });
+                }
             }
 
             doc.setFontSize(8);

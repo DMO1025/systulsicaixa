@@ -12,11 +12,14 @@ interface DezenaTotals {
     valor: number;
 }
 
-const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNumber: number, totalPages: number, companyName?: string) => {
+const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNumber: number, totalPages: number, companyName?: string, includeCompanyData?: boolean) => {
     let finalY = 30;
-    doc.setFontSize(14);
-    doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-    finalY += 15;
+    if (includeCompanyData) {
+        doc.setFontSize(14);
+        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+        finalY += 15;
+    }
+    
     doc.setFontSize(10);
     doc.text(title, 40, finalY);
     finalY += 13;
@@ -24,17 +27,21 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
     doc.text(dateStr, 40, finalY);
     finalY += 13;
     
-     if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
-    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['FAVORECIDO: AVALON RESTAURANTE E EVENTOS LTDA',  'BANCO: BRADESCO (237)'], ['CNPJ: 08.439.825/0001-19', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
+    if (includeCompanyData) {
+        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['FAVORECIDO: AVALON RESTAURANTE E EVENTOS LTDA',  'BANCO: BRADESCO (237)'], ['CNPJ: 08.439.825/0001-19', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        }
+        finalY = (doc as any).lastAutoTable.finalY || finalY;
     }
+    
     
     doc.setFontSize(8);
     if (totalPages > 1) {
@@ -42,11 +49,11 @@ const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNum
     }
     doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
     
-    return (doc as any).lastAutoTable.finalY || finalY;
+    return finalY;
 };
 
 export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
-    const { entries, range, selectedDezena, companyName } = params;
+    const { entries, range, selectedDezena, companyName, includeCompanyData } = params;
 
     const dateRangeStr = range?.from 
       ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
@@ -85,7 +92,7 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
         const totalValor = itemsForDezena.reduce((sum, item) => sum + (item.valor || 0), 0);
         const dezenaTotals: DezenaTotals = { items: itemsForDezena.length, valor: totalValor };
 
-        const startY = drawHeaderAndFooter(doc, `${title} - ${dezena}ª Dezena`, dateRangeStr, pageCounter, totalPagesForThisExport, companyName);
+        const startY = drawHeaderAndFooter(doc, `${title} - ${dezena}ª Dezena`, dateRangeStr, pageCounter, totalPagesForThisExport, companyName, includeCompanyData);
 
         const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Obs']];
         const body = itemsForDezena.map(item => [item.entryDate, item.horario || '-', item.hospede || '-', item.uh || '-', item.reserva || '-', formatCurrency(item.valor), item.observation || '-']);

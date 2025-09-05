@@ -15,6 +15,7 @@ export interface ExportParams {
     selectedDezena?: string;
     unitPrices: ChannelUnitPricesConfig;
     toast?: (options: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
+    includeCompanyData: boolean;
 }
 
 // Re-export types needed by generators to avoid circular dependencies

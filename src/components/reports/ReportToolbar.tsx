@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble, Building2 } from "lucide-react";
+import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble, Building2, Building } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
 import type { FilterType, PeriodId, DateRange } from '@/lib/types';
 import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
+import { Switch } from '@/components/ui/switch';
 
 interface ReportToolbarProps {
     filterType: FilterType;
@@ -38,6 +39,8 @@ interface ReportToolbarProps {
     setCompanyName: (value: string) => void;
     selectedDezena?: string;
     setSelectedDezena?: (value: string) => void;
+    includeCompanyData: boolean;
+    setIncludeCompanyData: (value: boolean) => void;
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -61,6 +64,8 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     setCompanyName,
     selectedDezena,
     setSelectedDezena,
+    includeCompanyData,
+    setIncludeCompanyData
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -276,21 +281,27 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
 
-                     {filterType !== 'date' && (
-                        <div className="space-y-2">
-                            <Label htmlFor="companyName" className="flex items-center gap-1.5"><Building2 className="h-4 w-4 text-muted-foreground"/>Empresa</Label>
-                            <Select value={companyName} onValueChange={setCompanyName}>
-                                <SelectTrigger id="companyName" className="w-full">
-                                    <SelectValue placeholder="Selecione a empresa" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
-                                    <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
-                                    <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    <div className="space-y-2">
+                        <Label htmlFor="companyName" className="flex items-center gap-1.5"><Building className="h-4 w-4 text-muted-foreground"/>Empresa</Label>
+                        <Select value={companyName} onValueChange={setCompanyName}>
+                            <SelectTrigger id="companyName" className="w-full">
+                                <SelectValue placeholder="Selecione a empresa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
+                                <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
+                                <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="flex items-end space-y-2 pb-1">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="include-company-data" checked={includeCompanyData} onCheckedChange={setIncludeCompanyData}/>
+                            <Label htmlFor="include-company-data">Incluir Dados da Empresa</Label>
                         </div>
-                    )}
+                    </div>
+
 
                 </div>
                 <div className="pt-4 mt-4 border-t flex items-center justify-end">

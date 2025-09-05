@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
         
         const createdUser = await createUser(newUser);
 
-        const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+        const actorUsername = getCookie('username', { cookies }) || 'sistema';
         await logAction(actorUsername, 'CREATE_USER', `Novo usuário '${createdUser.username}' foi criado.`);
         
         revalidateTag('users');

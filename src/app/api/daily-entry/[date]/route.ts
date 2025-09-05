@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: { date: s
   }
   
   try {
-    const username = getCookie('username', { cookies }) || 'desconhecido';
+    const username = getCookie('username', { cookies }) || 'sistema';
     const existingEntry = await getEntry(entryIdFromUrl);
     const actionType = existingEntry ? 'UPDATE_ENTRY' : 'CREATE_ENTRY';
     

@@ -62,7 +62,7 @@ export default function LoginPage() {
 
     try {
       const { role, shift, allowedPages } = await loginUser(username, password, selectedShift || undefined);
-      login(role, shift, allowedPages);
+      login(username, role, shift, allowedPages);
     } catch (error) {
       toast({
         title: 'Login Falhou',

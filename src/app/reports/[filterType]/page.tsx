@@ -35,6 +35,7 @@ import { TAB_DEFINITIONS } from '@/components/reports/tabDefinitions';
 import NoShowClientList from '@/components/reports/controle-cafe/NoShowClientList';
 import { cn } from '@/lib/utils';
 import { getAuditLogs } from '@/services/auditService';
+import AuditLogView from '@/components/reports/audit/AuditLogView';
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
 import ClientReportSummary from '@/components/reports/person/ClientReportSummary';
 
@@ -60,6 +61,7 @@ export default function ReportsPage() {
   const [companyName, setCompanyName] = useState('Avalon Restaurante e Eventos Ltda');
   const [selectedDezena, setSelectedDezena] = useState('all');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [includeCompanyData, setIncludeCompanyData] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
 
@@ -273,6 +275,7 @@ export default function ReportsPage() {
         selectedDezena,
         unitPrices: unitPricesConfig,
         toast,
+        includeCompanyData,
     });
   };
 
@@ -399,6 +402,8 @@ export default function ReportsPage() {
             setCompanyName={setCompanyName}
             selectedDezena={selectedDezena}
             setSelectedDezena={setSelectedDezena}
+            includeCompanyData={includeCompanyData}
+            setIncludeCompanyData={setIncludeCompanyData}
         />
       )}
 

@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const updatedData: Partial<User> = await request.json();
     const updatedUser = await updateUser(userId, updatedData);
     
-    const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+    const actorUsername = getCookie('username', { cookies }) || 'sistema';
     await logAction(actorUsername, 'UPDATE_USER', `Usuário '${updatedUser.username}' (ID: ${userId}) foi atualizado.`);
 
     revalidateTag('users');
@@ -33,7 +33,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const result = await deleteUser(userId);
     
-    const actorUsername = getCookie('username', { cookies }) || 'desconhecido';
+    const actorUsername = getCookie('username', { cookies }) || 'sistema';
     await logAction(actorUsername, 'DELETE_USER', `Usuário com ID: ${userId} foi removido.`);
 
     revalidateTag('users');

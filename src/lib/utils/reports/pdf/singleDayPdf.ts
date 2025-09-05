@@ -11,11 +11,13 @@ import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } fr
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
 
-const drawHeader = (doc: jsPDF, title: string, companyName?: string) => {
+const drawHeader = (doc: jsPDF, title: string, companyName?: string, includeCompanyData?: boolean) => {
     let finalY = 30;
-    doc.setFontSize(14);
-    doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-    finalY += 15;
+    if (includeCompanyData) {
+        doc.setFontSize(14);
+        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+        finalY += 15;
+    }
     doc.setFontSize(10);
     doc.text(`Relatório Detalhado do Dia`, 40, finalY);
     finalY += 13;
@@ -23,19 +25,21 @@ const drawHeader = (doc: jsPDF, title: string, companyName?: string) => {
     doc.text(title, 40, finalY);
     finalY += 13;
 
-    if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
-    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-         autoTable(doc, {
-            body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
+    if (includeCompanyData) {
+        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+             autoTable(doc, {
+                body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        }
+        return (doc as any).lastAutoTable.finalY || finalY;
     }
-    
-    return (doc as any).lastAutoTable.finalY || finalY;
+    return finalY;
 };
 
 const drawFooter = (doc: jsPDF, companyName?: string) => {
@@ -61,7 +65,7 @@ const renderPeriodDataVertical = (periodData: PeriodData) => {
 
     if (periodData.channels) {
         Object.entries(periodData.channels).forEach(([channelId, values]) => {
-            if (values && (values.qtd || values.vtotal)) {
+            if (values && (values.qtd !== undefined || values.vtotal !== undefined)) {
                  const label = SALES_CHANNELS[channelId as SalesChannelId] || channelId;
                  const parts = [];
                  if(values.qtd) parts.push(`Qtd: ${formatNumber(values.qtd)}`);
@@ -120,11 +124,11 @@ const renderEventosDataVertical = (eventosData: EventosPeriodData) => {
 
 
 export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dateRangeStr: string) => {
-    const { entries, companyName } = params;
+    const { entries, companyName, includeCompanyData } = params;
     if (entries.length === 0) return;
     const entry = entries[0];
     
-    let finalY = drawHeader(doc, dateRangeStr, companyName);
+    let finalY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
     
     const totals = calculateTotals(entry);
     const ticketMedio = totals.grandTotal.semCI.qtd > 0 
@@ -205,7 +209,7 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dat
         const periodData = entry[pDef.id as keyof typeof entry];
         
         doc.addPage();
-        let pageStartY = drawHeader(doc, dateRangeStr, companyName);
+        let pageStartY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
         pageStartY += 15;
 
         autoTable(doc, {
@@ -234,7 +238,7 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dat
 
     if (entry.generalObservations && entry.generalObservations.trim()) {
         doc.addPage();
-        let obsStartY = drawHeader(doc, dateRangeStr, companyName);
+        let obsStartY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
         obsStartY += 15;
         autoTable(doc, {
             head: [['Observações Gerais do Dia']],

@@ -1,7 +1,6 @@
-
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import type { ExportParams } from '../types';
 import { extractPersonTransactions } from '@/lib/reports/person/generator';
 import { getConsumptionTypeLabel } from '../exportUtils';
@@ -9,11 +8,14 @@ import { getConsumptionTypeLabel } from '../exportUtils';
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
-const drawHeaderOnce = (doc: jsPDF, title: string, dateRangeStr: string, companyName?: string) => {
+const drawHeaderOnce = (doc: jsPDF, title: string, dateRangeStr: string, companyName?: string, includeCompanyData?: boolean) => {
     let finalY = 30;
-    doc.setFontSize(14);
-    doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-    finalY += 15;
+    if (includeCompanyData) {
+        doc.setFontSize(14);
+        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
+        finalY += 15;
+    }
+
     doc.setFontSize(10);
     doc.text(title, 40, finalY);
     finalY += 13;
@@ -21,19 +23,21 @@ const drawHeaderOnce = (doc: jsPDF, title: string, dateRangeStr: string, company
     doc.text(dateRangeStr, 40, finalY);
     finalY += 13;
 
-    if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
-    } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-        autoTable(doc, {
-            body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-            startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-        });
+    if (includeCompanyData) {
+        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
+            autoTable(doc, {
+                body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
+                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
+            });
+        }
+        return (doc as any).lastAutoTable.finalY || finalY;
     }
-    
-    return (doc as any).lastAutoTable.finalY || finalY;
+    return finalY;
 };
 
 const drawFooter = (doc: jsPDF) => {
@@ -47,7 +51,7 @@ const drawFooter = (doc: jsPDF) => {
 }
 
 export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
-    const { entries, consumptionType, selectedClient, range, month, companyName } = params;
+    const { entries, consumptionType, selectedClient, range, month, companyName, includeCompanyData } = params;
     
     const { allTransactions } = extractPersonTransactions(entries, consumptionType || 'all');
     
@@ -61,10 +65,14 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
 
     const consumptionLabel = getConsumptionTypeLabel(consumptionType) || 'Todos';
     const clientLabel = isSpecificPersonSelected ? selectedClient : 'Todas as Pessoas';
-    const dateRangeStr = range?.from
-      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
-      : month ? format(month, 'MMMM/yyyy') : '';
-      
+    
+    let dateRangeStr = '';
+    if (month) {
+        dateRangeStr = format(month, "MMMM 'de' yyyy");
+    } else if (range?.from) {
+        dateRangeStr = `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`;
+    }
+
     const head = [['Data', 'Pessoa', 'Origem', 'Observação', 'Valor']];
     const body = transactionsToDisplay.map(t => [t.date, t.personName, t.origin, t.observation, formatCurrency(t.value)]);
     
@@ -77,7 +85,7 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
         { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'right' } }
     ]];
     
-    let startY = drawHeaderOnce(doc, `Extrato Detalhado - ${clientLabel}`, `Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, companyName);
+    let startY = drawHeaderOnce(doc, `Extrato Detalhado - ${clientLabel}`, `Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, companyName, includeCompanyData);
 
     autoTable(doc, {
         head: head,
@@ -100,9 +108,9 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
 
     let summaryStartY = (doc as any).lastAutoTable.finalY + 20;
 
-    // Conditionally render summary blocks
-    if (!isSpecificPersonSelected && !isSpecificConsumptionTypeSelected) {
-        // Only show this block on the most general view
+    const shouldShowFullSummary = !isSpecificPersonSelected && !isSpecificConsumptionTypeSelected;
+
+    if (shouldShowFullSummary) {
         const summaryByType = allTransactions.reduce((acc, t) => {
             let typeKey: 'hotel' | 'funcionario' | 'consumoInterno' | 'outros' = 'outros';
             
@@ -144,7 +152,6 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
         }
     }
     
-    // Summary by Period - shown when a specific person is selected OR a specific consumption type is selected OR all are selected
     const summaryByPeriod = transactionsToDisplay.reduce((acc, t) => {
         let periodKey: 'almoco' | 'jantar' | 'outros' = 'outros';
 
@@ -169,6 +176,11 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
             return acc;
         }, { qtd: 0, valor: 0 });
 
+        if (summaryStartY > doc.internal.pageSize.height - 150) {
+             doc.addPage();
+             summaryStartY = drawHeaderOnce(doc, `Continuação - Extrato Detalhado`, `Período: ${dateRangeStr}`, companyName, includeCompanyData) + 15;
+        }
+
         autoTable(doc, {
             head: [['Resumo por Período', 'Total de Itens', 'Valor Total']],
             body: summaryCategoriesByPeriod.map(cat => [cat.label, formatQty(cat.data.qtd), formatCurrency(cat.data.valor)]),
@@ -184,4 +196,3 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
 
     drawFooter(doc);
 };
-
