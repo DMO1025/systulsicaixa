@@ -368,16 +368,27 @@ export async function GET(request: NextRequest) {
             } else {
                 return NextResponse.json({ message: `Parâmetro 'date' inválido ou ausente. Use AAAA-MM-DD.` }, { status: 400, headers: CORS_HEADERS });
             }
-        } else if (filterType === 'range') {
+        } else if (filterType === 'range' || filterType.startsWith('client-')) {
             startDateStr = searchParams.get('startDate') || undefined;
             endDateStr = searchParams.get('endDate') || undefined;
-            if (!startDateStr || !isValid(parse(startDateStr, 'yyyy-MM-dd', new Date()))) {
+            
+            // Fallback to month if range is not provided for client filters
+            if (filterType.startsWith('client-') && (!startDateStr || !endDateStr)) {
+                 const monthStr = searchParams.get('month'); // YYYY-MM
+                 if (monthStr && isValid(parse(monthStr, 'yyyy-MM', new Date()))) {
+                    const monthDate = startOfMonth(parse(monthStr, 'yyyy-MM', new Date()));
+                    startDateStr = format(monthDate, 'yyyy-MM-dd');
+                    const endOfMonthDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+                    endDateStr = `${monthStr}-${String(endOfMonthDay).padStart(2, '0')}`;
+                 } else {
+                     return NextResponse.json({ message: `Parâmetros 'startDate'/'endDate' ou 'month' são necessários. Use AAAA-MM-DD ou AAAA-MM.` }, { status: 400, headers: CORS_HEADERS });
+                 }
+            } else if (!startDateStr || !isValid(parse(startDateStr, 'yyyy-MM-dd', new Date()))) {
                 return NextResponse.json({ message: `Parâmetro 'startDate' inválido ou ausente. Use AAAA-MM-DD.` }, { status: 400, headers: CORS_HEADERS });
-            }
-             if (endDateStr && !isValid(parse(endDateStr, 'yyyy-MM-dd', new Date()))) {
+            } else if (endDateStr && !isValid(parse(endDateStr, 'yyyy-MM-dd', new Date()))) {
                 return NextResponse.json({ message: `Parâmetro 'endDate' inválido. Use AAAA-MM-DD.` }, { status: 400, headers: CORS_HEADERS });
             }
-        } else { // month, period, client-extract, client-summary
+        } else { // month, period
             const monthStr = searchParams.get('month'); // YYYY-MM
             if (monthStr && isValid(parse(monthStr, 'yyyy-MM', new Date()))) {
                 const monthDate = startOfMonth(parse(monthStr, 'yyyy-MM', new Date()));

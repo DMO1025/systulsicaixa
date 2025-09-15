@@ -277,6 +277,7 @@ export type ReportData = { type: 'period'; data: PeriodReportViewData } | { type
 export type DateRange = ReactDayPickerDateRange;
 
 export interface UnifiedPersonTransaction {
+  id: string; // Unique ID for the transaction item (faturadoItem.id or consumoInternoItem.id)
   personName: string;
   date: string;
   origin: string;

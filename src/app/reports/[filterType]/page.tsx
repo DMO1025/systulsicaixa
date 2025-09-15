@@ -324,7 +324,17 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'client-extract') {
-      return <ClientExtractView entries={filteredEntries} consumptionType={consumptionType} selectedClient={selectedClient} setSelectedClient={setSelectedClient} />
+      const startDate = selectedRange?.from ? format(selectedRange.from, 'yyyy-MM-dd') : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const endDate = selectedRange?.to ? format(selectedRange.to, 'yyyy-MM-dd') : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+
+      return <ClientExtractView 
+                entries={filteredEntries} 
+                consumptionType={consumptionType} 
+                selectedClient={selectedClient} 
+                setSelectedClient={setSelectedClient} 
+                startDate={startDate}
+                endDate={endDate}
+             />
     }
     
     if (filterType === 'client-summary') {

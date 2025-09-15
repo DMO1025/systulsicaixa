@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
@@ -190,7 +190,7 @@ export default function ApiAccessSettingsPage() {
   const [filterType, setFilterType] = useState<FilterType>('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>();
+  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>({ from: startOfMonth(new Date()), to: new Date()});
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all'>('all');
   const [selectedClient, setSelectedClient] = useState('all');
   const [consumptionType, setConsumptionType] = useState('all');
@@ -257,21 +257,21 @@ export default function ApiAccessSettingsPage() {
             if (selectedDate) params.set('date', format(selectedDate, 'yyyy-MM-dd'));
             break;
         case 'range':
+        case 'client-extract':
+        case 'client-summary':
             if (selectedRange?.from) params.set('startDate', format(selectedRange.from, 'yyyy-MM-dd'));
             if (selectedRange?.to) params.set('endDate', format(selectedRange.to, 'yyyy-MM-dd'));
+            if (filterType === 'client-extract' || filterType === 'client-summary') {
+                params.set('consumptionType', consumptionType);
+                if (filterType === 'client-extract' && selectedClient !== 'all') {
+                    params.set('personName', selectedClient);
+                }
+            }
             break;
         case 'month':
         case 'period':
-        case 'client-extract':
-        case 'client-summary':
             params.set('month', format(selectedMonth, 'yyyy-MM'));
             if (filterType === 'period') params.set('periodId', selectedPeriod);
-            if (filterType === 'client-extract' || filterType === 'client-summary') {
-                params.set('consumptionType', consumptionType);
-            }
-            if (filterType === 'client-extract' && selectedClient !== 'all') {
-                params.set('personName', selectedClient);
-            }
             break;
     }
     
@@ -368,7 +368,7 @@ export default function ApiAccessSettingsPage() {
                             </Select>
                         </div>
                         
-                        {(filterType === 'month' || filterType === 'period' || filterType.startsWith('client')) && (
+                        {(filterType === 'month' || filterType === 'period') && (
                              <div className="space-y-1.5">
                                 <Label>Mês/Ano</Label>
                                 <Input type="month" value={format(selectedMonth, 'yyyy-MM')} onChange={(e) => setSelectedMonth(new Date(e.target.value + '-02'))} />
@@ -390,7 +390,7 @@ export default function ApiAccessSettingsPage() {
                             </div>
                         )}
 
-                         {filterType === 'range' && (
+                         {(filterType === 'range' || filterType.startsWith('client')) && (
                              <div className="space-y-1.5">
                                 <Label>Intervalo</Label>
                                 <Popover>
@@ -473,3 +473,5 @@ export default function ApiAccessSettingsPage() {
     </div>
   );
 }
+
+    
