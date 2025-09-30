@@ -18,6 +18,7 @@ import type { PeriodId } from '@/lib/config/periods';
 import { EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS, type EventLocationKey, type IndividualPeriodConfig as PeriodConfig } from '@/lib/config/forms';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
+import { CurrencyInput } from '../ui/currency-input';
 
 // Funções fábrica para objetos padrão
 const createDefaultSubEvent = (): SubEventItem => ({
@@ -292,15 +293,16 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                     <FormLabel className="text-xs flex items-center"><Hash className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Qtd</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        min={0}
+                        type="text"
+                        inputMode="numeric"
                         placeholder="0"
                         {...field}
-                        value={field.value ?? 0}
+                        value={field.value ?? ''}
                         onFocus={(e) => e.target.select()}
                         onChange={e => {
-                            const value = e.target.value;
-                            field.onChange(value === '' ? 0 : parseInt(value, 10));
+                            const rawValue = e.target.value;
+                            const numValue = parseInt(rawValue.replace(/[^0-9]/g, ''), 10);
+                            field.onChange(isNaN(numValue) ? undefined : numValue);
                         }}
                         className="h-8 text-xs"
                       />
@@ -316,20 +318,16 @@ const SubEventArrayComponent: React.FC<SubEventArrayProps> = ({
                     <FormItem className="min-w-[100px]">
                         <FormLabel className="text-xs flex items-center"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>V. Total</FormLabel>
                         <FormControl>
-                        <Input
-                            type="number"
-                            placeholder="0,00"
-                            step="0.01"
-                            min={0}
-                            {...field}
-                            value={field.value ?? 0}
-                            onFocus={(e) => e.target.select()}
-                            onChange={e => {
-                                const value = e.target.value;
-                                field.onChange(value === '' ? 0 : parseFloat(value));
-                            }}
-                            className="h-8 text-xs"
-                        />
+                          <div className="relative">
+                            <CurrencyInput
+                              placeholder="R$ 0,00"
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              onBlur={field.onBlur}
+                              className="h-8 text-xs pl-7"
+                            />
+                            <DollarSign className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                          </div>
                         </FormControl>
                         <FormMessage className="text-xs"/>
                     </FormItem>

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import type { PeriodId, FilterType, DateRange } from '@/lib/types';
@@ -382,10 +382,10 @@ export default function ApiAccessSettingsPage() {
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                            {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ptBR} /></PopoverContent>
                                 </Popover>
                             </div>
                         )}
@@ -397,7 +397,7 @@ export default function ApiAccessSettingsPage() {
                                     <PopoverTrigger asChild>
                                         <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedRange?.from ? (selectedRange.to ? `${format(selectedRange.from, "dd/MM/yy")} - ${format(selectedRange.to, "dd/MM/yy")}` : format(selectedRange.from, "dd/MM/yyyy")) : <span>Escolha um intervalo</span>}
+                                            {selectedRange?.from ? (selectedRange.to ? `${format(selectedRange.from, "dd/MM/yy", { locale: ptBR })} - ${format(selectedRange.to, "dd/MM/yy", { locale: ptBR })}` : format(selectedRange.from, "PPP", { locale: ptBR })) : <span>Escolha um intervalo</span>}
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={selectedRange?.from} selected={selectedRange} onSelect={setSelectedRange} numberOfMonths={2} locale={ptBR}/></PopoverContent>
@@ -473,5 +473,7 @@ export default function ApiAccessSettingsPage() {
     </div>
   );
 }
+
+    
 
     

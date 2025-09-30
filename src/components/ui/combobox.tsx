@@ -39,11 +39,14 @@ export function Combobox({
     setOpen(false);
     setSearchTerm("");
   };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    onChange(term); // Update form value as user types
+  }
 
-  const displayValue =
-    options.find((option) => option.value === value)?.label ||
-    placeholder ||
-    "Selecione...";
+  const displayValue = value || placeholder || "Selecione...";
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -66,8 +69,8 @@ export function Combobox({
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Input
                 placeholder="Selecione ou digite..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchTerm || value}
+                onChange={handleInputChange}
                 className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 autoFocus
             />

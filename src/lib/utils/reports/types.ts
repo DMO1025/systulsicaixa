@@ -1,9 +1,12 @@
-import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, ChannelUnitPricesConfig, CafeManhaNoShowItem, ControleCafeItem } from '@/lib/types';
+
+
+import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, ChannelUnitPricesConfig, CafeManhaNoShowItem, ControleCafeItem, EstornoItem, Company } from '@/lib/types';
 
 export interface ExportParams {
     formatType: 'pdf' | 'excel';
     filterType: FilterType;
     entries: DailyLogEntry[];
+    estornos?: EstornoItem[];
     reportData: ReportData | null;
     date?: Date;
     month?: Date;
@@ -12,11 +15,13 @@ export interface ExportParams {
     selectedClient?: string;
     consumptionType?: string;
     companyName?: string;
+    companies: Company[];
     selectedDezena?: string;
     unitPrices: ChannelUnitPricesConfig;
     toast?: (options: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
     includeCompanyData: boolean;
+    estornoCategory?: string;
 }
 
 // Re-export types needed by generators to avoid circular dependencies
-export type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, PeriodData, CafeManhaNoShowItem, ControleCafeItem, ChannelUnitPricesConfig };
+export type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, GeneralReportViewData, PeriodReportViewData, DailyCategoryDataItem, FaturadoItem, ConsumoInternoItem, PeriodData, CafeManhaNoShowItem, ControleCafeItem, ChannelUnitPricesConfig, EstornoItem, Company };

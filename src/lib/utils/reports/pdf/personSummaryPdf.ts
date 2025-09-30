@@ -1,15 +1,18 @@
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { ExportParams } from '../types';
 import { extractPersonTransactions } from '@/lib/reports/person/generator';
 import { getConsumptionTypeLabel } from '../exportUtils';
+import { drawHeaderAndFooter } from './pdfUtils';
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
-    const { entries, consumptionType, range, month, companyName, includeCompanyData } = params;
+    const { entries, consumptionType, range, month } = params;
 
     const { allTransactions } = extractPersonTransactions(entries, consumptionType || 'all');
     const summary: Record<string, { qtd: number, valor: number }> = {};
@@ -38,53 +41,31 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
     ]];
 
     const consumptionLabel = getConsumptionTypeLabel(consumptionType) || 'Todos';
-    const dateRangeStr = range?.from
-      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
-      : month ? format(month, 'MMMM/yyyy') : '';
+    let dateRangeStr = '';
+    if (month) {
+        dateRangeStr = `Período: ${format(month, "MMMM 'de' yyyy", { locale: ptBR })}`;
+    } else if (range?.from) {
+        dateRangeStr = `Período: ${format(range.from, 'dd/MM/yyyy', { locale: ptBR })} a ${range.to ? format(range.to, 'dd/MM/yyyy', { locale: ptBR }) : format(range.from, 'dd/MM/yyyy', { locale: ptBR })}`;
+    }
+    const finalFilterText = `${dateRangeStr} | Tipo de Consumo: ${consumptionLabel}`;
+    const title = 'Resumo de Consumo por Pessoa';
+    
+    const headerHeight = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
 
     autoTable(doc, {
         head: [['Pessoa', 'Total de Itens', 'Valor Total']],
         body: body,
         foot: footer,
-        startY: includeCompanyData ? 95 : 40,
         theme: 'striped',
+        showFoot: 'lastPage',
         headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
         footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
-        didDrawPage: (data) => {
-            if (includeCompanyData) {
-                let finalY = 30;
-                doc.setFontSize(14);
-                doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-                finalY += 15;
-                doc.setFontSize(10);
-                doc.text('Resumo de Consumo por Pessoa', 40, finalY);
-                finalY += 13;
-                doc.setFontSize(9);
-                doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, finalY);
-                finalY += 13;
-                
-                 if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-                    autoTable(doc, {
-                        body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                    });
-                } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-                     autoTable(doc, {
-                        body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                    });
-                }
-            } else {
-                 doc.setFontSize(12);
-                doc.text('Resumo de Consumo por Pessoa', 40, 30);
-                doc.setFontSize(9);
-                doc.text(`Período: ${dateRangeStr} | Tipo: ${consumptionLabel}`, 40, 45);
-            }
-
-            doc.setFontSize(8);
-            const pageCount = doc.internal.pages.length - 1;
-            doc.text(`Página ${data.pageNumber} de ${pageCount}`, doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 20);
-            doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
+        margin: { top: headerHeight },
+        didDrawPage: (hookData) => {
+           const totalPages = (doc as any).internal.getNumberOfPages();
+           if(totalPages > 1) {
+            drawHeaderAndFooter(doc, title, finalFilterText, params, hookData.pageNumber, totalPages);
+           }
         }
     });
 };

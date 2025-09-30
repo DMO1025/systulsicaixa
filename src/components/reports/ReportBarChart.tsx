@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { GeneralReportDailyItem } from '@/lib/types';
 import { parseISO, format, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 
 interface ReportLineChartProps {
   data: GeneralReportDailyItem[];
@@ -114,3 +114,5 @@ const ReportLineChart: React.FC<ReportLineChartProps> = ({ data, title, descript
 };
 
 export default ReportLineChart;
+
+    

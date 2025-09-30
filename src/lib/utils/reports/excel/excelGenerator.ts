@@ -7,12 +7,16 @@ import { generatePersonExtractExcel } from './personExtractExcel';
 import { generatePersonSummaryExcel } from './personSummaryExcel';
 import { generateControleCafeExcel } from './controleCafeExcel';
 import { generateSingleDayReportExcel } from './singleDayReportExcel';
+import { generateEstornosExcel } from './estornosExcel';
+import { generateControleFrigobarExcel } from './controleFrigobarExcel';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.WorkBook | null> => {
-    const { filterType, entries, reportData, toast } = params;
+    const { filterType, entries, reportData, toast, unitPrices } = params;
     const wb = XLSX.utils.book_new();
 
-    if (entries.length === 0 && filterType !== 'history') {
+    if (entries.length === 0 && filterType !== 'history' && params.estornos?.length === 0) {
         if (toast) toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
         return null;
     }
@@ -55,6 +59,16 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
             generateControleCafeExcel(wb, entries, 'no-show', params.companyName);
             sheetsAdded = true;
             break;
+        case 'estornos':
+            if(params.estornos) {
+                generateEstornosExcel(wb, params.estornos, params.companyName);
+                sheetsAdded = true;
+            }
+            break;
+        case 'controle-frigobar':
+            await generateControleFrigobarExcel(wb, entries, unitPrices, params.companyName);
+            sheetsAdded = true;
+            break;
         default:
             console.warn(`Excel export for filterType "${filterType}" not implemented.`);
             if (toast) toast({ title: "Exportação não disponível", description: `A exportação para Excel para o tipo de relatório "${filterType}" não está implementada.`, variant: "destructive" });
@@ -67,3 +81,5 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
 
     return wb;
 };
+
+    

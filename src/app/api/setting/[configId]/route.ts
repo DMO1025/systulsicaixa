@@ -11,6 +11,7 @@ import { logAction } from '@/services/auditService';
 
 
 const validConfigIds = z.enum([
+  'appName',
   'cardVisibilityConfig', 
   'channelUnitPricesConfig', 
   'mysqlConnectionConfig',
@@ -18,7 +19,9 @@ const validConfigIds = z.enum([
   'summaryCardItemsConfig',
   'billedClients',
   'noShowClients',
-  'apiAccessConfig'
+  'apiAccessConfig',
+  'frigobarItems',
+  'companies',
 ]);
 type ValidConfigId = z.infer<typeof validConfigIds>;
 

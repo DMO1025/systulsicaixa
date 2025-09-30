@@ -1,15 +1,26 @@
 
 "use client";
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from './Header';
+import Breadcrumbs from './Breadcrumbs'; // Import the new component
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { appName, isLoading: configLoading } = useAppConfig();
+
+  useEffect(() => {
+    if(appName) {
+      document.title = appName;
+    }
+  }, [appName]);
+
+  const isLoading = authLoading || configLoading;
 
   if (isLoading) {
     return (
@@ -38,6 +49,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background overflow-auto">
+        <Breadcrumbs /> {/* Add Breadcrumbs here */}
         {children}
       </main>
     </div>

@@ -1,5 +1,3 @@
-
-
 import type { jsPDF as jsPDFType } from 'jspdf';
 import { format } from 'date-fns';
 import { getFilename } from '../exportUtils';
@@ -12,11 +10,13 @@ import { generatePersonExtractPdf } from './personExtractPdf';
 import { generatePersonSummaryPdf } from './personSummaryPdf';
 import { generateControleCafePdf } from './controleCafePdf';
 import { generateNoShowPdf } from './noShowPdf';
+import { generateEstornosPdf } from './estornosPdf';
+import { generateControleFrigobarPdf } from './controleFrigobarPdf';
 
 
 export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { formatType: 'pdf' }) => {
     const { default: jsPDF } = await import('jspdf');
-    const { filterType, date, month, range, includeCompanyData } = params;
+    const { filterType, date, month, range, reportData } = params;
 
     const isSalesReport = filterType === 'month' || filterType === 'range' || filterType === 'period';
     const orientation = isSalesReport ? 'landscape' : 'portrait';
@@ -27,7 +27,7 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     const consumptionLabel = params.consumptionType ? params.consumptionType.replace('faturado-', '').replace('ci', 'consumo-interno') : '';
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe')) {
+    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
             : 'periodo_indefinido';
@@ -43,15 +43,18 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     switch (filterType) {
         case 'date':
             filename = getFilename(['Relatorio_Dia', dateRangeFilenameStr], 'pdf');
-            generateSingleDayReportPdf(doc, params, dateRangeFilenameStr);
+            generateSingleDayReportPdf(doc, params);
             break;
         case 'range':
         case 'month':
+             const titleGeneral = reportData?.data.reportTitle || 'Relatorio Geral';
+             filename = getFilename(['Relatorio_Geral', titleGeneral, dateRangeFilenameStr], 'pdf');
+             generateGeneralReportPdf(doc, params);
+             break;
         case 'period':
-             const periodTitle = params.reportData?.data.reportTitle || 'Relatorio';
+             const periodTitle = reportData?.data.reportTitle || 'Relatorio';
              filename = getFilename(['Relatorio', periodTitle, dateRangeFilenameStr], 'pdf');
-             if (params.reportData?.type === 'general') generateGeneralReportPdf(doc, params, dateRangeFilenameStr);
-             else if (params.reportData?.type === 'period') generatePeriodReportPdf(doc, params, dateRangeFilenameStr);
+             generatePeriodReportPdf(doc, params);
             break;
         case 'client-extract':
             const personName = params.selectedClient && params.selectedClient !== 'all' ? params.selectedClient : 'Todas_Pessoas';
@@ -72,18 +75,22 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
             filename = getFilename(['No_Show', dateRangeFilenameStr, dezenaLabelNoShow], 'pdf');
             await generateNoShowPdf(doc, params);
             break;
+        case 'estornos':
+            filename = getFilename(['Relatorio_Estornos', params.estornoCategory, dateRangeFilenameStr], 'pdf');
+            generateEstornosPdf(doc, params);
+            break;
+        case 'controle-frigobar':
+            filename = getFilename(['Relatorio_Controle_Frigobar', dateRangeFilenameStr], 'pdf');
+            await generateControleFrigobarPdf(doc, params);
+            break;
         default:
             console.warn(`Tipo de relatório PDF não implementado: ${filterType}`);
             if(params.toast) params.toast({ title: 'Exportação Falhou', description: `Tipo de relatório PDF não implementado: ${filterType}`, variant: 'destructive'});
             return;
     }
     
-    if (doc.internal.pages.length > 1 && doc.internal.pages[doc.internal.pages.length-1].length === 0) {
-        doc.deletePage(doc.internal.pages.length-1);
-    }
-    
-    // Verifica se alguma página foi adicionada antes de salvar
-    if (doc.getNumberOfPages() > 0 && doc.internal.pages[1].length > 0) {
+    // Final check to prevent saving empty PDFs.
+    if (doc.getNumberOfPages() > 0 && doc.internal.pages[1]) {
         doc.save(filename);
     } else {
         if(params.toast) params.toast({ title: 'Nada para Exportar', description: 'Nenhum dado foi encontrado para gerar o PDF com os filtros atuais.', variant: 'default'});

@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { ChartConfig } from '@/lib/types';
 import { parseISO, format, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 
 
 interface PeriodReportLineChartProps {
@@ -115,3 +115,5 @@ const PeriodReportLineChart: React.FC<PeriodReportLineChartProps> = ({ data, con
 };
 
 export default PeriodReportLineChart;
+
+    

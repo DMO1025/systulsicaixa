@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { Form, FormItem, FormLabel as ShadcnFormLabel, FormControl } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -23,6 +23,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { getSetting } from '@/services/settingsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Label } from '@/components/ui/label';
 
 
 export interface PeriodFormProps {
@@ -221,49 +222,51 @@ const CafeManhaNoShowForm: React.FC<PeriodFormProps> = ({ form, periodId, period
         <CardDescription>{cardDescriptionText}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="border rounded-lg p-4 space-y-4 bg-muted/20">
-          <h4 className="font-semibold text-md">Adicionar Novo Registro de No-Show</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
-              <FormItem>
-                <FormLabel>Data do Item</FormLabel>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9", !newItem.data && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {newItem.data ? format(newItem.data, "dd/MM/yyyy") : <span>Selecione uma data</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={newItem.data} onSelect={(d) => handleInputChange('data', d)} initialFocus />
-                    </PopoverContent>
-                </Popover>
-              </FormItem>
-             <FormItem>
-                <FormLabel>Horário</FormLabel>
-                <Input value={newItem.horario ?? ''} onChange={e => handleInputChange('horario', e.target.value)} type="time" onFocus={(e) => e.target.select()} />
-              </FormItem>
-              <FormItem>
-                <FormLabel>Hóspede</FormLabel>
-                <Input value={newItem.hospede ?? ''} onChange={e => handleInputChange('hospede', e.target.value)} placeholder="Nome do hóspede" onFocus={(e) => e.target.select()} />
-              </FormItem>
-              <FormItem>
-                <FormLabel>UH</FormLabel>
-                <Input value={newItem.uh ?? ''} onChange={e => handleInputChange('uh', e.target.value)} placeholder="Nº" onFocus={(e) => e.target.select()} />
-              </FormItem>
-              <FormItem>
-                <FormLabel>Reserva</FormLabel>
-                <Input value={newItem.reserva ?? ''} onChange={e => handleInputChange('reserva', e.target.value)} placeholder="Nº" onFocus={(e) => e.target.select()} />
-              </FormItem>
-              <FormItem className="col-span-2 lg:col-span-4">
-                <FormLabel>Observação</FormLabel>
-                <Input value={newItem.observation ?? ''} onChange={e => handleInputChange('observation', e.target.value)} placeholder="Opcional" onFocus={(e) => e.target.select()} />
-              </FormItem>
-              <Button type="button" onClick={handleAddItem} className="col-span-2 lg:col-span-1" disabled={isAddingItem}>
-                {isAddingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
-                Adicionar e Salvar
-              </Button>
-          </div>
-        </div>
+        <Form {...form}>
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/20">
+            <h4 className="font-semibold text-md">Adicionar Novo Registro de No-Show</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
+                <div className="space-y-1.5">
+                    <Label>Data do Item</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9", !newItem.data && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newItem.data ? format(newItem.data, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={newItem.data} onSelect={(d) => handleInputChange('data', d)} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Horário</Label>
+                    <Input value={newItem.horario ?? ''} onChange={e => handleInputChange('horario', e.target.value)} type="time" onFocus={(e) => e.target.select()} />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Hóspede</Label>
+                    <Input value={newItem.hospede ?? ''} onChange={e => handleInputChange('hospede', e.target.value)} placeholder="Nome do hóspede" onFocus={(e) => e.target.select()} />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>UH</Label>
+                    <Input value={newItem.uh ?? ''} onChange={e => handleInputChange('uh', e.target.value)} placeholder="Nº" onFocus={(e) => e.target.select()} />
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Reserva</Label>
+                    <Input value={newItem.reserva ?? ''} onChange={e => handleInputChange('reserva', e.target.value)} placeholder="Nº" onFocus={(e) => e.target.select()} />
+                </div>
+                <div className="col-span-2 lg:col-span-4 space-y-1.5">
+                    <Label>Observação</Label>
+                    <Input value={newItem.observation ?? ''} onChange={e => handleInputChange('observation', e.target.value)} placeholder="Opcional" onFocus={(e) => e.target.select()} />
+                </div>
+                <Button type="button" onClick={handleAddItem} className="col-span-2 lg:col-span-1" disabled={isAddingItem}>
+                    {isAddingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
+                    Adicionar e Salvar
+                </Button>
+            </div>
+            </div>
+        </Form>
 
         <div className="border rounded-lg mt-6">
             <div className="p-4 border-b">

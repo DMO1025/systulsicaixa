@@ -42,9 +42,6 @@ export default async function HelpPage() {
     <div className="max-w-4xl mx-auto space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Manual de Uso</h1>
-        <Button asChild variant="outline">
-          <Link href={PATHS.DASHBOARD}>Voltar para o Dashboard</Link>
-        </Button>
       </div>
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">

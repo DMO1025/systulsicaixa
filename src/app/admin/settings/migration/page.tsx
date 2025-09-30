@@ -171,7 +171,7 @@ export default function MigrationPage() {
         <CardHeader>
           <CardTitle>Atualizar Estrutura de Lançamentos no MySQL</CardTitle>
           <CardDescription>
-            Use esta função para corrigir a estrutura de dados de lançamentos já existentes no MySQL. Isso irá separar a antiga aba "C.I. & Faturados" em "Faturado" e "Consumo Interno" e mover os dados do "Frigobar" para seus respectivos turnos. Execute esta função se o dashboard ou relatórios estiverem exibindo valores incorretos para dados antigos.
+            Use esta função para garantir que a tabela `daily_entries` tenha todas as colunas mais recentes. Isso adicionará colunas que possam estar faltando, como `estornoFrigobar`. É seguro executar esta ação múltiplas vezes.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -266,3 +266,5 @@ export default function MigrationPage() {
     </div>
   );
 }
+
+    

@@ -1,9 +1,10 @@
+
 "use client";
 
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, parseISO, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import type { AuditLog } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -62,3 +63,5 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
 };
 
 export default AuditLogView;
+
+    

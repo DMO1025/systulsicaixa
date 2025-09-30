@@ -2,7 +2,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { getAllDailyEntries } from '@/lib/data/entries';
+import { getAllEntries } from '@/lib/data/entries';
 import { generateGeneralReport } from '@/lib/reports/general/generator';
 import { generatePeriodReportData } from '@/lib/reports/period/generator';
 import type { DailyLogEntry, FilterType } from '@/lib/types';

@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { generatePdf } from './pdf/pdfGenerator';
 import { generateExcelWorkbook } from './excel/excelGenerator';
-import type { DailyLogEntry, CafeManhaNoShowItem, ControleCafeItem, ExportParams } from './types';
+import type { DailyLogEntry, CafeManhaNoShowItem, ControleCafeItem, ExportParams, EstornoItem } from './types';
 import { parseISO } from 'date-fns';
 
 
@@ -71,41 +71,42 @@ const exportToExcel = async (params: ExportParams) => {
 
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe')) {
-        const dezenaLabel = params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : null;
-        dateRangeFilenameStr = month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
-        const typeLabel = filterType === 'controle-cafe' ? 'Controle_Cafe' : 'No_Show';
-        const filename = getFilename([typeLabel, dateRangeFilenameStr, dezenaLabel], 'xlsx');
-        XLSX.writeFile(wb, filename);
-
+    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') {
+        dateRangeFilenameStr = range?.from 
+            ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
+            : 'periodo_indefinido';
     } else if (filterType === 'date' && date) {
         dateRangeFilenameStr = format(date, 'yyyy-MM-dd');
-        const filename = getFilename(['Relatorio_Dia', dateRangeFilenameStr], 'xlsx');
-        XLSX.writeFile(wb, filename);
+    } else if (filterType === 'range' && range?.from) {
+        dateRangeFilenameStr = `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`;
+    } else if (month) {
+        dateRangeFilenameStr = format(month, 'yyyy-MM');
     }
-    else {
-        dateRangeFilenameStr = range?.from
-          ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
-          : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
-          
-        const consumptionLabel = getConsumptionTypeLabel(params.consumptionType) || '';
-        const personName = params.selectedClient && params.selectedClient !== 'all' ? params.selectedClient : 'Todas_Pessoas';
+    
 
-        const filenameMap: Record<string, string[]> = {
-            'range': ['Relatorio_Geral', dateRangeFilenameStr],
-            'month': ['Relatorio_Geral', dateRangeFilenameStr],
-            'period': ['Relatorio_Por_Periodo', reportData?.data.reportTitle || 'Periodo', dateRangeFilenameStr],
-            'client-extract': ['Extrato_Pessoa', personName, consumptionLabel, dateRangeFilenameStr],
-            'client-summary': ['Resumo_Pessoas', consumptionLabel, dateRangeFilenameStr]
-        };
-        const filename = getFilename(filenameMap[filterType] || ['Relatorio'], 'xlsx');
-        XLSX.writeFile(wb, filename);
-    }
+    const consumptionLabel = getConsumptionTypeLabel(params.consumptionType) || '';
+    const personName = params.selectedClient && params.selectedClient !== 'all' ? params.selectedClient : 'Todas_Pessoas';
+
+    const filenameMap: Record<string, string[]> = {
+        'range': ['Relatorio_Geral', dateRangeFilenameStr],
+        'month': ['Relatorio_Geral', dateRangeFilenameStr],
+        'period': ['Relatorio_Por_Periodo', reportData?.data.reportTitle || 'Periodo', dateRangeFilenameStr],
+        'client-extract': ['Extrato_Pessoa', personName, consumptionLabel, dateRangeFilenameStr],
+        'client-summary': ['Resumo_Pessoas', consumptionLabel, dateRangeFilenameStr],
+        'controle-cafe': ['Controle_Cafe', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
+        'controle-cafe-no-show': ['Controle_No_Show', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
+        'estornos': ['Relatorio_Estornos', params.estornoCategory || 'Todos', dateRangeFilenameStr],
+        'controle-frigobar': ['Controle_Frigobar', dateRangeFilenameStr],
+        'date': ['Relatorio_Dia', dateRangeFilenameStr],
+    };
+
+    const filename = getFilename(filenameMap[filterType] || ['Relatorio'], 'xlsx');
+    XLSX.writeFile(wb, filename);
 };
 
 
 export const exportReport = async (params: ExportParams) => {
-    if (params.entries.length === 0) {
+    if (params.entries.length === 0 && params.estornos?.length === 0) {
       if(params.toast) params.toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
@@ -116,3 +117,5 @@ export const exportReport = async (params: ExportParams) => {
         await exportToExcel(params);
     }
 };
+
+    

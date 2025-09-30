@@ -1,4 +1,5 @@
 
+
 import mysql from 'mysql2/promise';
 import type { Pool, PoolOptions } from 'mysql2/promise';
 import type { Settings, MysqlConnectionConfig } from './types';
@@ -12,8 +13,9 @@ export const DAILY_ENTRIES_TABLE_NAME = 'daily_entries';
 export const SETTINGS_TABLE_NAME = 'settings';
 export const USERS_TABLE_NAME = 'users';
 export const AUDIT_LOG_TABLE_NAME = 'audit_log';
+export const ESTORNOS_TABLE_NAME = 'estornos';
 
-const generateSchema = (): string => {
+const generateSchemaCommands = (): string[] => {
   const dailyEntriesPeriodColumns = PERIOD_DEFINITIONS.map(p => `\`${p.id}\` JSON`).join(',\n  ');
 
   const dailyEntriesSchema = `
@@ -55,10 +57,19 @@ const generateSchema = (): string => {
     details TEXT
   );`;
 
-  return `${dailyEntriesSchema};;${settingsSchema};;${usersSchema};;${auditLogSchema}`;
+  const estornosSchema = `
+  CREATE TABLE IF NOT EXISTS \`${ESTORNOS_TABLE_NAME}\` (
+    daily_entry_id VARCHAR(10) NOT NULL PRIMARY KEY,
+    items JSON,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    lastModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (daily_entry_id) REFERENCES ${DAILY_ENTRIES_TABLE_NAME}(id) ON DELETE CASCADE
+  );`;
+
+  return [dailyEntriesSchema, settingsSchema, usersSchema, auditLogSchema, estornosSchema];
 };
 
-export const DATABASE_INIT_SCHEMA = generateSchema();
+export const DATABASE_INIT_COMMANDS = generateSchemaCommands();
 
 async function getMysqlConfigFromFile(): Promise<MysqlConnectionConfig | null> {
     const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
@@ -152,13 +163,23 @@ export async function isMysqlConnected(currentPool?: Pool | null): Promise<boole
 export function safeStringify(value: any): string | null {
   if (value === undefined || value === null) return null;
   try {
+    // Handling for estornos table structure
+    if (value && Array.isArray(value) && value.length > 0 && ('description' in value[0] && 'category' in value[0])) {
+      return JSON.stringify(value);
+    }
+
     if (typeof value === 'object' && value !== null) {
-      const keys = Object.keys(value);
+      // Check for empty arrays within faturadoItems or consumoInternoItems
+      if (('faturadoItems' in value && Array.isArray(value.faturadoItems) && value.faturadoItems.length === 0) ||
+          ('consumoInternoItems' in value && Array.isArray(value.consumoInternoItems) && value.consumoInternoItems.length === 0)) {
+         // If it only contains empty item arrays and no channels, it's empty
+         if (!value.channels || Object.keys(value.channels).length === 0) return null;
+      }
 
       if ('items' in value && Array.isArray(value.items)) {
         const hasObservations = value.periodObservations && value.periodObservations.trim() !== '';
         if (value.items.length === 0 && !hasObservations) {
-          return null;
+          return JSON.stringify({"items":[]}); // Return an empty items string instead of null for estornos
         }
       }
       
@@ -167,13 +188,12 @@ export function safeStringify(value: any): string | null {
         if (typeof v === 'string' && v.trim() === '') return false;
         if (Array.isArray(v) && v.length === 0) return false;
         if (typeof v === 'object' && v !== null && Object.keys(v).length === 0) return false;
-        if (typeof v === 'object' && v !== null && 'faturado' in v && (v as any).faturado?.faturadoItems?.length > 0) {
-            return true;
+        if(typeof v === 'object' && v !== null && ('faturadoItems' in v || 'consumoInternoItems' in v)) {
+            return (v as any)?.faturadoItems?.length > 0 || (v as any)?.consumoInternoItems?.length > 0;
         }
         if(typeof v === 'object' && v !== null && 'channels' in v && Object.keys((v as any).channels).length > 0){
             return Object.values((v as any).channels).some(ch => ch && ( (ch as any).qtd !== undefined || (ch as any).vtotal !== undefined));
         }
-
         return true;
       });
 
@@ -188,8 +208,12 @@ export function safeStringify(value: any): string | null {
   }
 }
 
-export function safeParse<T>(jsonString: string | null | undefined): T | null {
-  if (jsonString === null || jsonString === undefined || jsonString.trim() === "") return null;
+
+export function safeParse<T>(jsonString: any): T | null {
+  if (jsonString === null || jsonString === undefined) return null;
+  // If it's not a string, assume it's already a parsed object
+  if (typeof jsonString !== 'string' || jsonString.trim() === "") return jsonString as T;
+
   try {
     const parsed = JSON.parse(jsonString) as T;
     if (parsed && typeof parsed === 'object' && 'serializationError' in parsed) {

@@ -1,4 +1,7 @@
+
 import * as XLSX from 'xlsx';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { DailyLogEntry, CafeManhaNoShowItem, ControleCafeItem } from '../types';
 import { getControleCafeItems } from '../exportUtils';
 
@@ -8,7 +11,7 @@ export const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEn
       const allItems = getControleCafeItems(entries, 'no-show') as (CafeManhaNoShowItem & { entryDate: string })[];
       const dataForSheet = allItems.map(item => ({
           'Empresa': companyName,
-          'Data': item.entryDate,
+          'Data': format(parseISO(String(item.data)), 'dd/MM/yyyy', { locale: ptBR }),
           'Horário': item.horario,
           'Hóspede': item.hospede,
           'UH': item.uh,
@@ -62,3 +65,5 @@ export const generateControleCafeExcel = (wb: XLSX.WorkBook, entries: DailyLogEn
       XLSX.utils.book_append_sheet(wb, ws, 'Controle_Cafe');
     }
 };
+
+    

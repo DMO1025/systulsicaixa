@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User, Settings, MenuIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { usePathname, useRouter } from 'next/navigation';
@@ -24,6 +25,7 @@ import { BASE_NAV_ITEMS, PATHS, ADMIN_SETTINGS_PATHS } from '@/lib/config/naviga
 
 export default function Header() {
   const { userRole, logout, allowedPages } = useAuth();
+  const { appName } = useAppConfig();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -40,27 +42,37 @@ export default function Header() {
   });
 
   const getIsActive = (href: string) => {
-    if (href === PATHS.DASHBOARD && pathname === PATHS.HOME) {
+    // Exact match for the home page.
+    if (href === PATHS.DASHBOARD && (pathname === PATHS.HOME || pathname === PATHS.DASHBOARD)) {
         return true;
     }
-    if (href === PATHS.HOME) {
-        return pathname === href;
-    }
-     if (href === PATHS.HOME) {
-        return pathname === href;
-    }
-    // Handle the /entry/ and /controls/ paths
+     // For other base paths, we need to check prefixes, but also consider context.
     if (pathname.startsWith(PATHS.ENTRY_BASE)) {
         const periodId = pathname.split('/')[2];
         const periodDef = PERIOD_DEFINITIONS.find(p => p.id === periodId);
         if (periodDef) {
+            // If we are on a 'control' type page, the 'Controles Diários' link should be active.
             if (periodDef.type === 'control' && href === PATHS.CONTROLS_BASE) return true;
+            // If we are on an 'entry' type page, the 'Lançamento Diário' link should be active.
             if (periodDef.type === 'entry' && href === PATHS.ENTRY_BASE) return true;
         }
-        return false; // Fallback if no specific period matches
+        // Fallback for the selector page itself
+        return href === PATHS.ENTRY_BASE;
     }
-    // Default check for other pages like /reports, /help
-    return pathname.startsWith(href);
+    if (pathname.startsWith(PATHS.CONTROLS_BASE) && href === PATHS.CONTROLS_BASE) {
+      return true;
+    }
+
+    if (pathname.startsWith(PATHS.ESTORNOS_BASE) && href === PATHS.ESTORNOS_BASE) {
+      return true;
+    }
+
+    // Default check for other pages like /reports, /help, etc.
+    if (href.length > 1) {
+      return pathname.startsWith(href);
+    }
+    
+    return pathname === href;
   };
 
   const getLinkClassName = (href: string) => {
@@ -88,7 +100,7 @@ export default function Header() {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                 </svg>
-                <SheetTitle className="text-xl font-semibold text-primary">Caixa Tulsi</SheetTitle>
+                <SheetTitle className="text-xl font-semibold text-primary">{appName}</SheetTitle>
               </Link>
             </SheetHeader>
             <nav className="grid gap-2 text-lg font-medium">
@@ -115,7 +127,7 @@ export default function Header() {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-primary">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
           </svg>
-          <h1 className="text-xl font-semibold text-primary">Caixa Tulsi</h1>
+          <h1 className="text-xl font-semibold text-primary">{appName}</h1>
         </Link>
         <nav className="flex items-center gap-1">
           {navItems.map((item) => (

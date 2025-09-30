@@ -2,9 +2,10 @@
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO, getDate, getMonth, getYear, addMonths, lastDayOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import type { ExportParams, ControleCafeItem, ChannelUnitPricesConfig, DailyLogEntry, CafeManhaNoShowItem } from '../types';
 import { getControleCafeItems } from '../exportUtils';
+import { drawHeaderAndFooter } from './pdfUtils';
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
@@ -19,46 +20,8 @@ interface DezenaTotals {
     totalValor: number;
 }
 
-const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, pageNumber: number, totalPages: number, companyName?: string, includeCompanyData?: boolean) => {
-    let finalY = 30;
-    if (includeCompanyData) {
-        doc.setFontSize(14);
-        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-        finalY += 15;
-    }
-    doc.setFontSize(10);
-    doc.text(title, 40, finalY);
-    finalY += 13;
-    doc.setFontSize(9);
-    doc.text(dateStr, 40, finalY);
-    finalY += 13;
-
-    if (includeCompanyData) {
-        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-            autoTable(doc, {
-                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-            });
-        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-             autoTable(doc, {
-                body: [['FAVORECIDO: AVALON RESTAURANTE E EVENTOS LTDA',  'BANCO: BRADESCO (237)'], ['CNPJ: 08.439.825/0001-19', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-            });
-        }
-        finalY = (doc as any).lastAutoTable.finalY || finalY;
-    }
-    
-    doc.setFontSize(8);
-    if (totalPages > 1) {
-        doc.text(`Página ${pageNumber} de ${totalPages}`, doc.internal.pageSize.width - 70, doc.internal.pageSize.height - 20);
-    }
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
-    
-    return finalY;
-};
-
 export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) => {
-    const { entries, range, selectedDezena, companyName, unitPrices, includeCompanyData } = params;
+    const { entries, range, selectedDezena, unitPrices } = params;
 
     const cafePrice = unitPrices?.cdmListaHospedes || 0;
     const dateRangeStr = range?.from 
@@ -104,6 +67,9 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
         if (pageCounter > 1) {
             doc.addPage();
         }
+        
+        const subTitle = `${title} - ${dezena}ª Dezena`;
+        const headerHeight = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, pageCounter, totalPagesForThisExport);
 
         const head = [['Data', 'Adultos', 'Criança 01', 'Criança 02', 'Cont. Manual', 'Sem Check-in', 'Total Dia', 'Valor Dia (R$)']];
         const dezenaTotals: DezenaTotals = { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0, totalGeral: 0, totalValor: 0 };
@@ -123,8 +89,6 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
             return [item.entryDate, formatQty(item.adultoQtd), formatQty(item.crianca01Qtd), formatQty(item.crianca02Qtd), formatQty(item.contagemManual), formatQty(item.semCheckIn), formatQty(totalDia), formatCurrency(valorDia)];
         });
 
-        const startY = drawHeaderAndFooter(doc, `${title} - ${dezena}ª Dezena`, dateRangeStr, pageCounter, totalPagesForThisExport, companyName, includeCompanyData);
-        
         const footer = [[
             { content: 'TOTAL', styles: { fontStyle: 'bold' } }, 
             { content: formatQty(dezenaTotals.adultoQtd), styles: { fontStyle: 'bold' } },
@@ -140,15 +104,19 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
             head, 
             body,
             foot: footer,
-            startY: startY + 5, 
             theme: 'striped', 
             styles: { fontSize: 8 }, 
             headStyles: { halign: 'center' }, 
             bodyStyles: { halign: 'center' },
-            footStyles: { halign: 'center', fillColor: [230, 230, 230], textColor: 0 }
+            footStyles: { halign: 'center', fillColor: [230, 230, 230], textColor: 0 },
+            margin: { top: headerHeight },
+            didDrawPage: (hookData) => {
+                if (totalPagesForThisExport > 1) {
+                    drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, hookData.pageNumber, totalPagesForThisExport);
+                }
+            }
         });
 
-        // Add summary table below the main table
         const totalCriancas = dezenaTotals.crianca01Qtd + dezenaTotals.crianca02Qtd;
         autoTable(doc, {
             body: [

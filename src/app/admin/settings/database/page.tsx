@@ -1,8 +1,8 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,44 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Save, Database, Wifi, TableProperties, Loader2, ArrowLeft } from 'lucide-react'; 
+import { Save, Database, Wifi, TableProperties, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { MysqlConnectionConfig } from '@/lib/types';
 import { getSetting, saveSetting } from '@/services/settingsService';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+
+interface ActionResult {
+    message: string;
+    log?: string[];
+    success: boolean;
+}
+
+const renderResult = (result: ActionResult | null) => {
+    if (!result) return null;
+    return (
+        <div className="mt-4">
+            <Alert variant={result.success ? "default" : "destructive"} className={result.success ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : ""}>
+                {result.success ? <CheckCircle className="h-4 w-4"/> : <AlertCircle className="h-4 w-4" />}
+                <AlertTitle>{result.success ? "Sucesso" : "Falha"}</AlertTitle>
+                <AlertDescription>
+                    <p>{result.message}</p>
+                </AlertDescription>
+            </Alert>
+            
+            {result.log && result.log.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold text-sm mb-2">Log de Execução:</h4>
+                <div className="bg-muted p-3 rounded-md text-xs font-mono h-64 overflow-y-auto">
+                  {result.log.map((line, index) => (
+                    <p key={index} className="whitespace-pre-wrap">{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+    );
+  };
+
 
 export default function DatabaseSettingsPage() {
   const { userRole, isLoading: authLoading } = useAuth();
@@ -24,7 +59,10 @@ export default function DatabaseSettingsPage() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [testConnectionResult, setTestConnectionResult] = useState<ActionResult | null>(null);
+
   const [isEnsuringTable, setIsEnsuringTable] = useState(false);
+  const [ensureTableResult, setEnsureTableResult] = useState<ActionResult | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -56,7 +94,7 @@ export default function DatabaseSettingsPage() {
     const { name, value } = e.target;
     setMysqlConfig(prev => ({
       ...prev,
-      [name]: name === 'port' ? (value === '' ? undefined : parseInt(value, 10)) : value
+      [name]: name === 'port' ? (value === '' ? undefined : parseInt(value.replace(/[^0-9]/g, ''), 10)) : value
     }));
   };
 
@@ -75,6 +113,8 @@ export default function DatabaseSettingsPage() {
 
   const handleTestConnection = async () => {
     setIsTestingConnection(true);
+    setTestConnectionResult(null);
+    setEnsureTableResult(null); 
     try {
       const response = await fetch('/api/db-admin?action=test-connection', {
         method: 'POST',
@@ -82,9 +122,11 @@ export default function DatabaseSettingsPage() {
         body: JSON.stringify(mysqlConfig) 
       });
       const result = await response.json();
+      setTestConnectionResult({ ...result, success: response.ok });
       if (!response.ok) throw new Error(result.message || 'Falha ao testar conexão.');
       toast({ title: "Teste de Conexão", description: result.message });
     } catch (error: any) {
+      setTestConnectionResult({ message: error.message, success: false });
       toast({ title: "Erro no Teste de Conexão", description: error.message, variant: "destructive" });
     } finally {
       setIsTestingConnection(false);
@@ -93,16 +135,23 @@ export default function DatabaseSettingsPage() {
 
   const handleEnsureTable = async () => {
     setIsEnsuringTable(true);
+    setEnsureTableResult(null);
+    setTestConnectionResult(null);
     try {
-      const response = await fetch('/api/db-admin?action=ensure-table', {
+      const response = await fetch('/api/db-admin?action=ensure-tables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mysqlConfig)
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Falha ao criar/verificar tabela.');
-      toast({ title: "Tabela de Lançamentos", description: result.message });
+      setEnsureTableResult({ ...result, success: response.ok });
+      
+      const toastVariant = response.ok ? 'default' : 'destructive';
+      const toastTitle = response.ok ? 'Verificação Concluída' : 'Erro na Verificação';
+      toast({ title: toastTitle, description: result.message, variant: toastVariant, duration: response.ok ? 5000 : 10000 });
+
     } catch (error: any) {
+      setEnsureTableResult({ message: error.message, success: false, log: [`Erro de rede ou servidor: ${error.message}`] });
       toast({ title: "Erro na Tabela", description: error.message, variant: "destructive" });
     } finally {
       setIsEnsuringTable(false);
@@ -137,7 +186,7 @@ export default function DatabaseSettingsPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="mysql-port">Porta</Label>
-              <Input id="mysql-port" name="port" type="number" value={mysqlConfig.port || ''} onChange={handleMysqlConfigChange} placeholder="3306" />
+              <Input id="mysql-port" name="port" type="text" value={mysqlConfig.port || ''} onChange={handleMysqlConfigChange} placeholder="3306" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="mysql-user">Usuário</Label>
@@ -159,9 +208,11 @@ export default function DatabaseSettingsPage() {
             </Button>
             <Button onClick={handleEnsureTable} variant="outline" disabled={isEnsuringTable || isSaving}>
               {isEnsuringTable ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TableProperties className="mr-2 h-4 w-4" />}
-              Criar/Verificar Tabela
+              Criar/Verificar Tabelas
             </Button>
           </div>
+          {renderResult(testConnectionResult)}
+          {renderResult(ensureTableResult)}
         </CardContent>
       </Card>
       

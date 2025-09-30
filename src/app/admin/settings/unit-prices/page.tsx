@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -15,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { Save, DollarSign, Loader2, ArrowLeft } from 'lucide-react';
 import type { ChannelUnitPricesConfig } from '@/lib/types';
 import { getSetting, saveSetting } from '@/services/settingsService';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 const CHANNELS_FOR_UNIT_PRICE_CONFIG: SalesChannelId[] = [
   'cdmListaHospedes', 
@@ -59,10 +61,10 @@ export default function UnitPricesSettingsPage() {
     }
   }, [userRole, authLoading, router, toast]);
 
-  const handleUnitPriceChange = (channelId: SalesChannelId, value: string) => {
+  const handleUnitPriceChange = (channelId: SalesChannelId, value: number | undefined) => {
     setChannelUnitPrices(prev => ({
       ...prev,
-      [channelId]: value === '' ? undefined : parseFloat(value)
+      [channelId]: value
     }));
   };
 
@@ -107,13 +109,11 @@ export default function UnitPricesSettingsPage() {
               </Label>
               <div className="relative w-full sm:w-auto sm:min-w-[150px]">
                 <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+                <CurrencyInput
                   id={`price-${channelId}`}
-                  type="number"
-                  step="0.01"
-                  placeholder="Ex: 25.00"
-                  value={channelUnitPrices[channelId] ?? ''}
-                  onChange={(e) => handleUnitPriceChange(channelId, e.target.value)}
+                  placeholder="R$ 0,00"
+                  value={channelUnitPrices[channelId]}
+                  onValueChange={(value) => handleUnitPriceChange(channelId, value)}
                   className="pl-8 text-sm h-9"
                 />
               </div>

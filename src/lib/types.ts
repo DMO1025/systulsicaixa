@@ -20,7 +20,7 @@ export type SummaryCardItemId = SummaryCardItemIdFromConfig;
 export type GroupedChannelConfig = GroupedChannelConfigFromConfig;
 
 
-export type PageId = 'dashboard' | 'entry' | 'reports' | 'controls';
+export type PageId = 'dashboard' | 'entry' | 'reports' | 'controls' | 'estornos';
 export type ChartConfig = ShadCNChartConfig;
 
 export interface SalesItem {
@@ -35,6 +35,52 @@ export interface BilledClient {
   id: string;
   name: string;
 }
+
+// --- Frigobar Item Structure ---
+export type FrigobarItemCategory = 'comida' | 'bebida';
+
+export interface FrigobarItem {
+  id: string;
+  name: string;
+  price: number;
+  category: FrigobarItemCategory;
+}
+
+// --- Company Structure ---
+export interface Company {
+  id: string;
+  name: string;
+  cnpj?: string;
+  bankName?: string;
+  agency?: string;
+  account?: string;
+}
+
+
+// New structure for logging a full consumption event
+export interface FrigobarConsumptionLog {
+  id: string;
+  uh: string;
+  items: Record<string, number>; // Key is FrigobarItem.id, value is quantity
+  totalValue: number;
+  valorRecebido?: number;
+  registeredBy?: string;
+  timestamp: string; // ISO string
+  observation?: string;
+  isAntecipado?: boolean;
+}
+
+// Kept the old name for compatibility where it might be used for a single item context, but it's largely replaced.
+export type FrigobarConsumptionItem = FrigobarConsumptionLog;
+
+// This will be the structure stored in the database for a given day
+export interface FrigobarPeriodData {
+  logs: FrigobarConsumptionLog[];
+  periodObservations?: string;
+  checkoutsPrevistos?: number;
+  checkoutsProrrogados?: number;
+}
+
 
 // --- Faturado Structure ---
 export interface FaturadoItem {
@@ -72,6 +118,38 @@ export interface ControleCafeItem {
   contagemManual?: number;
   semCheckIn?: number;
 }
+
+// --- Estorno Structure ---
+export type EstornoCategory = 'restaurante' | 'frigobar' | 'room-service';
+export type EstornoReason = 'duplicidade' | 'erro de lancamento' | 'pagamento direto' | 'nao consumido' | 'assinatura divergente' | 'cortesia';
+
+
+export interface EstornoItem {
+  id: string;
+  date: string; // YYYY-MM-DD format
+  hora?: string;
+  registeredBy?: string;
+  uh?: string;
+  nf?: string;
+  reason: EstornoReason;
+  quantity: number;
+  valorTotalNota?: number;
+  valorEstorno: number;
+  observation?: string;
+  category: EstornoCategory;
+}
+
+
+export interface ControleEstornoPeriodData {
+  items: EstornoItem[];
+}
+
+export interface EstornoEntry {
+    daily_entry_id: string;
+    category: EstornoCategory;
+    items: EstornoItem[];
+}
+
 
 export interface SubTabData {
   channels?: Partial<Record<SalesChannelId, SalesItem>>;
@@ -112,6 +190,7 @@ export type ControleCafePeriodData = {
   semCheckIn?: number;
   periodObservations?: string;
 };
+
 // --- End Event Structure ---
 
 
@@ -125,10 +204,13 @@ export type PeriodData = {
 export type DailyEntryFormData = {
   date: Date;
   generalObservations?: string;
-} & Omit<Partial<Record<PeriodId, PeriodData>>, 'eventos' | 'cafeManhaNoShow' | 'controleCafeDaManha'> & { 
+} & Omit<Partial<Record<PeriodId, PeriodData>>, 'eventos' | 'cafeManhaNoShow' | 'controleCafeDaManha' | 'controleFrigobar' | 'frigobar' | 'estornoFrigobar'> & { 
   eventos?: EventosPeriodData; 
   cafeManhaNoShow?: CafeManhaNoShowPeriodData;
   controleCafeDaManha?: ControleCafePeriodData;
+  controleFrigobar?: FrigobarPeriodData;
+  frigobar?: PeriodData;
+  estornoFrigobar?: ControleEstornoPeriodData;
 };
 
 
@@ -150,6 +232,10 @@ export interface DailyLogEntry extends Omit<DailyEntryFormData, 'date'> {
   baliAlmoco?: PeriodData | string;
   baliHappy?: PeriodData | string;
   eventos?: EventosPeriodData | string;
+  estornos?: ControleEstornoPeriodData | string;
+  frigobar?: PeriodData | string;
+  controleFrigobar?: FrigobarPeriodData | string;
+  estornoFrigobar?: ControleEstornoPeriodData | string;
   calculatedTotals?: {
     byPeriod: Partial<Record<PeriodId, number>>;
     byPaymentMethod: PaymentBreakdown;
@@ -234,7 +320,7 @@ export interface MonthlyEvolutionDataItem {
 export type EvolutionChartConfig = ShadCNChartConfig;
 
 // Reports Page Specific Types
-export type FilterType = 'date' | 'period' | 'month' | 'range' | 'client-extract' | 'client-summary' | 'controle-cafe-no-show' | 'controle-cafe' | 'history';
+export type FilterType = 'date' | 'period' | 'month' | 'range' | 'client-extract' | 'client-summary' | 'controle-cafe-no-show' | 'controle-cafe' | 'history' | 'estornos' | 'controle-frigobar';
 
 export interface DailyCategoryDataItem { date: string; [key: string]: any; }
 export interface PeriodReportViewData {
@@ -303,4 +389,18 @@ export interface DashboardAnalysisInput {
     withoutCI: { quantity: number; value: number };
     ciAdjustment: number;
   };
+}
+
+export interface Settings {
+    appName?: string;
+    cardVisibilityConfig?: CardVisibilityConfig;
+    channelUnitPricesConfig?: ChannelUnitPricesConfig;
+    mysqlConnectionConfig?: MysqlConnectionConfig;
+    dashboardItemVisibilityConfig?: DashboardItemVisibilityConfig;
+    summaryCardItemsConfig?: SummaryCardItemsConfig;
+    billedClients?: BilledClient[];
+    noShowClients?: BilledClient[];
+    apiAccessConfig?: ApiAccessConfig;
+    frigobarItems?: FrigobarItem[];
+    companies?: Company[];
 }

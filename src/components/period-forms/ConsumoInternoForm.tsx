@@ -16,6 +16,7 @@ import { getSetting } from '@/services/settingsService';
 import { FormField, FormControl, FormMessage } from '@/components/ui/form';
 import { getSafeNumericValue } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 
 const createDefaultConsumoInternoItem = (): ConsumoInternoItem => ({
@@ -122,33 +123,29 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
                  <div className="md:col-span-2">
                     <Label className="text-xs flex items-center mb-1"><Hash className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Qtd</Label>
                     <Input
-                        type="number"
-                        min={0}
+                        type="text"
+                        inputMode="numeric"
                         placeholder="0"
-                        value={newEntry.quantity ?? 0}
+                        value={newEntry.quantity ?? ''}
                         onFocus={(e) => e.target.select()}
                         onChange={e => {
-                            const value = e.target.value;
-                            handleInputChange('quantity', value === '' ? 0 : parseInt(value, 10));
+                            const rawValue = e.target.value;
+                            const numValue = parseInt(rawValue.replace(/[^0-9]/g, ''), 10);
+                            handleInputChange('quantity', isNaN(numValue) ? undefined : numValue);
                         }}
                         className="h-9 text-sm"
                     />
                  </div>
                  <div className="md:col-span-2">
                      <Label className="text-xs flex items-center mb-1"><DollarSign className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>Valor</Label>
-                     <Input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        placeholder="0,00"
-                        value={newEntry.value ?? 0}
-                        onFocus={(e) => e.target.select()}
-                        onChange={e => {
-                            const value = e.target.value;
-                            handleInputChange('value', value === '' ? 0 : parseFloat(value));
-                        }}
-                        className="h-9 text-sm"
-                     />
+                     <div className="relative">
+                        <CurrencyInput
+                            placeholder="R$ 0,00"
+                            value={newEntry.value}
+                            onValueChange={(value) => handleInputChange('value', value)}
+                            className="h-9 text-sm"
+                        />
+                     </div>
                  </div>
             </div>
             <div className="mt-4 flex justify-between items-end gap-4">
@@ -218,18 +215,11 @@ const ConsumoInternoForm: React.FC<ConsumoInternoFormProps> = ({ form, basePath 
                         <Label className="text-sm font-semibold sm:col-span-2">VALOR ADICIONAL (REAJUSTE DE C.I)</Label>
                         <div className="relative">
                             <DollarSign className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                placeholder="0,00"
-                                {...field}
-                                value={field.value ?? 0}
-                                onFocus={(e) => e.target.select()}
-                                onChange={e => {
-                                    const value = e.target.value;
-                                    field.onChange(value === '' ? 0 : parseFloat(value));
-                                }}
+                             <CurrencyInput
+                                placeholder="R$ 0,00"
+                                value={field.value ?? undefined}
+                                onValueChange={field.onChange}
+                                onBlur={field.onBlur}
                                 className="h-9 text-sm text-right w-full pl-7"
                             />
                             <FormMessage className="text-xs mt-1 text-right" />

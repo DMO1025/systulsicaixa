@@ -1,56 +1,17 @@
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import type { ExportParams, PeriodData, EventosPeriodData, SalesChannelId } from '../types';
 import { processEntryForTotals as calculateTotals } from '@/lib/utils/calculations';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
+import { drawHeaderAndFooter } from './pdfUtils';
 
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatNumber = (value: number | undefined) => (value || 0).toLocaleString('pt-BR');
-
-const drawHeader = (doc: jsPDF, title: string, companyName?: string, includeCompanyData?: boolean) => {
-    let finalY = 30;
-    if (includeCompanyData) {
-        doc.setFontSize(14);
-        doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-        finalY += 15;
-    }
-    doc.setFontSize(10);
-    doc.text(`Relatório Detalhado do Dia`, 40, finalY);
-    finalY += 13;
-    doc.setFontSize(9);
-    doc.text(title, 40, finalY);
-    finalY += 13;
-
-    if (includeCompanyData) {
-        if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-            autoTable(doc, {
-                body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-            });
-        } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-             autoTable(doc, {
-                body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-            });
-        }
-        return (doc as any).lastAutoTable.finalY || finalY;
-    }
-    return finalY;
-};
-
-const drawFooter = (doc: jsPDF, companyName?: string) => {
-    const pageCount = doc.internal.pages.length;
-    for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 70, doc.internal.pageSize.height - 20);
-        doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
-    }
-};
 
 const renderPeriodDataVertical = (periodData: PeriodData) => {
     const body: (string | number)[][] = [];
@@ -123,22 +84,21 @@ const renderEventosDataVertical = (eventosData: EventosPeriodData) => {
 };
 
 
-export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dateRangeStr: string) => {
-    const { entries, companyName, includeCompanyData } = params;
+export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams) => {
+    const { entries } = params;
     if (entries.length === 0) return;
     const entry = entries[0];
+    const dateRangeStr = format(parseISO(String(entry.id)), 'PPP', { locale: ptBR });
     
-    let finalY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
+    const headerHeight = drawHeaderAndFooter(doc, "Relatório Detalhado do Dia", dateRangeStr, params, 1, 1);
     
     const totals = calculateTotals(entry);
     const ticketMedio = totals.grandTotal.semCI.qtd > 0 
         ? totals.grandTotal.semCI.valor / totals.grandTotal.semCI.qtd 
         : 0;
     
-    finalY += 15;
-
     autoTable(doc, {
-        startY: finalY,
+        margin: { top: headerHeight },
         body: [
             ['Receita Total (com CI)', 'Receita Líquida (sem CI)', 'Ticket Médio (sem CI)'],
             [formatCurrency(totals.grandTotal.comCI.valor), formatCurrency(totals.grandTotal.semCI.valor), formatCurrency(ticketMedio)]
@@ -205,19 +165,11 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dat
         return hasChannels || hasSubTabs;
     });
 
-    periodsWithData.forEach((pDef) => {
+    periodsWithData.forEach((pDef, index) => {
         const periodData = entry[pDef.id as keyof typeof entry];
         
         doc.addPage();
-        let pageStartY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
-        pageStartY += 15;
-
-        autoTable(doc, {
-            head: [[pDef.label]],
-            startY: pageStartY,
-            headStyles: { fillColor: [60, 60, 60], textColor: 255, fontStyle: 'bold' }
-        });
-        const tableStartY = (doc as any).lastAutoTable.finalY;
+        let pageStartY = drawHeaderAndFooter(doc, `Detalhes do Período: ${pDef.label}`, dateRangeStr, params, index + 2, periodsWithData.length + 1);
 
         const bodyData = pDef.id === 'eventos'
             ? renderEventosDataVertical(periodData as EventosPeriodData)
@@ -225,9 +177,11 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dat
 
         if (bodyData.length > 0) {
             autoTable(doc, {
+                head: [[pDef.label, 'Detalhes']],
                 body: bodyData,
-                startY: tableStartY,
+                startY: pageStartY,
                 theme: 'grid',
+                headStyles: {fillColor: [60, 60, 60], textColor: 255},
                 columnStyles: {
                     0: { fontStyle: 'bold', cellWidth: 'auto' },
                     1: { halign: 'right', cellWidth: 200 }
@@ -238,14 +192,11 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams, dat
 
     if (entry.generalObservations && entry.generalObservations.trim()) {
         doc.addPage();
-        let obsStartY = drawHeader(doc, dateRangeStr, companyName, includeCompanyData);
-        obsStartY += 15;
+        let obsStartY = drawHeaderAndFooter(doc, 'Observações Gerais do Dia', dateRangeStr, params, periodsWithData.length + 2, periodsWithData.length + 2);
         autoTable(doc, {
             head: [['Observações Gerais do Dia']],
             body: [[entry.generalObservations]],
             startY: obsStartY,
         });
     }
-
-    drawFooter(doc, companyName);
 };

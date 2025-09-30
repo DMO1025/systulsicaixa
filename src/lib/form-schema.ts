@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { PERIOD_FORM_CONFIG } from '@/lib/config/forms';
@@ -50,6 +49,26 @@ const controleCafePeriodDataSchema = z.object({
 });
 
 
+const frigobarConsumptionLogSchema = z.object({
+  id: z.string(),
+  uh: z.string(),
+  items: z.record(z.string(), z.number()),
+  totalValue: z.number(),
+  valorRecebido: z.number().optional(),
+  registeredBy: z.string().optional(),
+  timestamp: z.string(),
+  observation: z.string().optional(),
+  isAntecipado: z.boolean().optional(),
+});
+
+const frigobarPeriodDataSchema = z.object({
+  logs: z.array(frigobarConsumptionLogSchema).optional(),
+  periodObservations: z.string().optional(),
+  checkoutsPrevistos: z.number().optional(),
+  checkoutsProrrogados: z.number().optional(),
+});
+
+
 const subTabSchema = z.object({
   channels: channelDataSchema.optional(),
   faturadoItems: z.array(faturadoItemSchema).optional(),
@@ -97,15 +116,13 @@ export const dailyEntryFormSchema = z.object({
   date: z.date({ required_error: "A data do lançamento é obrigatória." }),
   generalObservations: z.string().optional(),
   ...Object.fromEntries(
-    PERIOD_DEFINITIONS.map(p => 
-      p.id === 'eventos' 
-      ? [p.id, eventosPeriodDataSchema.optional()]
-      : p.id === 'cafeManhaNoShow'
-      ? [p.id, cafeManhaNoShowPeriodDataSchema.optional()]
-      : p.id === 'controleCafeDaManha'
-      ? [p.id, controleCafePeriodDataSchema.optional()]
-      : [p.id, periodDataSchema.optional()]
-    )
+    PERIOD_DEFINITIONS.map(p => {
+      if (p.id === 'eventos') return [p.id, eventosPeriodDataSchema.optional()];
+      if (p.id === 'cafeManhaNoShow') return [p.id, cafeManhaNoShowPeriodDataSchema.optional()];
+      if (p.id === 'controleCafeDaManha') return [p.id, controleCafePeriodDataSchema.optional()];
+      if (p.id === 'controleFrigobar') return [p.id, frigobarPeriodDataSchema.optional()];
+      return [p.id, periodDataSchema.optional()];
+    })
   ),
 });
 
@@ -121,27 +138,38 @@ export const initialDefaultValuesForAllPeriods = (() => {
   PERIOD_DEFINITIONS.forEach(periodDef => {
     const periodId = periodDef.id;
     const config = PERIOD_FORM_CONFIG[periodId];
-    if (!config) {
-      if (periodId === 'eventos') {
-        defaults.eventos = { items: [], periodObservations: '' };
-      } else if (periodId === 'cafeManhaNoShow') {
-        defaults.cafeManhaNoShow = { 
-            items: [], 
-            periodObservations: '',
-            newItem: { id: '', data: undefined, horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
-        };
-      } else if (periodId === 'controleCafeDaManha') {
-        defaults.controleCafeDaManha = { 
-            adultoQtd: undefined,
-            crianca01Qtd: undefined,
-            crianca02Qtd: undefined,
-            contagemManual: undefined,
-            semCheckIn: undefined,
-            periodObservations: '',
-        };
-      }
+    
+    // Handle custom form structures
+    if (periodId === 'eventos') {
+      defaults.eventos = { items: [], periodObservations: '' };
       return;
     }
+    if (periodId === 'cafeManhaNoShow') {
+      defaults.cafeManhaNoShow = { 
+          items: [], 
+          periodObservations: '',
+          newItem: { id: '', data: undefined, horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
+      };
+      return;
+    }
+    if (periodId === 'controleCafeDaManha') {
+      defaults.controleCafeDaManha = { 
+          adultoQtd: undefined,
+          crianca01Qtd: undefined,
+          crianca02Qtd: undefined,
+          contagemManual: undefined,
+          semCheckIn: undefined,
+          periodObservations: '',
+      };
+      return;
+    }
+    if (periodId === 'controleFrigobar') {
+      defaults.controleFrigobar = { logs: [], periodObservations: '', checkoutsPrevistos: undefined, checkoutsProrrogados: undefined };
+      return;
+    }
+    
+    // Handle standard period structures
+    if (!config) return;
 
     const currentPeriodData: any = { periodObservations: '' };
 
@@ -163,27 +191,8 @@ export const initialDefaultValuesForAllPeriods = (() => {
         });
       });
     }
-
-    if (periodId === 'eventos') {
-        defaults.eventos = { items: [], periodObservations: '' };
-    } else if (periodId === 'cafeManhaNoShow') {
-        defaults.cafeManhaNoShow = {
-             items: [], 
-             periodObservations: '',
-             newItem: { id: '', data: undefined, horario: '', hospede: '', uh: '', reserva: '', valor: undefined, observation: '' }
-        };
-    } else if (periodId === 'controleCafeDaManha') {
-        defaults.controleCafeDaManha = { 
-            adultoQtd: undefined,
-            crianca01Qtd: undefined,
-            crianca02Qtd: undefined,
-            contagemManual: undefined,
-            semCheckIn: undefined,
-            periodObservations: '',
-        };
-    } else {
-        defaults[periodId] = currentPeriodData;
-    }
+    
+    defaults[periodId] = currentPeriodData;
   });
 
   return defaults as z.infer<typeof dailyEntryFormSchema>;

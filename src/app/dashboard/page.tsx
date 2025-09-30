@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText, DollarSign } from "lucide-react";
+import { Loader2, PlusCircle, Calendar as CalendarIcon, Sparkles, ReceiptText, DollarSign, Undo2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllDailyEntries } from '@/services/dailyEntryService';
-import type { DailyLogEntry, PeriodId, DashboardAnalysisInput } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardAnalysisInput, EstornoItem } from '@/lib/types';
 import { format, isValid, parseISO, startOfMonth, subMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { getSetting } from '@/services/settingsService';
@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 
 const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth: Date, setSelectedMonth: (date: Date) => void }) => {
@@ -94,6 +95,59 @@ const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth:
     );
 };
 
+const EstornosTable: React.FC<{ totalEstornos: { detalhes: Record<string, { qtd: number; valor: number }>; total: { qtd: number; valor: number } } }> = ({ totalEstornos }) => {
+  const categoryLabels: Record<string, string> = {
+    'restaurante': 'ESTORNO RESTAURANTE',
+    'frigobar': 'ESTORNO FRIGOBAR',
+    'room-service': 'ESTORNO ROOM SERVICE',
+    'outros': 'OUTROS ESTORNOS'
+  };
+
+  const hasDetails = Object.keys(totalEstornos.detalhes).length > 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-semibold uppercase">CONTROLE DE ESTORNOS</CardTitle>
+        <Undo2 className="h-5 w-5 text-muted-foreground" />
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="px-4 py-2 text-xs uppercase">ITEM</TableHead>
+              <TableHead className="px-4 py-2 text-xs uppercase text-right">QTD</TableHead>
+              <TableHead className="px-4 py-2 text-xs uppercase text-right">VALOR DEBITADO</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {hasDetails && Object.entries(totalEstornos.detalhes).map(([category, data]) => (
+                <TableRow key={category}>
+                    <TableCell className="px-4 py-1 text-xs uppercase">{categoryLabels[category] || category.toUpperCase()}</TableCell>
+                    <TableCell className="text-right px-4 py-1 text-xs uppercase">{data.qtd.toLocaleString('pt-BR')}</TableCell>
+                    <TableCell className="text-right px-4 py-1 text-xs uppercase">
+                        <span className="bg-white text-destructive p-1 rounded-md">
+                            - R$ {data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                    </TableCell>
+                </TableRow>
+            ))}
+            <TableRow className="font-semibold bg-muted/50">
+              <TableCell className="px-4 py-2 text-xs uppercase">TOTAL ESTORNOS</TableCell>
+              <TableCell className="text-right px-4 py-2 text-xs">{totalEstornos.total.qtd.toLocaleString('pt-BR')}</TableCell>
+              <TableCell className="text-right px-4 py-2 text-xs">
+                <span className="bg-white text-destructive p-1 rounded-md">
+                    - R$ {totalEstornos.total.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
 
 export default function DashboardPage() {
   const { userRole } = useAuth();
@@ -116,6 +170,7 @@ export default function DashboardPage() {
       overallTotalTransactions: 0,
       totalGeralSemCI: { qtd: 0, valor: 0 },
       totalConsumoInternoGeral: { qtd: 0, valor: 0 },
+      totalEstornos: { detalhes: {}, total: { qtd: 0, valor: 0 } },
       totalRSValor: 0,
       totalRSQtd: 0,
       totalAlmocoValor: 0,
@@ -138,14 +193,20 @@ export default function DashboardPage() {
         const endDateForFetch = endOfMonth(selectedMonth);
         const startDateForFetch = startOfMonth(subMonths(selectedMonth, 2));
 
-        const entriesInRange = await getAllDailyEntries(
-            format(startDateForFetch, 'yyyy-MM-dd'),
-            format(endDateForFetch, 'yyyy-MM-dd'),
-            window.location.origin
-        ) as DailyLogEntry[];
+        const estornosStartDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+        const estornosEndDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+        const estornosPromises = ['restaurante', 'frigobar', 'room-service'].map(cat =>
+            fetch(`/api/estornos?category=${cat}&startDate=${estornosStartDate}&endDate=${estornosEndDate}`).then(res => res.ok ? res.json() : [])
+        );
+
+        const [entriesInRange, visibilityConfig, ...estornosArrays] = await Promise.all([
+            getAllDailyEntries(format(startDateForFetch, 'yyyy-MM-dd'), format(endDateForFetch, 'yyyy-MM-dd'), window.location.origin) as Promise<DailyLogEntry[]>,
+            getSetting('dashboardItemVisibilityConfig'),
+            ...estornosPromises
+        ]);
         
-        const visibilityConfig = await getSetting('dashboardItemVisibilityConfig');
-        
+        const allEstornos = estornosArrays.flat() as EstornoItem[];
+
         const targetYear = selectedMonth.getUTCFullYear();
         const targetMonth = selectedMonth.getUTCMonth();
 
@@ -167,9 +228,9 @@ export default function DashboardPage() {
             return entryYearUTC === targetYear && entryMonthUTC === targetMonth;
         });
 
-        setHasDataForMonth(entriesForMonth.length > 0);
+        setHasDataForMonth(entriesForMonth.length > 0 || allEstornos.length > 0);
 
-        const monthTotals = processEntriesForDashboard(entriesForMonth);
+        const monthTotals = processEntriesForDashboard(entriesForMonth, allEstornos);
         
         const dailyTotalsData = entriesForMonth.map(entry => {
           const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import to avoid server/client issues
@@ -259,14 +320,12 @@ export default function DashboardPage() {
         });
           
         const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
-        const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.filter(
-            item => item.item !== 'ALMOÇO C.I.' && item.item !== 'JANTAR C.I.'
-        ).map(config => ({
+        const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.map(config => ({
             item: config.item,
             qtdDisplay: config.item === 'ROOM SERVICE' ? '0 / 0' : '0',
             valorTotal: 0,
             reportLink: config.periodId 
-                ? `${REPORTS_PATHS.PERIOD}?periodId=${config.periodId}&filterFocus=item&month=${currentMonthStr}` 
+                ? `${REPORTS_PATHS.CLIENT_EXTRACT}?periodId=${config.periodId}&filterFocus=item&month=${currentMonthStr}` 
                 : undefined,
             periodId: config.periodId as PeriodId | undefined,
         }));
@@ -305,6 +364,7 @@ export default function DashboardPage() {
           overallTotalRevenue: monthTotals.grandTotalComCI.valor,
           overallTotalTransactions: monthTotals.grandTotalComCI.qtd,
           totalReajusteCI: monthTotals.totalReajusteCI,
+          totalEstornos: monthTotals.totalEstornos,
           totalRSValor: monthTotals.roomService.valor,
           totalRSQtd: monthTotals.roomService.qtdPedidos,
           totalAlmocoValor: monthTotals.almoco.valor,
@@ -504,6 +564,7 @@ export default function DashboardPage() {
             <DailyTotalsTable dailyTotals={dashboardData.dailyTotals} />
             <div className="space-y-6">
             <MonthlyAccumulatedTable data={dashboardData.acumulativoMensalData} />
+            <EstornosTable totalEstornos={dashboardData.totalEstornos} />
             <InternalConsumptionTable 
                 ciAlmoco={dashboardData.totalCIAlmoco}
                 ciJantar={dashboardData.totalCIJantar}
@@ -543,3 +604,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

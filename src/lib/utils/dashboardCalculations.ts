@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import type { DailyLogEntry } from '@/lib/types';
+import type { DailyLogEntry, EstornoItem } from '@/lib/types';
 import { processEntryForTotals } from './calculations';
 
 export interface DashboardTotals {
@@ -19,6 +18,10 @@ export interface DashboardTotals {
   baliHappy: { qtd: number; valor: number };
   frigobar: { qtd: number; valor: number };
   eventos: { qtd: number; valor: number };
+  totalEstornos: { 
+    detalhes: Record<string, { qtd: number; valor: number }>;
+    total: { qtd: number; valor: number };
+  };
   totalCIAlmoco: { qtd: number; valor: number };
   totalCIJantar: { qtd: number; valor: number };
   totalReajusteCI: number;
@@ -27,7 +30,7 @@ export interface DashboardTotals {
   totalConsumoInternoGeral: { qtd: number; valor: number };
 }
 
-export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardTotals {
+export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: EstornoItem[]): DashboardTotals {
   
   const totals: DashboardTotals = {
     roomService: { qtdPedidos: 0, qtdPratos: 0, valor: 0 },
@@ -43,6 +46,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     baliHappy: { qtd: 0, valor: 0 },
     frigobar: { qtd: 0, valor: 0 },
     eventos: { qtd: 0, valor: 0 },
+    totalEstornos: { detalhes: {}, total: { qtd: 0, valor: 0 } },
     totalCIAlmoco: { qtd: 0, valor: 0 },
     totalCIJantar: { qtd: 0, valor: 0 },
     totalReajusteCI: 0,
@@ -116,6 +120,38 @@ export function processEntriesForDashboard(entries: DailyLogEntry[]): DashboardT
     totals.totalConsumoInternoGeral.valor += entryTotals.totalCI.valor;
     totals.totalConsumoInternoGeral.qtd += entryTotals.totalCI.qtd;
   }
+  
+  // Process Estornos
+  const estornosDebito = estornos.filter(item => 
+      item.reason === 'erro de lancamento' || 
+      item.reason === 'nao consumido' ||
+      item.reason === 'duplicidade'
+  );
+
+  const detalhesEstornos: Record<string, { qtd: number; valor: number }> = {};
+  let totalEstornosValor = 0;
+  let totalEstornosQtd = 0;
+
+  for (const item of estornosDebito) {
+    const category = item.category || 'outros';
+    if (!detalhesEstornos[category]) {
+      detalhesEstornos[category] = { qtd: 0, valor: 0 };
+    }
+    detalhesEstornos[category].qtd += item.quantity || 0;
+    detalhesEstornos[category].valor += item.valorEstorno || 0;
+    
+    totalEstornosQtd += item.quantity || 0;
+    totalEstornosValor += item.valorEstorno || 0;
+  }
+
+  totals.totalEstornos = { 
+    detalhes: detalhesEstornos,
+    total: { qtd: totalEstornosQtd, valor: totalEstornosValor }
+  };
+  
+  // Adjust grand totals with estornos that should be debited
+  totals.grandTotalComCI.valor -= totalEstornosValor;
+  totals.grandTotalSemCI.valor -= totalEstornosValor;
 
   return totals;
 }

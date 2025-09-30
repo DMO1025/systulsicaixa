@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { DailyEntryFormData, ChannelUnitPricesConfig, DailyLogEntry, PeriodData, EventosPeriodData, PeriodId, FaturadoItem, ConsumoInternoItem, CafeManhaNoShowItem, CafeManhaNoShowPeriodData, ControleCafePeriodData, ControleCafeItem, UserRole } from '@/lib/types';
+import type { DailyEntryFormData, ChannelUnitPricesConfig, DailyLogEntry, PeriodData, EventosPeriodData, PeriodId, FaturadoItem, ConsumoInternoItem, CafeManhaNoShowItem, CafeManhaNoShowPeriodData, ControleCafePeriodData, ControleCafeItem, UserRole, FrigobarPeriodData } from '@/lib/types';
 import { getDailyEntry, saveDailyEntry, getAllEntryDates } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
@@ -52,7 +52,20 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
 
   useEffect(() => {
     if (isDateInitialized || !userRole) return;
-    const initialDate = new Date();
+
+    let initialDate = new Date();
+    try {
+        const savedDateString = localStorage.getItem('lastSelectedEntryDate');
+        if (savedDateString) {
+            const parsedDate = parseISO(savedDateString);
+            if (isValid(parsedDate)) {
+                initialDate = parsedDate;
+            }
+        }
+    } catch (error) {
+        console.warn("Could not read date from localStorage, defaulting to today.");
+    }
+    
     form.setValue('date', initialDate, { shouldValidate: true });
     setIsDateInitialized(true);
   }, [userRole, form, isDateInitialized]);
@@ -77,6 +90,7 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
 
   const loadEntryData = useCallback(async (dateToLoad: Date) => {
     if (!dateToLoad || !isValid(dateToLoad)) return;
+
     setIsDataLoading(true);
     setAutoSaveStatus('idle');
     let dataToResetWith: DailyEntryFormData = { ...initialDefaultValuesForAllPeriods, date: dateToLoad };
@@ -110,7 +124,14 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
     }
     if (watchedDateString) {
       const dateToLoad = parseISO(watchedDateString);
-      if (isValid(dateToLoad)) loadEntryData(dateToLoad);
+      if (isValid(dateToLoad)) {
+        loadEntryData(dateToLoad);
+        try {
+            localStorage.setItem('lastSelectedEntryDate', watchedDateString);
+        } catch (error) {
+            console.warn("Could not save date to localStorage.");
+        }
+      }
     } else {
       setIsDataLoading(true);
     }

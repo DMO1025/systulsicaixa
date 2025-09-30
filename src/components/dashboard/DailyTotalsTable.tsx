@@ -77,3 +77,4 @@ const DailyTotalsTable: React.FC<DailyTotalsTableProps> = ({ dailyTotals }) => {
 
 export default DailyTotalsTable;
 
+    

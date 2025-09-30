@@ -10,8 +10,8 @@ export default function ReportsRootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to the default report page which is 'client-extract'
-    router.replace(REPORTS_PATHS.CLIENT_EXTRACT);
+    // Redirect to the default report page which is 'month'
+    router.replace(REPORTS_PATHS.MONTH);
   }, [router]);
 
   return (

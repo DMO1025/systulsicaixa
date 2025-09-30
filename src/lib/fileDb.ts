@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { DailyLogEntry, PeriodData, EventosPeriodData, Settings, User } from './types';
-import { PERIOD_DEFINITIONS } from './constants';
+import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { format, parseISO, isValid } from 'date-fns';
 
 const DATA_DIR = path.join(process.cwd(), 'data');

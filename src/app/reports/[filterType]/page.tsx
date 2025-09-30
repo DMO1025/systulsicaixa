@@ -1,9 +1,8 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isValid, startOfMonth, endOfMonth, eachDayOfInterval, max as maxDate, getYear, getMonth, getDate } from 'date-fns';
@@ -11,7 +10,7 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import type { DateRange } from 'react-day-picker';
 import { REPORTS_GROUPS } from '@/lib/config/navigation';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company } from '@/lib/types';
 import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/config/periods';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
@@ -24,6 +23,7 @@ import ReportToolbar from '@/components/reports/ReportToolbar';
 import GeneralReportView from '@/components/reports/general/GeneralReportView';
 import SingleDayReportView from '@/components/reports/daily/SingleDayReportView';
 import PeriodSpecificReportView from '@/components/reports/period/PeriodSpecificReportView';
+import EstornosReportView from '@/components/reports/estornos/EstornosReportView';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Filter, ListChecks, FileCheck2, Wallet, Refrigerator, CalendarDays, Sun, Moon, Coffee, Utensils, UtensilsCrossed, HelpCircle, Package, Building, Truck, Users, ClipboardCheck, BedDouble, Loader2, BarChartBig, CalendarRange, ListFilter, UserSquare, History } from "lucide-react";
 import ReportLineChart from '@/components/reports/ReportBarChart';
@@ -38,13 +38,16 @@ import { getAuditLogs } from '@/services/auditService';
 import AuditLogView from '@/components/reports/audit/AuditLogView';
 import ResumoLateralCard from '@/components/shared/ResumoLateralCard';
 import ClientReportSummary from '@/components/reports/person/ClientReportSummary';
+import ControleFrigobarReportView from '@/components/reports/controle-frigobar/ControleFrigobarReportView';
 
 export default function ReportsPage() {
   useAuth();
   const params = useParams();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
+  const [estornosData, setEstornosData] = useState<EstornoItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -58,29 +61,49 @@ export default function ReportsPage() {
   const [datesWithEntries, setDatesWithEntries] = useState<Date[]>([]);
   const [consumptionType, setConsumptionType] = useState('all');
   const [selectedClient, setSelectedClient] = useState('all');
-  const [companyName, setCompanyName] = useState('Avalon Restaurante e Eventos Ltda');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyName, setCompanyName] = useState('');
   const [selectedDezena, setSelectedDezena] = useState('all');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [includeCompanyData, setIncludeCompanyData] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
+  const estornoCategoryParam = searchParams.get('category');
+  const [estornoCategory, setEstornoCategory] = useState<string>(estornoCategoryParam || 'all');
+
+  // Update state if URL param changes
+  useEffect(() => {
+    setEstornoCategory(estornoCategoryParam || 'all');
+  }, [estornoCategoryParam]);
 
   const reportInfo = useMemo(() => {
-    return REPORTS_GROUPS.flatMap(g => g.items).find(item => item.id === filterType);
+    let groupItems = REPORTS_GROUPS.flatMap(g => g.items);
+    groupItems = groupItems.concat(groupItems.flatMap(item => item.subItems || []));
+    return groupItems.find(item => item.id === filterType);
   }, [filterType]);
   
   // Effect for fetching static metadata and all entry dates for the calendar
   useEffect(() => {
     async function fetchInitialMetadata() {
       try {
-        const [visibility, prices, allEntryDates] = await Promise.all([
+        const [visibility, prices, allEntryDates, companiesData] = await Promise.all([
           getSetting<DashboardItemVisibilityConfig>('dashboardItemVisibilityConfig'),
           getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig'),
           getAllDailyEntries(undefined, undefined, undefined, 'id'),
+          getSetting<Company[]>('companies'),
         ]);
 
         setVisibilityConfig(visibility || {});
         setUnitPricesConfig(prices || {});
+
+        const fetchedCompanies = Array.isArray(companiesData) ? companiesData : [];
+        setCompanies(fetchedCompanies);
+        if (fetchedCompanies.length > 0) {
+            setCompanyName(fetchedCompanies[0].name);
+        } else {
+            setCompanyName('Avalon Restaurante e Eventos Ltda'); // Default fallback
+        }
+
 
         if (Array.isArray(allEntryDates)) {
              const dates = allEntryDates
@@ -106,7 +129,7 @@ export default function ReportsPage() {
 
         if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
             startDateStr = endDateStr = format(selectedDate, 'yyyy-MM-dd');
-        } else if ((filterType === 'range' || filterType.startsWith('controle-cafe')) && selectedRange?.from && isValid(selectedRange.from)) {
+        } else if ((filterType === 'range' || filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') && selectedRange?.from && isValid(selectedRange.from)) {
             startDateStr = format(selectedRange.from, 'yyyy-MM-dd');
             endDateStr = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : startDateStr;
         } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('client-')) {
@@ -123,28 +146,43 @@ export default function ReportsPage() {
             } finally {
                 setIsLoading(false);
             }
-            return; // Exit early for history filter
+            return;
         }
 
         if (!startDateStr) {
             setFilteredEntries([]);
+            setEstornosData([]);
             setIsLoading(false);
             return;
         }
 
         try {
-            const entries = await getAllDailyEntries(startDateStr, endDateStr);
+            const entryPromise = getAllDailyEntries(startDateStr, endDateStr);
+            
+            let estornosPromise;
+            if (filterType === 'estornos') {
+                const estornosUrl = `/api/estornos?startDate=${startDateStr}&endDate=${endDateStr}&category=${estornoCategory || ''}`;
+                estornosPromise = fetch(estornosUrl).then(res => res.json());
+            }
+
+            const [entries, estornos] = await Promise.all([entryPromise, estornosPromise]);
+
             setFilteredEntries(entries as DailyLogEntry[]);
+            if(estornos) {
+              setEstornosData(estornos);
+            }
+
         } catch (error) {
             console.error("Falha ao buscar dados do relatório:", error);
             toast({ title: "Erro ao Carregar Relatório", description: (error as Error).message, variant: "destructive" });
             setFilteredEntries([]);
+            setEstornosData([]);
         } finally {
             setIsLoading(false);
         }
     }
     fetchReportData();
-  }, [filterType, selectedDate, selectedMonth, selectedRange, toast]);
+  }, [filterType, selectedDate, selectedMonth, selectedRange, toast, estornoCategory]);
 
 
   const visiblePeriodDefinitions = useMemo(() => {
@@ -163,7 +201,7 @@ export default function ReportsPage() {
   }, [visibilityConfig]);
 
   const reportData = useMemo((): ReportData | null => {
-    if (isLoading || filterType === 'date' || filterType.startsWith('client-') || filterType.startsWith('controle-cafe') || filterType === 'history') return null;
+    if (isLoading || filterType === 'date' || filterType.startsWith('client-') || filterType.startsWith('controle-cafe') || filterType === 'history' || filterType === 'estornos' || filterType === 'controle-frigobar') return null;
     const periodForReport = (filterType === 'range' || filterType === 'month') ? 'all' : selectedPeriod;
     return generateReportData(filteredEntries, periodForReport);
   }, [filteredEntries, selectedPeriod, filterType, isLoading]);
@@ -256,7 +294,7 @@ export default function ReportsPage() {
 
 
   const handleExport = async (formatType: 'pdf' | 'excel') => {
-    if (filterType !== 'history' && filteredEntries.length === 0) {
+    if (filterType !== 'history' && filteredEntries.length === 0 && estornosData.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
@@ -272,10 +310,12 @@ export default function ReportsPage() {
         consumptionType,
         selectedClient,
         companyName,
+        companies,
         selectedDezena,
         unitPrices: unitPricesConfig,
         toast,
         includeCompanyData,
+        estornos: estornosData,
     });
   };
 
@@ -315,12 +355,20 @@ export default function ReportsPage() {
         return <AuditLogView logs={auditLogs} />;
     }
 
+    if (filterType === 'estornos') {
+        return <EstornosReportView estornos={estornosData} category={estornoCategory} />;
+    }
+
     if (filterType === 'controle-cafe-no-show') {
       return <ControleCafeReportView entries={filteredEntries} type="no-show" />;
     }
     
     if (filterType === 'controle-cafe') {
       return <ControleCafeReportView entries={filteredEntries} type="controle" />;
+    }
+
+    if (filterType === 'controle-frigobar') {
+      return <ControleFrigobarReportView entries={filteredEntries} />;
     }
 
     if (filterType === 'client-extract') {
@@ -375,7 +423,7 @@ export default function ReportsPage() {
   };
 
   const showToolbar = filterType !== 'history';
-  const showChart = filterType !== 'history' && !filterType.startsWith('client') && !filterType.startsWith('controle-cafe') && filterType !== 'date';
+  const showChart = filterType !== 'history' && !filterType.startsWith('client') && !filterType.startsWith('controle-cafe') && filterType !== 'date' && filterType !== 'estornos' && filterType !== 'controle-frigobar';
   const showAside = useMemo(() => {
     return filterType === 'controle-cafe' || filterType === 'controle-cafe-no-show' || (filterType === 'date' && filteredEntries.length > 0) || filterType.startsWith('client-');
   }, [filterType, filteredEntries]);
@@ -404,16 +452,19 @@ export default function ReportsPage() {
             selectedRange={selectedRange}
             setSelectedRange={setSelectedRange}
             handleExport={handleExport}
-            isDataAvailable={!!reportData || filteredEntries.length > 0 || (filterType === 'history' && auditLogs.length > 0)}
+            isDataAvailable={!!reportData || filteredEntries.length > 0 || (filterType === 'history' && auditLogs.length > 0) || (filterType === 'estornos' && estornosData.length > 0)}
             datesWithEntries={datesWithEntries}
             consumptionType={consumptionType}
             setConsumptionType={setConsumptionType}
+            companies={companies}
             companyName={companyName}
             setCompanyName={setCompanyName}
             selectedDezena={selectedDezena}
             setSelectedDezena={setSelectedDezena}
             includeCompanyData={includeCompanyData}
             setIncludeCompanyData={setIncludeCompanyData}
+            estornoCategory={estornoCategory}
+            setEstornoCategory={setEstornoCategory}
         />
       )}
 

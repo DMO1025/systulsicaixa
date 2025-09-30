@@ -238,7 +238,7 @@ const commonAlmocoJantarStructure = (
       delivery: deliverySubTab,
       faturado: faturadoSubTab,
       consumoInterno: consumoInternoSubTab,
-      frigobar: getFrigobarSubTab('PT')
+      frigobar: getFrigobarSubTab('PT'),
     };
   }
   if (periodPrefix === 'ast') {
@@ -249,7 +249,7 @@ const commonAlmocoJantarStructure = (
       delivery: deliverySubTab,
       faturado: faturadoSubTab,
       consumoInterno: consumoInternoSubTab,
-      frigobar: getFrigobarSubTab('ST')
+      frigobar: getFrigobarSubTab('ST'),
     };
   }
    if (periodPrefix === 'jnt') {
@@ -260,7 +260,7 @@ const commonAlmocoJantarStructure = (
       delivery: deliverySubTab,
       faturado: faturadoSubTab,
       consumoInterno: consumoInternoSubTab,
-      frigobar: getFrigobarSubTab('JNT')
+      frigobar: getFrigobarSubTab('JNT'),
     };
   }
   return {};
@@ -322,6 +322,37 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, IndividualPeriodConfig> = {
     subTabs: commonAlmocoJantarStructure('jnt'),
     payments: false, observations: true
   },
+  frigobar: {
+    subTabs: {
+      primeiroTurno: {
+        label: "1º TURNO",
+        groupedChannels: [
+          { label: "TOTAL DE QUARTOS", qtd: "frgPTTotalQuartos" },
+          { label: "PAGAMENTO RESTAURANTE", vtotal: "frgPTPagRestaurante" },
+          { label: "PAGAMENTO HOTEL", vtotal: "frgPTPagHotel" },
+        ]
+      },
+      segundoTurno: {
+        label: "2º TURNO",
+        groupedChannels: [
+          { label: "TOTAL DE QUARTOS", qtd: "frgSTTotalQuartos" },
+          { label: "PAGAMENTO RESTAURANTE", vtotal: "frgSTPagRestaurante" },
+          { label: "PAGAMENTO HOTEL", vtotal: "frgSTPagHotel" },
+        ]
+      },
+      jantar: {
+        label: "JANTAR",
+        groupedChannels: [
+          { label: "TOTAL DE QUARTOS", qtd: "frgJNTTotalQuartos" },
+          { label: "PAGAMENTO RESTAURANTE", vtotal: "frgJNTPagRestaurante" },
+          { label: "PAGAMENTO HOTEL", vtotal: "frgJNTPagHotel" },
+        ]
+      },
+    },
+    description: "Lançamento de vendas de frigobar nos turnos.",
+    payments: false,
+    observations: true,
+  },
   
   baliAlmoco: { ..._DEFAULT_DIRECT_CHANNELS_CONFIG, description: "Movimentação do Bali Bar durante o almoço." },
   baliHappy: { ..._DEFAULT_DIRECT_CHANNELS_CONFIG, description: "Movimentação do Bali Bar durante o happy hour." },
@@ -373,6 +404,14 @@ export const PERIOD_FORM_CONFIG: Record<PeriodId, IndividualPeriodConfig> = {
     payments: false,
     observations: true,
   },
+  controleFrigobar: {
+    customForm: true,
+    description: "Controle de consumo e perdas do frigobar.",
+  },
+  estornoFrigobar: {
+    customForm: true,
+    description: "Controle de estornos do frigobar.",
+  }
 };
 
 

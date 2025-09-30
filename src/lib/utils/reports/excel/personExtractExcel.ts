@@ -1,4 +1,7 @@
+
 import * as XLSX from 'xlsx';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { DailyLogEntry } from '../types';
 import { extractPersonTransactions } from '@/lib/reports/person/generator';
 
@@ -10,7 +13,7 @@ export const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogE
      const dataForSheet = allTransactions.map(t => ({
         'Empresa': companyName,
         'Pessoa': t.personName,
-        'Data': t.date,
+        'Data': format(parseISO(t.date.split('/').reverse().join('-')), 'dd/MM/yyyy', { locale: ptBR }),
         'Origem': t.origin,
         'Observação': t.observation,
         'Quantidade': t.quantity,
@@ -37,3 +40,5 @@ export const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogE
      const ws = XLSX.utils.json_to_sheet(dataForSheet);
      XLSX.utils.book_append_sheet(wb, ws, 'Extrato_Pessoas');
 };
+
+    

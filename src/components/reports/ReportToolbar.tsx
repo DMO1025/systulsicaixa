@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -10,11 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble, Building2, Building } from "lucide-react";
+import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFilter, CalendarDays, BarChartBig, UserSquare, ClipboardCheck, BedDouble, Building2, Building, Undo2 } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
-import type { FilterType, PeriodId, DateRange } from '@/lib/types';
+import type { FilterType, PeriodId, DateRange, Company } from '@/lib/types';
 import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
 import { Switch } from '@/components/ui/switch';
 
@@ -35,12 +34,15 @@ interface ReportToolbarProps {
     datesWithEntries: Date[];
     consumptionType: string;
     setConsumptionType: (value: string) => void;
+    companies: Company[];
     companyName: string;
     setCompanyName: (value: string) => void;
     selectedDezena?: string;
     setSelectedDezena?: (value: string) => void;
     includeCompanyData: boolean;
     setIncludeCompanyData: (value: boolean) => void;
+    estornoCategory?: string;
+    setEstornoCategory?: (value: string) => void;
 }
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -60,12 +62,15 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     datesWithEntries,
     consumptionType,
     setConsumptionType,
+    companies,
     companyName,
     setCompanyName,
     selectedDezena,
     setSelectedDezena,
     includeCompanyData,
-    setIncludeCompanyData
+    setIncludeCompanyData,
+    estornoCategory,
+    setEstornoCategory
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -148,7 +153,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
                     
-                    {(filterType === 'range' || filterType.startsWith('controle-cafe')) && (
+                    {(filterType === 'range' || filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') && (
                        <div className="space-y-2">
                          <Label htmlFor="date-range">Intervalo de Datas</Label>
                             <Popover>
@@ -245,7 +250,7 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </Select>
                         </div>
                     )}
-
+                    
                     {filterType.startsWith('client-') && (
                         <div className="space-y-2">
                             <Label htmlFor="consumptionType">Tipo de Consumo</Label>
@@ -259,6 +264,23 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                     <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
                                     <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
                                     <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {filterType === 'estornos' && setEstornoCategory && (
+                        <div className="space-y-2">
+                            <Label htmlFor="estornoCategory">Categoria do Estorno</Label>
+                            <Select value={estornoCategory} onValueChange={setEstornoCategory}>
+                                <SelectTrigger id="estornoCategory" className="w-full">
+                                    <SelectValue placeholder="Selecione a categoria" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="restaurante">Restaurante</SelectItem>
+                                    <SelectItem value="frigobar">Frigobar</SelectItem>
+                                    <SelectItem value="room-service">Room Service</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -283,14 +305,13 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
 
                     <div className="space-y-2">
                         <Label htmlFor="companyName" className="flex items-center gap-1.5"><Building className="h-4 w-4 text-muted-foreground"/>Empresa</Label>
-                        <Select value={companyName} onValueChange={setCompanyName}>
+                         <Select value={companyName} onValueChange={setCompanyName}>
                             <SelectTrigger id="companyName" className="w-full">
                                 <SelectValue placeholder="Selecione a empresa" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Avalon Restaurante e Eventos Ltda">Avalon Restaurante e Eventos Ltda</SelectItem>
-                                <SelectItem value="Momentum Gastronomico Ltda">Momentum Gastronomico Ltda</SelectItem>
-                                <SelectItem value="Rubi Restaurante e Eventos Ltda">Rubi Restaurante e Eventos Ltda</SelectItem>
+                                {companies.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                                {companies.length === 0 && <div className="text-center text-sm text-muted-foreground p-4">Nenhuma empresa cadastrada.</div>}
                             </SelectContent>
                         </Select>
                     </div>
@@ -316,3 +337,5 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
 };
 
 export default ReportToolbar;
+
+    

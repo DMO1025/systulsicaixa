@@ -1,7 +1,7 @@
 
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getDbPool, DATABASE_INIT_SCHEMA, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME } from '@/lib/mysql';
+import { getDbPool, DATABASE_INIT_COMMANDS, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME, ESTORNOS_TABLE_NAME } from '@/lib/mysql';
 import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData, SubTabData } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import mysql, { type PoolOptions, type RowDataPacket } from 'mysql2/promise';
@@ -54,11 +54,18 @@ async function ensureTables(): Promise<NextResponse> {
       if (!pool || !(await isMysqlConnected(pool))) {
         return NextResponse.json({ message: 'Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.' }, { status: 500 });
       }
-      const statements = DATABASE_INIT_SCHEMA.split(';').filter(s => s.trim().length > 0);
-      for (const statement of statements) {
-          await pool.query(statement);
+
+      for (const command of DATABASE_INIT_COMMANDS) {
+          try {
+            await pool.query(command);
+          } catch(err: any) {
+              // Ignore "Duplicate key name" error which happens if PRIMARY KEY already exists on other tables.
+              if(err.code !== 'ER_DUP_KEYNAME') {
+                  throw err;
+              }
+          }
       }
-      return NextResponse.json({ message: 'Tabelas do banco de dados (lançamentos, usuários, configurações) verificadas/criadas com sucesso!' });
+      return NextResponse.json({ message: 'Tabelas do banco de dados (lançamentos, usuários, configurações, estornos e frigobar) verificadas/criadas com sucesso!' });
     } catch (error: any) {
       console.error('API db-admin/ensure-table erro:', error);
       return NextResponse.json({ message: `Erro ao verificar/criar tabelas: ${error.message}` }, { status: 500 });
@@ -98,10 +105,10 @@ async function updateMysqlStructure(): Promise<NextResponse> {
         await connection.beginTransaction();
         log.push('Transação iniciada.');
         
-        // Add new columns if they don't exist
         const [tableInfo] = await connection.query<RowDataPacket[]>(`SHOW COLUMNS FROM \`${DAILY_ENTRIES_TABLE_NAME}\``);
         const existingColumns = new Set(tableInfo.map(c => c.Field));
-
+        
+        log.push('Verificando se as colunas de períodos existem...');
         for (const pDef of PERIOD_DEFINITIONS) {
             if (!existingColumns.has(pDef.id)) {
                 log.push(`  - Coluna '${pDef.id}' não encontrada. Adicionando...`);
@@ -109,18 +116,15 @@ async function updateMysqlStructure(): Promise<NextResponse> {
                 log.push(`  - Coluna '${pDef.id}' adicionada com sucesso.`);
             }
         }
+        log.push('Verificação de colunas concluída.');
 
         const [allEntries] = await connection.query<RowDataPacket[]>(`SELECT * FROM \`${DAILY_ENTRIES_TABLE_NAME}\``);
-        log.push(`Encontrados ${allEntries.length} registros no MySQL para verificação.`);
+        log.push(`Encontrados ${allEntries.length} registros no MySQL para verificação de dados internos.`);
         let updatedCount = 0;
 
         for (const rawEntry of allEntries) {
             const transformedEntry = applyStructuralTransformations(rawEntry, log);
-
-            // This logic is simplified; in a real scenario, you'd have more complex transformation rules
-            // For now, we just ensure data is parsed. If you need to move data between columns, add logic here.
             
-            // Check if any transformation actually changed the object
             let hasChanged = false;
             for(const key in transformedEntry) {
                 if(JSON.stringify(transformedEntry[key]) !== JSON.stringify(rawEntry[key])) {
@@ -129,16 +133,14 @@ async function updateMysqlStructure(): Promise<NextResponse> {
                 }
             }
 
-
             if (hasChanged) {
                 updatedCount++;
-                log.push(`  - [${transformedEntry.id}] Modificações detectadas. Preparando para atualizar...`);
+                log.push(`  - [${transformedEntry.id}] Modificações de tipo de dados detectadas. Preparando para atualizar...`);
                 
                 const updateFragments: string[] = [];
                 const updateValues: (string | null)[] = [];
 
                 PERIOD_DEFINITIONS.forEach(pDef => {
-                    // Only update columns that exist in the transformed entry
                     if (transformedEntry.hasOwnProperty(pDef.id)) {
                        updateFragments.push(`\`${pDef.id}\` = ?`);
                        updateValues.push(safeStringify(transformedEntry[pDef.id]));
@@ -149,8 +151,6 @@ async function updateMysqlStructure(): Promise<NextResponse> {
                     updateValues.push(transformedEntry.id);
                     const updateSql = `UPDATE \`${DAILY_ENTRIES_TABLE_NAME}\` SET ${updateFragments.join(', ')} WHERE id = ?`;
                     await connection.query(updateSql, updateValues);
-                } else {
-                     log.push(`  - [${transformedEntry.id}] Nenhuma alteração estrutural necessária para atualizar colunas.`);
                 }
             }
         }
@@ -163,7 +163,7 @@ async function updateMysqlStructure(): Promise<NextResponse> {
             log.push("Cache de lançamentos ('entries') invalidado.");
         }
 
-        const successMessage = `Verificação concluída. ${updatedCount > 0 ? `${updatedCount} de ${allEntries.length} registros foram atualizados` : `Nenhuma atualização estrutural foi necessária nos ${allEntries.length} registros.`} As colunas da tabela também foram verificadas e atualizadas.`;
+        const successMessage = `Verificação concluída. ${updatedCount > 0 ? `${updatedCount} de ${allEntries.length} registros foram atualizados` : `Nenhuma atualização de dados internos foi necessária.`} As colunas da tabela também foram verificadas e atualizadas.`;
         log.push(`\n${successMessage}`);
 
         return NextResponse.json({ message: successMessage, log });
@@ -228,7 +228,6 @@ async function clearFciData(request: NextRequest): Promise<NextResponse> {
                     try {
                         const periodData = JSON.parse(rawEntry[periodId]);
                         
-                        // Limpa o formato antigo, preservando os itens do novo formato.
                         if (periodData?.subTabs?.ciEFaturados) {
                             periodData.subTabs.ciEFaturados.channels = {};
                             entryChanged = true;

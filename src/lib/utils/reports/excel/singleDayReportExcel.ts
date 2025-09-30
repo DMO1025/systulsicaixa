@@ -1,5 +1,7 @@
+
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { DailyLogEntry, EventosPeriodData, PeriodData, SalesChannelId } from '../types';
 import { processEntryForTotals } from '@/lib/utils/calculations';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
@@ -10,8 +12,8 @@ const formatCurrency = (value: number | undefined) => Number(value || 0);
 const formatNumber = (value: number | undefined) => Number(value || 0);
 
 export const generateSingleDayReportExcel = (wb: XLSX.WorkBook, entry: DailyLogEntry, companyName?: string) => {
-    const dateStr = format(parseISO(String(entry.id)), 'yyyy-MM-dd');
-    const sheetName = `Relatorio_${dateStr}`;
+    const dateStr = format(parseISO(String(entry.id)), 'dd/MM/yyyy', { locale: ptBR });
+    const sheetName = `Relatorio_${format(parseISO(String(entry.id)), 'yyyy-MM-dd')}`;
     const ws_data: any[][] = [];
 
     // Header
@@ -111,3 +113,5 @@ export const generateSingleDayReportExcel = (wb: XLSX.WorkBook, entry: DailyLogE
 
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 };
+
+    

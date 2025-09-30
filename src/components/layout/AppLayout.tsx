@@ -4,6 +4,7 @@
 import React, { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from './Header';
+import Breadcrumbs from './Breadcrumbs'; // Import the new component
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -38,6 +39,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background overflow-auto">
+        <Breadcrumbs /> {/* Add Breadcrumbs here */}
         {children}
       </main>
     </div>

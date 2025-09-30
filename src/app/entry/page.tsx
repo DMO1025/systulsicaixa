@@ -19,7 +19,8 @@ interface UICardConfig { // Renamed from CardConfig to avoid conflict
   label: string;
   href: string;
   icon: React.ElementType;
-  type: 'period'; 
+  type: 'period';
+  description?: string;
 }
 
 const operatorShiftCardsConfig: Record<OperatorShift, string[]> = {
@@ -46,6 +47,7 @@ export default function DailyEntrySelectorPage() {
           href: `${PATHS.ENTRY_BASE}/${period.id}`,
           icon: getPeriodIcon(period.id),
           type: 'period',
+          description: period.description,
         }));
 
       try {
@@ -111,29 +113,23 @@ export default function DailyEntrySelectorPage() {
         </CardHeader>
         <CardContent>
           {visibleCards.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {visibleCards.map((card) => {
                 const Icon = card.icon;
                 return (
-                  <Link
-                    href={card.href}
-                    key={card.id}
-                    className={cn(
-                      "group block rounded-lg ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                      "cursor-pointer hover:shadow-lg transition-shadow duration-200"
-                    )}
-                    aria-label={card.label}
-                  >
-                    <Card 
-                      className={cn(
-                        "ring-1 ring-border bg-card text-card-foreground shadow-sm h-full", 
-                        "flex flex-col items-center justify-center space-y-2 aspect-square p-3 sm:p-4"
-                      )}
-                    >
-                      <Icon className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground group-hover:text-primary" />
-                      <p className="text-xs sm:text-sm text-center font-medium text-foreground group-hover:text-primary">
-                        {card.label}
-                      </p>
+                  <Link href={card.href} key={card.id}>
+                    <Card className="hover:bg-muted/50 hover:shadow-lg transition-all h-full">
+                      <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                        <div className="p-3 bg-primary/10 rounded-lg">
+                            <Icon className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{card.label}</CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{card.description || `Acessar o lançamento de ${card.label}.`}</p>
+                      </CardContent>
                     </Card>
                   </Link>
                 );

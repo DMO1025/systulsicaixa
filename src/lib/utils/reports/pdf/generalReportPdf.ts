@@ -1,22 +1,28 @@
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
-import type { ExportParams } from '../types';
+import { ptBR } from 'date-fns/locale';
+import type { ExportParams, GeneralReportViewData, PeriodDefinition } from '../types';
 import { getPeriodIcon } from '@/lib/config/periods';
+import { drawHeaderAndFooter } from './pdfUtils';
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
-export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams, dateRangeStr: string) => {
-    const { reportData, visiblePeriods, companyName, includeCompanyData } = params;
+export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams) => {
+    const { reportData, visiblePeriods, month, range } = params;
 
     if (reportData?.type !== 'general') return;
     const data = reportData.data;
+
+    const dateRangeStr = range?.from 
+      ? `${format(range.from, 'dd/MM/yyyy')} a ${range.to ? format(range.to, 'dd/MM/yyyy') : format(range.from, 'dd/MM/yyyy')}`
+      : month ? format(month, 'MMMM \'de\' yyyy', { locale: ptBR }) : '';
+
     
-    // Consolidate "Almoço" periods and respect visibility
     const reportablePeriods = visiblePeriods.reduce((acc, p) => {
-        if (p.type !== 'entry' || p.id === 'madrugada') return acc; // Exclude madrugada as it's part of Room Service
+        if (p.type !== 'entry' || p.id === 'madrugada') return acc;
         if (p.id.includes('almoco')) {
             if (!acc.find(item => item.id === 'almoco')) {
                 acc.push({ ...p, id: 'almoco', label: 'Almoço' });
@@ -70,96 +76,22 @@ export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams, dateR
         formatCurrency(data.summary.grandTotalSemCI)
     ]];
 
+    const headerHeight = drawHeaderAndFooter(doc, `Relatório Geral - ${data.reportTitle}`, dateRangeStr, params, 1, (doc as any).internal.getNumberOfPages());
+
     autoTable(doc, {
         head: head,
         body: body,
         foot: footer,
-        startY: includeCompanyData ? 95 : 40,
         theme: 'striped',
         styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', halign: 'center', valign: 'middle' },
         headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
         footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', fontSize: 7, halign: 'center' },
-        didDrawPage: (data) => {
-            if (includeCompanyData) {
-                let finalY = 30;
-                doc.setFontSize(14);
-                doc.text(companyName || "Avalon Restaurante e Eventos Ltda", 40, finalY);
-                finalY += 15;
-                doc.setFontSize(10);
-                doc.text(`Relatório Geral - ${reportData.data.reportTitle}`, 40, finalY);
-                finalY += 13;
-                doc.setFontSize(9);
-                doc.text(dateRangeStr, 40, finalY);
-                finalY += 13;
-                
-                if (companyName === 'Rubi Restaurante e Eventos Ltda') {
-                    autoTable(doc, {
-                        body: [['FAVORECIDO: RUBI RESTAURANTE E EVENTOS LTDA', 'BANCO: ITAÚ (341)'], ['CNPJ: 56.034.124/0001-42', 'AGENCIA: 0641 | CONTA CORRENTE: 98250'],],
-                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                    });
-                } else if (companyName === 'Avalon Restaurante e Eventos Ltda') {
-                     autoTable(doc, {
-                        body: [['CNPJ: 08.439.825/0001-19', 'BANCO: BRADESCO (237)'], ['', 'AGENCIA: 07828 | CONTA CORRENTE: 0179750-6'],],
-                        startY: finalY, theme: 'plain', styles: { fontSize: 8, cellPadding: 1 },
-                    });
-                }
-            }
-
-            doc.setFontSize(8);
-            const pageCount = doc.internal.pages.length - 1;
-            doc.text(`Página ${data.pageNumber} de ${pageCount}`, doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 20);
-            doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 40, doc.internal.pageSize.height - 20);
-        },
-        willDrawPage: (hookData) => {
-             // Add summary tables at the end of the last page
-            if (hookData.pageNumber === hookData.pageCount) {
-                const summary = data.summary;
-                const tmGeral = (summary.grandTotalQtd - summary.grandTotalCIQtd > 0)
-                    ? summary.grandTotalSemCI / (summary.grandTotalQtd - summary.grandTotalCIQtd)
-                    : 0;
-
-                const rsTotal = summary.periodTotals.roomService || { qtd: 0, valor: 0 };
-                const tmRS = rsTotal.qtd > 0 ? rsTotal.valor / rsTotal.qtd : 0;
-
-                const almocoQtd = almocoTotalSummary.qtd;
-                const almocoValor = almocoTotalSummary.valor;
-                const tmAlmoco = almocoQtd > 0 ? almocoValor / almocoQtd : 0;
-
-                const jantarTotal = summary.periodTotals.jantar || { qtd: 0, valor: 0 };
-                const tmJantar = jantarTotal.qtd > 0 ? jantarTotal.valor / jantarTotal.qtd : 0;
-
-                const frigobarTotal = summary.periodTotals.frigobar || { qtd: 0, valor: 0 };
-                const tmFrigobar = frigobarTotal.qtd > 0 ? frigobarTotal.valor / frigobarTotal.qtd : 0;
-                
-                const tableStartY = hookData.cursor?.y ? hookData.cursor.y + 20 : 40;
-                
-                autoTable(doc, {
-                    body: [
-                        [{ content: 'Receita Total (com CI)', styles: { fontStyle: 'bold' } }, formatCurrency(summary.grandTotalComCI)],
-                        [{ content: 'Receita Líquida (sem CI)', styles: { fontStyle: 'bold' } }, formatCurrency(summary.grandTotalSemCI)]
-                    ],
-                    startY: tableStartY,
-                    theme: 'grid',
-                    tableWidth: 250,
-                    styles: { fontSize: 9 },
-                    columnStyles: { 1: { halign: 'right' } }
-                });
-
-                autoTable(doc, {
-                    head: [['Ticket Médio Serviços Restaurante']],
-                    body: [
-                        ['Room Service', formatCurrency(tmRS)],
-                        ['Almoço', formatCurrency(tmAlmoco)],
-                        ['Jantar', formatCurrency(tmJantar)],
-                        ['Frigobar', formatCurrency(tmFrigobar)]
-                    ],
-                    startY: tableStartY,
-                    theme: 'grid',
-                    tableWidth: 250,
-                    margin: { left: 300 },
-                    headStyles: { fontStyle: 'bold' },
-                    columnStyles: { 1: { halign: 'right' } }
-                });
+        showFoot: 'lastPage',
+        margin: { top: headerHeight },
+        didDrawPage: (hookData) => {
+            const totalPages = (doc as any).internal.getNumberOfPages();
+            if(totalPages > 1) {
+                drawHeaderAndFooter(doc, `Relatório Geral - ${data.reportTitle}`, dateRangeStr, params, hookData.pageNumber, totalPages);
             }
         }
     });
