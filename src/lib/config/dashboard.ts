@@ -15,8 +15,8 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
   { item: "BALI ALMOÇO", periodId: "baliAlmoco" },
   { item: "BALI HAPPY HOUR", periodId: "baliHappy" },
   { item: "FRIGOBAR", periodId: "frigobar" },
-  { item: "EVENTOS", periodId: "eventos" },
-  // { item: "CONTROLE ESTORNO", periodId: "estornos" }, // Removido daqui
+  { item: "EVENTOS (DIRETO)", periodId: "eventos" },
+  { item: "EVENTOS (HOTEL)", periodId: "eventos" },
 ] as const;
 
 // --- Summary Card Constants ---

@@ -17,7 +17,8 @@ export interface DashboardTotals {
   baliAlmoco: { qtd: number; valor: number };
   baliHappy: { qtd: number; valor: number };
   frigobar: { qtd: number; valor: number };
-  eventos: { qtd: number; valor: number };
+  eventosDireto: { qtd: number; valor: number };
+  eventosHotel: { qtd: number; valor: number };
   totalEstornos: { 
     detalhes: Record<string, { qtd: number; valor: number }>;
     total: { qtd: number; valor: number };
@@ -45,7 +46,8 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
     baliAlmoco: { qtd: 0, valor: 0 },
     baliHappy: { qtd: 0, valor: 0 },
     frigobar: { qtd: 0, valor: 0 },
-    eventos: { qtd: 0, valor: 0 },
+    eventosDireto: { qtd: 0, valor: 0 },
+    eventosHotel: { qtd: 0, valor: 0 },
     totalEstornos: { detalhes: {}, total: { qtd: 0, valor: 0 } },
     totalCIAlmoco: { qtd: 0, valor: 0 },
     totalCIJantar: { qtd: 0, valor: 0 },
@@ -83,11 +85,11 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
     totals.frigobar.valor += entryTotals.frigobar.valor;
     totals.frigobar.qtd += entryTotals.frigobar.qtd;
     
-    // --- Eventos ---
-    const eventosTotal = entryTotals.eventos.direto.valor + entryTotals.eventos.hotel.valor;
-    const eventosQtd = entryTotals.eventos.direto.qtd + entryTotals.eventos.hotel.qtd;
-    totals.eventos.valor += eventosTotal;
-    totals.eventos.qtd += eventosQtd;
+    // --- Eventos (Direto vs Hotel) ---
+    totals.eventosDireto.valor += entryTotals.eventos.direto.valor;
+    totals.eventosDireto.qtd += entryTotals.eventos.direto.qtd;
+    totals.eventosHotel.valor += entryTotals.eventos.hotel.valor;
+    totals.eventosHotel.qtd += entryTotals.eventos.hotel.qtd;
     
     // --- C.I. & Reajuste ---
     totals.totalCIAlmoco.valor += entryTotals.almocoCI.valor;

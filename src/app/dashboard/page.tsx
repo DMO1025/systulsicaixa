@@ -344,7 +344,8 @@ export default function DashboardPage() {
                 case "BALI ALMOÇO": return { ...item, qtdDisplay: monthTotals.baliAlmoco.qtd.toString(), valorTotal: monthTotals.baliAlmoco.valor };
                 case "BALI HAPPY HOUR": return { ...item, qtdDisplay: monthTotals.baliHappy.qtd.toString(), valorTotal: monthTotals.baliHappy.valor };
                 case "FRIGOBAR": return { ...item, qtdDisplay: monthTotals.frigobar.qtd.toString(), valorTotal: monthTotals.frigobar.valor };
-                case "EVENTOS": return { ...item, qtdDisplay: monthTotals.eventos.qtd.toString(), valorTotal: monthTotals.eventos.valor };
+                case "EVENTOS (DIRETO)": return { ...item, qtdDisplay: monthTotals.eventosDireto.qtd.toString(), valorTotal: monthTotals.eventosDireto.valor };
+                case "EVENTOS (HOTEL)": return { ...item, qtdDisplay: monthTotals.eventosHotel.qtd.toString(), valorTotal: monthTotals.eventosHotel.valor };
                 default: return item;
             }
         });
@@ -604,5 +605,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
