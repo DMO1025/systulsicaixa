@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { DailyLogEntry } from '@/lib/types';
+import type { DailyLogEntry, PeriodData, ConsumoInternoItem, FaturadoItem } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,13 +21,14 @@ interface ClientExtractViewProps {
   setSelectedClient: (client: string) => void;
   startDate?: string;
   endDate?: string;
+  onTransactionsUpdate: (transactions: UnifiedPersonTransaction[]) => void;
 }
 
 
 const formatCurrency = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const formatNumber = (value: number) => (value || 0).toLocaleString('pt-BR');
 
-const ClientExtractView: React.FC<ClientExtractViewProps> = ({ entries, consumptionType, selectedClient, setSelectedClient, startDate, endDate }) => {
+const ClientExtractView: React.FC<ClientExtractViewProps> = ({ entries, consumptionType, selectedClient, setSelectedClient, startDate, endDate, onTransactionsUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<UnifiedPersonTransaction | null>(null);
   
@@ -41,16 +43,20 @@ const ClientExtractView: React.FC<ClientExtractViewProps> = ({ entries, consumpt
   useEffect(() => {
     setDisplayedData(allTransactions);
     setCurrentPersonList(personList);
-  }, [allTransactions, personList]);
+    onTransactionsUpdate(allTransactions); // Pass initial data to parent
+  }, [allTransactions, personList, onTransactionsUpdate]);
 
 
   useEffect(() => {
+    let filtered;
     if (selectedClient === 'all') {
-        setDisplayedData(allTransactions);
+        filtered = allTransactions;
     } else {
-        setDisplayedData(allTransactions.filter(t => t.personName === selectedClient));
+        filtered = allTransactions.filter(t => t.personName === selectedClient);
     }
-  }, [selectedClient, allTransactions]);
+    setDisplayedData(filtered);
+    onTransactionsUpdate(filtered);
+  }, [selectedClient, allTransactions, onTransactionsUpdate]);
   
 
   const clientTotals = useMemo(() => {
@@ -68,20 +74,21 @@ const ClientExtractView: React.FC<ClientExtractViewProps> = ({ entries, consumpt
   }, [currentPersonList, selectedClient, setSelectedClient]);
 
   const handleObservationUpdated = (updatedTransaction: UnifiedPersonTransaction) => {
-      setDisplayedData(prevData =>
-        prevData.map(item =>
+      const updatedData = displayedData.map(item =>
           item.id === updatedTransaction.id ? updatedTransaction : item
-        )
       );
+      setDisplayedData(updatedData);
+      onTransactionsUpdate(updatedData);
   };
   
   const handleNameUpdated = (oldName: string, newName: string) => {
-    setDisplayedData(prevData =>
-      prevData.map(item =>
+    const updatedData = displayedData.map(item =>
         item.personName === oldName ? { ...item, personName: newName } : item
-      )
     );
-     setCurrentPersonList(prevList => {
+    setDisplayedData(updatedData);
+    onTransactionsUpdate(updatedData);
+
+    setCurrentPersonList(prevList => {
         const newList = prevList.map(name => name === oldName ? newName : name);
         return [...new Set(newList)].sort((a,b) => a.localeCompare(b));
     });

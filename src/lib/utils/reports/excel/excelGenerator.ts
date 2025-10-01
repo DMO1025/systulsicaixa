@@ -1,4 +1,5 @@
 
+
 import * as XLSX from 'xlsx';
 import type { ExportParams } from '../types';
 import { generateGeneralReportExcel } from './generalReportExcel';
@@ -13,10 +14,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.WorkBook | null> => {
-    const { filterType, entries, reportData, toast, unitPrices } = params;
+    const { filterType, entries, reportData, toast, unitPrices, personTransactions } = params;
     const wb = XLSX.utils.book_new();
 
-    if (entries.length === 0 && filterType !== 'history' && params.estornos?.length === 0) {
+    if (entries.length === 0 && filterType !== 'history' && params.estornos?.length === 0 && personTransactions?.length === 0) {
         if (toast) toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
         return null;
     }
@@ -44,8 +45,10 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
             }
             break;
         case 'client-extract':
-            generatePersonExtractExcel(wb, entries, params.consumptionType || 'all', params.selectedClient, params.companyName);
-            sheetsAdded = true;
+            if (personTransactions) {
+                generatePersonExtractExcel(wb, personTransactions, params.selectedClient, params.companyName);
+                sheetsAdded = true;
+            }
             break;
         case 'client-summary':
             generatePersonSummaryExcel(wb, entries, params.consumptionType || 'all', params.companyName);
@@ -81,5 +84,3 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
 
     return wb;
 };
-
-    

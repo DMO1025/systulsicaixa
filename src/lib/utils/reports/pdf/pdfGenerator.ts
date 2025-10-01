@@ -1,3 +1,4 @@
+
 import type { jsPDF as jsPDFType } from 'jspdf';
 import { format } from 'date-fns';
 import { getFilename } from '../exportUtils';
@@ -16,7 +17,7 @@ import { generateControleFrigobarPdf } from './controleFrigobarPdf';
 
 export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { formatType: 'pdf' }) => {
     const { default: jsPDF } = await import('jspdf');
-    const { filterType, date, month, range, reportData } = params;
+    const { filterType, date, month, range, reportData, personTransactions } = params;
 
     const isSalesReport = filterType === 'month' || filterType === 'range' || filterType === 'period';
     const orientation = isSalesReport ? 'landscape' : 'portrait';
@@ -27,10 +28,10 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     const consumptionLabel = params.consumptionType ? params.consumptionType.replace('faturado-', '').replace('ci', 'consumo-interno') : '';
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') {
+    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar' || filterType === 'client-extract' || filterType === 'client-summary') {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
-            : 'periodo_indefinido';
+            : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
     } else if (filterType === 'date' && date) {
         dateRangeFilenameStr = format(date, 'yyyy-MM-dd');
     } else if (filterType === 'range' && range?.from) {

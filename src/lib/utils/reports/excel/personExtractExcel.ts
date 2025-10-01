@@ -1,16 +1,18 @@
 
+
 import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { DailyLogEntry } from '../types';
+import type { DailyLogEntry, UnifiedPersonTransaction } from '../types';
 import { extractPersonTransactions } from '@/lib/reports/person/generator';
 
-export const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogEntry[], consumptionType: string, selectedPerson?: string, companyName?: string) => {
-    let { allTransactions } = extractPersonTransactions(entries, consumptionType);
+export const generatePersonExtractExcel = (wb: XLSX.WorkBook, transactions: UnifiedPersonTransaction[], selectedPerson?: string, companyName?: string) => {
+    let transactionsToExport = transactions;
     if(selectedPerson && selectedPerson !== 'all') {
-      allTransactions = allTransactions.filter(t => t.personName === selectedPerson);
+      transactionsToExport = transactions.filter(t => t.personName === selectedPerson);
     }
-     const dataForSheet = allTransactions.map(t => ({
+
+     const dataForSheet = transactionsToExport.map(t => ({
         'Empresa': companyName,
         'Pessoa': t.personName,
         'Data': format(parseISO(t.date.split('/').reverse().join('-')), 'dd/MM/yyyy', { locale: ptBR }),
@@ -20,7 +22,7 @@ export const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogE
         'Valor': t.value
      }));
 
-     const totals = allTransactions.reduce((acc, t) => {
+     const totals = transactionsToExport.reduce((acc, t) => {
         acc.qtd += t.quantity;
         acc.valor += t.value;
         return acc;
@@ -40,5 +42,3 @@ export const generatePersonExtractExcel = (wb: XLSX.WorkBook, entries: DailyLogE
      const ws = XLSX.utils.json_to_sheet(dataForSheet);
      XLSX.utils.book_append_sheet(wb, ws, 'Extrato_Pessoas');
 };
-
-    

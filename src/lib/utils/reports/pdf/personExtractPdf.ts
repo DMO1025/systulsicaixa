@@ -1,10 +1,10 @@
 
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { ExportParams } from '../types';
-import { extractPersonTransactions } from '@/lib/reports/person/generator';
+import type { ExportParams, UnifiedPersonTransaction } from '../types';
 import { getConsumptionTypeLabel } from '../exportUtils';
 import { drawHeaderAndFooter } from './pdfUtils';
 
@@ -12,15 +12,13 @@ const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).t
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
-    const { entries, consumptionType, selectedClient, range, month } = params;
-    
-    const { allTransactions } = extractPersonTransactions(entries, consumptionType || 'all');
+    const { personTransactions, consumptionType, selectedClient, range, month } = params;
     
     const isSpecificPersonSelected = selectedClient && selectedClient !== 'all';
     
-    let transactionsToDisplay = allTransactions;
+    let transactionsToDisplay: UnifiedPersonTransaction[] = personTransactions || [];
     if (isSpecificPersonSelected) {
-        transactionsToDisplay = allTransactions.filter(t => t.personName === selectedClient);
+        transactionsToDisplay = transactionsToDisplay.filter(t => t.personName === selectedClient);
     }
 
     const consumptionLabel = getConsumptionTypeLabel(consumptionType) || 'Todos';

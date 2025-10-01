@@ -1,4 +1,5 @@
 
+
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { generatePdf } from './pdf/pdfGenerator';
@@ -71,10 +72,10 @@ const exportToExcel = async (params: ExportParams) => {
 
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') {
+    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar' || filterType === 'client-extract' || filterType === 'client-summary') {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
-            : 'periodo_indefinido';
+            : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
     } else if (filterType === 'date' && date) {
         dateRangeFilenameStr = format(date, 'yyyy-MM-dd');
     } else if (filterType === 'range' && range?.from) {
@@ -106,7 +107,7 @@ const exportToExcel = async (params: ExportParams) => {
 
 
 export const exportReport = async (params: ExportParams) => {
-    if (params.entries.length === 0 && params.estornos?.length === 0) {
+    if (params.entries.length === 0 && params.estornos?.length === 0 && params.personTransactions?.length === 0) {
       if(params.toast) params.toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
@@ -117,5 +118,3 @@ export const exportReport = async (params: ExportParams) => {
         await exportToExcel(params);
     }
 };
-
-    

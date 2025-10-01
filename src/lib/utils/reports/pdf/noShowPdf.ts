@@ -39,12 +39,11 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
     const dezenasToProcess = selectedDezena && selectedDezena !== 'all' ? [selectedDezena] : ['1', '2', '3'];
 
     let pageCounter = 0;
-    const totalPagesForThisExport = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d))).length;
+    const dezenasComDados = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d)));
+    const totalPagesForThisExport = dezenasComDados.length;
     
-    for (const dezena of dezenasToProcess) {
+    for (const dezena of dezenasComDados) {
         const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, dezena));
-        
-        if (itemsForDezena.length === 0) continue;
         
         pageCounter++;
         if (pageCounter > 1) {
@@ -55,7 +54,7 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
         const dezenaTotals: DezenaTotals = { items: itemsForDezena.length, valor: totalValor };
         
         const subTitle = `${title} - ${dezena}ª Dezena`;
-        const headerHeight = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, pageCounter, totalPagesForThisExport);
+        let startY = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, 1, 1);
 
         const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Obs']];
         const body = itemsForDezena.map(item => [item.entryDate, item.horario || '-', item.hospede || '-', item.uh || '-', item.reserva || '-', formatCurrency(item.valor), item.observation || '-']);
@@ -79,11 +78,13 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
                 5: { cellWidth: 50, halign: 'right' },
                 6: { cellWidth: 'auto' },
             },
-            margin: { top: headerHeight },
+            margin: { top: startY },
             didDrawPage: (hookData) => {
-                if(totalPagesForThisExport > 1) {
-                  drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, hookData.pageNumber, totalPagesForThisExport);
-                }
+                const isNewAutoTablePage = hookData.pageNumber > 1;
+                const finalPageNumber = pageCounter + hookData.pageNumber - 1;
+                 if (isNewAutoTablePage) {
+                    startY = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, finalPageNumber, totalPagesForThisExport);
+                 }
             }
         });
 

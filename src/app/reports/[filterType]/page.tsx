@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,7 +11,7 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import type { DateRange } from 'react-day-picker';
 import { REPORTS_GROUPS } from '@/lib/config/navigation';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company, UnifiedPersonTransaction } from '@/lib/types';
 import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/config/periods';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { getAllDailyEntries } from '@/services/dailyEntryService';
@@ -48,6 +49,7 @@ export default function ReportsPage() {
 
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
   const [estornosData, setEstornosData] = useState<EstornoItem[]>([]);
+  const [personTransactions, setPersonTransactions] = useState<UnifiedPersonTransaction[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -294,7 +296,7 @@ export default function ReportsPage() {
 
 
   const handleExport = async (formatType: 'pdf' | 'excel') => {
-    if (filterType !== 'history' && filteredEntries.length === 0 && estornosData.length === 0) {
+    if (filterType !== 'history' && filteredEntries.length === 0 && estornosData.length === 0 && personTransactions.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
@@ -302,6 +304,7 @@ export default function ReportsPage() {
         formatType,
         filterType,
         entries: filteredEntries,
+        personTransactions: personTransactions,
         reportData,
         date: selectedDate,
         month: selectedMonth,
@@ -372,16 +375,17 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'client-extract') {
-      const startDate = selectedRange?.from ? format(selectedRange.from, 'yyyy-MM-dd') : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-      const endDate = selectedRange?.to ? format(selectedRange.to, 'yyyy-MM-dd') : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const startDateStr = selectedRange?.from ? format(selectedRange.from, 'yyyy-MM-dd') : format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const endDateStr = selectedRange?.to ? format(selectedRange.to, 'yyyy-MM-dd') : format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
 
       return <ClientExtractView 
                 entries={filteredEntries} 
                 consumptionType={consumptionType} 
                 selectedClient={selectedClient} 
                 setSelectedClient={setSelectedClient} 
-                startDate={startDate}
-                endDate={endDate}
+                startDate={startDateStr}
+                endDate={endDateStr}
+                onTransactionsUpdate={setPersonTransactions}
              />
     }
     

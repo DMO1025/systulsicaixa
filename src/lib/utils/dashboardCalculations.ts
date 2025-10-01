@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { DailyLogEntry, EstornoItem } from '@/lib/types';
@@ -125,9 +126,8 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   
   // Process Estornos
   const estornosDebito = estornos.filter(item => 
-      item.reason === 'erro de lancamento' || 
-      item.reason === 'nao consumido' ||
-      item.reason === 'duplicidade'
+      item.reason === 'erro de lancamento' ||
+      item.reason === 'assinatura divergente'
   );
 
   const detalhesEstornos: Record<string, { qtd: number; valor: number }> = {};
