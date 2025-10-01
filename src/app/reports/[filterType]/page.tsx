@@ -11,10 +11,10 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import type { DateRange } from 'react-day-picker';
 import { REPORTS_GROUPS } from '@/lib/config/navigation';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company, UnifiedPersonTransaction } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company, UnifiedPersonTransaction, ReportExportData } from '@/lib/types';
 import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/config/periods';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
-import { getAllDailyEntries } from '@/services/dailyEntryService';
+import { getAllDailyEntries, getAllEntryDates } from '@/services/dailyEntryService';
 import { getSetting } from '@/services/settingsService';
 import { exportReport } from '@/lib/utils/reports/exportUtils';
 import { generateReportData } from '@/lib/utils/reportGenerators';
@@ -50,6 +50,7 @@ export default function ReportsPage() {
   const [filteredEntries, setFilteredEntries] = useState<DailyLogEntry[]>([]);
   const [estornosData, setEstornosData] = useState<EstornoItem[]>([]);
   const [personTransactions, setPersonTransactions] = useState<UnifiedPersonTransaction[]>([]);
+  const [reportExportData, setReportExportData] = useState<ReportExportData | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -68,6 +69,7 @@ export default function ReportsPage() {
   const [selectedDezena, setSelectedDezena] = useState('all');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [includeCompanyData, setIncludeCompanyData] = useState(true);
+  const [includeItemsInPdf, setIncludeItemsInPdf] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
   const estornoCategoryParam = searchParams.get('category');
@@ -84,14 +86,13 @@ export default function ReportsPage() {
     return groupItems.find(item => item.id === filterType);
   }, [filterType]);
   
-  // Effect for fetching static metadata and all entry dates for the calendar
+  // Effect for fetching static metadata
   useEffect(() => {
     async function fetchInitialMetadata() {
       try {
-        const [visibility, prices, allEntryDates, companiesData] = await Promise.all([
+        const [visibility, prices, companiesData] = await Promise.all([
           getSetting<DashboardItemVisibilityConfig>('dashboardItemVisibilityConfig'),
           getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig'),
-          getAllDailyEntries(undefined, undefined, undefined, 'id'),
           getSetting<Company[]>('companies'),
         ]);
 
@@ -105,20 +106,23 @@ export default function ReportsPage() {
         } else {
             setCompanyName('Avalon Restaurante e Eventos Ltda'); // Default fallback
         }
-
-
-        if (Array.isArray(allEntryDates)) {
-             const dates = allEntryDates
-                .map(entry => entry.id ? parseISO(String(entry.id)) : null)
-                .filter((date): date is Date => date !== null && isValid(date));
-            setDatesWithEntries(dates);
-        }
       } catch (error) {
         console.error("Falha ao carregar metadados iniciais:", error);
         toast({ title: "Erro ao Carregar Metadados", description: (error as Error).message, variant: "destructive" });
       }
     }
     fetchInitialMetadata();
+    
+    // Lazy load dates for calendar
+    getAllEntryDates().then(allEntryDates => {
+      const dates = allEntryDates
+        .map(entry => entry.id ? parseISO(String(entry.id)) : null)
+        .filter((date): date is Date => date !== null && isValid(date));
+      setDatesWithEntries(dates);
+    }).catch(error => {
+      console.warn("Could not lazy load dates for calendar:", error);
+    });
+
   }, [toast]);
   
   // Effect for fetching the actual report data based on current filters
@@ -296,16 +300,20 @@ export default function ReportsPage() {
 
 
   const handleExport = async (formatType: 'pdf' | 'excel') => {
-    if (filterType !== 'history' && filteredEntries.length === 0 && estornosData.length === 0 && personTransactions.length === 0) {
+    // A verificação de dados agora considera o reportExportData para o controle de frigobar
+    if (filterType !== 'history' && filterType !== 'controle-frigobar' && filteredEntries.length === 0 && estornosData.length === 0 && personTransactions.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
       return;
     }
+    
+    const dataToExport = filterType === 'controle-frigobar' ? reportExportData : reportData;
+
     await exportReport({
         formatType,
         filterType,
         entries: filteredEntries,
         personTransactions: personTransactions,
-        reportData,
+        reportData: dataToExport,
         date: selectedDate,
         month: selectedMonth,
         range: selectedRange,
@@ -319,6 +327,7 @@ export default function ReportsPage() {
         toast,
         includeCompanyData,
         estornos: estornosData,
+        includeItemsInPdf,
     });
   };
 
@@ -371,7 +380,7 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'controle-frigobar') {
-      return <ControleFrigobarReportView entries={filteredEntries} />;
+      return <ControleFrigobarReportView entries={filteredEntries} onDataCalculated={setReportExportData} />;
     }
 
     if (filterType === 'client-extract') {
@@ -456,7 +465,7 @@ export default function ReportsPage() {
             selectedRange={selectedRange}
             setSelectedRange={setSelectedRange}
             handleExport={handleExport}
-            isDataAvailable={!!reportData || filteredEntries.length > 0 || (filterType === 'history' && auditLogs.length > 0) || (filterType === 'estornos' && estornosData.length > 0)}
+            isDataAvailable={!!reportData || filteredEntries.length > 0 || (filterType === 'history' && auditLogs.length > 0) || (filterType === 'estornos' && estornosData.length > 0) || (filterType === 'controle-frigobar')}
             datesWithEntries={datesWithEntries}
             consumptionType={consumptionType}
             setConsumptionType={setConsumptionType}
@@ -467,6 +476,8 @@ export default function ReportsPage() {
             setSelectedDezena={setSelectedDezena}
             includeCompanyData={includeCompanyData}
             setIncludeCompanyData={setIncludeCompanyData}
+            includeItemsInPdf={includeItemsInPdf}
+            setIncludeItemsInPdf={setIncludeItemsInPdf}
             estornoCategory={estornoCategory}
             setEstornoCategory={setEstornoCategory}
         />
@@ -484,3 +495,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

@@ -156,6 +156,7 @@ export default function DashboardPage() {
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [hasDataForMonth, setHasDataForMonth] = useState(false);
+  const [evolutionData, setEvolutionData] = useState<any[]>([]);
 
   // Memoized state for all processed data
   const processedData = useMemo(() => {
@@ -185,55 +186,36 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(processedData);
 
   useEffect(() => {
-    async function fetchDataAndProcess() {
+    async function fetchDataForDashboard() {
       setIsLoading(true);
       setAnalysis('');
 
       try {
-        const endDateForFetch = endOfMonth(selectedMonth);
-        const startDateForFetch = startOfMonth(subMonths(selectedMonth, 2));
+        const monthStartDate = startOfMonth(selectedMonth);
+        const monthEndDate = endOfMonth(selectedMonth);
 
-        const estornosStartDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-        const estornosEndDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
-        const estornosPromises = ['restaurante', 'frigobar', 'room-service'].map(cat =>
-            fetch(`/api/estornos?category=${cat}&startDate=${estornosStartDate}&endDate=${estornosEndDate}`).then(res => res.ok ? res.json() : [])
-        );
-
-        const [entriesInRange, visibilityConfig, ...estornosArrays] = await Promise.all([
-            getAllDailyEntries(format(startDateForFetch, 'yyyy-MM-dd'), format(endDateForFetch, 'yyyy-MM-dd'), window.location.origin) as Promise<DailyLogEntry[]>,
-            getSetting('dashboardItemVisibilityConfig'),
-            ...estornosPromises
+        const [entriesForMonth, visibilityConfig, ...estornosArrays] = await Promise.all([
+          getAllDailyEntries(format(monthStartDate, 'yyyy-MM-dd'), format(monthEndDate, 'yyyy-MM-dd')),
+          getSetting('dashboardItemVisibilityConfig'),
+          ...['restaurante', 'frigobar', 'room-service'].map(cat =>
+            fetch(`/api/estornos?category=${cat}&startDate=${format(monthStartDate, 'yyyy-MM-dd')}&endDate=${format(monthEndDate, 'yyyy-MM-dd')}`).then(res => res.ok ? res.json() : [])
+          )
         ]);
         
         const allEstornos = estornosArrays.flat() as EstornoItem[];
 
-        const targetYear = selectedMonth.getUTCFullYear();
-        const targetMonth = selectedMonth.getUTCMonth();
-
-        // Consolidate entries by ID to prevent duplicates
         const consolidatedEntriesMap = new Map<string, DailyLogEntry>();
-        for (const entry of entriesInRange) {
-            if (entry.id) {
-                consolidatedEntriesMap.set(entry.id, entry);
-            }
+        for (const entry of (entriesForMonth as DailyLogEntry[])) {
+            if (entry.id) consolidatedEntriesMap.set(entry.id, entry);
         }
         const consolidatedEntries = Array.from(consolidatedEntriesMap.values());
 
+        setHasDataForMonth(consolidatedEntries.length > 0 || allEstornos.length > 0);
 
-        const entriesForMonth = consolidatedEntries.filter(entry => {
-            const entryDate = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-            if (!isValid(entryDate)) return false;
-            const entryYearUTC = entryDate.getUTCFullYear();
-            const entryMonthUTC = entryDate.getUTCMonth();
-            return entryYearUTC === targetYear && entryMonthUTC === targetMonth;
-        });
-
-        setHasDataForMonth(entriesForMonth.length > 0 || allEstornos.length > 0);
-
-        const monthTotals = processEntriesForDashboard(entriesForMonth, allEstornos);
+        const monthTotals = processEntriesForDashboard(consolidatedEntries, allEstornos);
         
-        const dailyTotalsData = entriesForMonth.map(entry => {
-          const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import to avoid server/client issues
+        const dailyTotalsData = consolidatedEntries.map(entry => {
+          const { processEntryForTotals } = require('@/lib/utils/calculations');
           const entryTotals = processEntryForTotals(entry);
           let formattedDate = "Data Inválida";
           if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -265,60 +247,6 @@ export default function DashboardPage() {
             return 0; 
         });
 
-        const monthlyAggregates: Record<string, {
-            monthLabel: string;
-            valorComCI: number; qtdComCI: number;
-            valorCI: number; qtdCI: number;
-            reajusteCIValor: number;
-        }> = {};
-
-        for (let i = 0; i < 3; i++) { 
-            const targetMonthDate = subMonths(selectedMonth, i);
-            const monthKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, '0')}`;
-            const monthLabel = format(targetMonthDate, "MMM/yy", { locale: ptBR });
-            monthlyAggregates[monthKey] = {
-                monthLabel, valorComCI: 0, qtdComCI: 0, valorCI: 0, qtdCI: 0, reajusteCIValor: 0,
-            };
-        }
-        
-        consolidatedEntries.forEach(entry => {
-            const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
-            if (isValid(entryDateObj)) {
-                const entryYearUTC = entryDateObj.getUTCFullYear();
-                const entryMonthUTC = entryDateObj.getUTCMonth();
-                const entryMonthKey = `${entryYearUTC}-${String(entryMonthUTC + 1).padStart(2, '0')}`;
-        
-                if (monthlyAggregates[entryMonthKey]) {
-                    const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import
-                    const entryTotals = processEntryForTotals(entry);
-                    monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
-                    monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
-                    monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
-                    monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
-                    monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.totalReajusteCI;
-                }
-            }
-        });
-        
-        const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
-            const dateA = parseISO(keyA + "-01");
-            const dateB = parseISO(keyB + "-01");
-            return dateA.getTime() - dateB.getTime(); 
-        });
-        
-        const finalMonthlyEvolutionData = sortedMonthKeys.map(monthKey => {
-            const data = monthlyAggregates[monthKey];
-            return {
-                month: data.monthLabel,
-                valorComCI: data.valorComCI,
-                valorSemCI: data.valorComCI - data.valorCI - data.reajusteCIValor,
-                valorCI: data.valorCI,
-                reajusteCIValor: data.reajusteCIValor,
-                qtdComCI: data.qtdComCI,
-                qtdSemCI: data.qtdComCI - data.qtdCI,
-            };
-        });
-          
         const currentMonthStr = format(selectedMonth, "yyyy-MM-dd");
         const initialAcumulativoMensalState = DASHBOARD_ACCUMULATED_ITEMS_CONFIG.map(config => ({
             item: config.item,
@@ -329,7 +257,7 @@ export default function DashboardPage() {
                 : undefined,
             periodId: config.periodId as PeriodId | undefined,
         }));
-
+        
         const updatedAcumulativoMensalData = initialAcumulativoMensalState.map(item => {
             switch (item.item) {
                 case "ROOM SERVICE": return { ...item, qtdDisplay: `${monthTotals.roomService.qtdPedidos} / ${monthTotals.roomService.qtdPratos}`, valorTotal: monthTotals.roomService.valor };
@@ -353,11 +281,11 @@ export default function DashboardPage() {
         const finalVisibleData = updatedAcumulativoMensalData.filter(item => {
           return visibilityConfig?.[item.item] !== false; 
         });
-        
+
         setDashboardData({
           dailyTotals: dailyTotalsData,
           acumulativoMensalData: finalVisibleData,
-          monthlyEvolutionData: finalMonthlyEvolutionData,
+          monthlyEvolutionData: [], // Will be loaded separately
           totalCIAlmoco: monthTotals.totalCIAlmoco,
           totalCIJantar: monthTotals.totalCIJantar,
           totalConsumoInternoGeral: monthTotals.totalConsumoInternoGeral,
@@ -376,13 +304,80 @@ export default function DashboardPage() {
           totalFrigobarQtd: monthTotals.frigobar.qtd,
         });
 
-      } catch (error: any) {
-        console.error("Falha ao buscar ou processar os lançamentos para o dashboard:", error);
+      } catch (error) {
+        console.error("Falha ao buscar dados do dashboard:", error);
       } finally {
         setIsLoading(false);
       }
     }
-    fetchDataAndProcess();
+
+    async function fetchEvolutionData() {
+        try {
+            const endDateForFetch = endOfMonth(selectedMonth);
+            const startDateForFetch = startOfMonth(subMonths(selectedMonth, 2));
+
+            const entriesInRange = await getAllDailyEntries(format(startDateForFetch, 'yyyy-MM-dd'), format(endDateForFetch, 'yyyy-MM-dd')) as DailyLogEntry[];
+
+            const monthlyAggregates: Record<string, {
+                monthLabel: string; valorComCI: number; qtdComCI: number;
+                valorCI: number; qtdCI: number; reajusteCIValor: number;
+            }> = {};
+
+            for (let i = 0; i < 3; i++) { 
+                const targetMonthDate = subMonths(selectedMonth, i);
+                const monthKey = `${targetMonthDate.getFullYear()}-${String(targetMonthDate.getMonth() + 1).padStart(2, '0')}`;
+                const monthLabel = format(targetMonthDate, "MMM/yy", { locale: ptBR });
+                monthlyAggregates[monthKey] = {
+                    monthLabel, valorComCI: 0, qtdComCI: 0, valorCI: 0, qtdCI: 0, reajusteCIValor: 0,
+                };
+            }
+            
+            entriesInRange.forEach(entry => {
+                const entryDateObj = entry.date instanceof Date ? entry.date : parseISO(String(entry.date));
+                if (isValid(entryDateObj)) {
+                    const entryYearUTC = entryDateObj.getUTCFullYear();
+                    const entryMonthUTC = entryDateObj.getUTCMonth();
+                    const entryMonthKey = `${entryYearUTC}-${String(entryMonthUTC + 1).padStart(2, '0')}`;
+            
+                    if (monthlyAggregates[entryMonthKey]) {
+                        const { processEntryForTotals } = require('@/lib/utils/calculations'); // Local import
+                        const entryTotals = processEntryForTotals(entry);
+                        monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
+                        monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
+                        monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;
+                        monthlyAggregates[entryMonthKey].qtdCI += entryTotals.totalCI.qtd; 
+                        monthlyAggregates[entryMonthKey].reajusteCIValor += entryTotals.totalReajusteCI;
+                    }
+                }
+            });
+            
+            const sortedMonthKeys = Object.keys(monthlyAggregates).sort((keyA, keyB) => {
+                const dateA = parseISO(keyA + "-01");
+                const dateB = parseISO(keyB + "-01");
+                return dateA.getTime() - dateB.getTime(); 
+            });
+            
+            const finalMonthlyEvolutionData = sortedMonthKeys.map(monthKey => {
+                const data = monthlyAggregates[monthKey];
+                return {
+                    month: data.monthLabel,
+                    valorComCI: data.valorComCI,
+                    valorSemCI: data.valorComCI - data.valorCI - data.reajusteCIValor,
+                    valorCI: data.valorCI,
+                    reajusteCIValor: data.reajusteCIValor,
+                    qtdComCI: data.qtdComCI,
+                    qtdSemCI: data.qtdComCI - data.qtdCI,
+                };
+            });
+            setEvolutionData(finalMonthlyEvolutionData);
+        } catch (error) {
+            console.error("Failed to fetch evolution data:", error);
+        }
+    }
+    
+    fetchDataForDashboard();
+    fetchEvolutionData();
+
   }, [selectedMonth]);
 
   const handleGenerateAnalysis = async () => {
@@ -581,8 +576,8 @@ export default function DashboardPage() {
             </div>
         </div>
         <MonthlyEvolutionChart 
-            data={dashboardData.monthlyEvolutionData} 
-            isLoading={isLoading}
+            data={evolutionData} 
+            isLoading={evolutionData.length === 0 && isLoading}
         />
       </>
     );
@@ -605,3 +600,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

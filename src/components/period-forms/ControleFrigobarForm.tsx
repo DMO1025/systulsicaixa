@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -28,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { FrigobarItem, FrigobarConsumptionLog, FrigobarItemCategory, DailyLogEntry, FrigobarPeriodData } from '@/lib/types';
 import { getSetting } from '@/services/settingsService';
-import { saveDailyEntry, getDailyEntry, getAllDailyEntries } from '@/services/dailyEntryService';
+import { saveDailyEntry, getDailyEntry, getAllDailyEntries, getAllEntryDates } from '@/services/dailyEntryService';
 
 const createDefaultNewEntry = (): { uh: string; items: Record<string, number>; isAntecipado: boolean } => ({
   uh: '',
@@ -116,45 +115,50 @@ export default function ControleFrigobarForm() {
     }
   };
 
-  const fetchHistoryAndEntryData = useCallback(async (date: Date) => {
+  const fetchHistoryForDay = useCallback(async (date: Date) => {
     setIsLoadingHistory(true);
     try {
         const entryData = await getDailyEntry(date);
         const frigobarData = entryData?.controleFrigobar as FrigobarPeriodData | undefined;
         
-        if (frigobarData?.logs) {
-            setHistoryItems(frigobarData.logs.sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()));
-        } else {
-            setHistoryItems([]);
-        }
-
+        setHistoryItems(frigobarData?.logs?.sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()) || []);
         setGeneralObservations(frigobarData?.periodObservations || '');
         setCheckoutsPrevistos(String(frigobarData?.checkoutsPrevistos ?? ''));
         setCheckoutsProrrogados(String(frigobarData?.checkoutsProrrogados ?? ''));
 
-
-        const allEntries = await getAllDailyEntries(undefined, undefined, undefined, 'id,controleFrigobar');
-        const datesWithLogs = allEntries
-            .filter(e => e.controleFrigobar && (e.controleFrigobar as any).logs?.length > 0)
-            .map(e => parseISO(String(e.id)));
-        setDatesWithEntries(datesWithLogs);
-
     } catch (error) {
-      toast({ title: 'Erro ao buscar dados', description: (error as Error).message, variant: 'destructive' });
+      toast({ title: 'Erro ao buscar dados do dia', description: (error as Error).message, variant: 'destructive' });
       setHistoryItems([]);
-      setDatesWithEntries([]);
     } finally {
       setIsLoadingHistory(false);
     }
   }, [toast]);
 
+  // Fetch all items on mount
   useEffect(() => {
     fetchFrigobarItems();
   }, []);
 
+  // Fetch history for the selected day
   useEffect(() => {
-    fetchHistoryAndEntryData(selectedDate);
-  }, [selectedDate, fetchHistoryAndEntryData]);
+    fetchHistoryForDay(selectedDate);
+  }, [selectedDate, fetchHistoryForDay]);
+
+  // Fetch all entry dates for the calendar in the background
+   useEffect(() => {
+    async function fetchAllDates() {
+        try {
+            const allDates = await getAllEntryDates();
+            const datesWithLogs = allDates
+                .map(e => parseISO(String(e.id)))
+                .filter(isValid);
+            setDatesWithEntries(datesWithLogs);
+        } catch (error) {
+            console.error("Failed to fetch entry dates for calendar:", error);
+        }
+    }
+    fetchAllDates();
+  }, []);
   
   const handleQuantityChange = (itemId: string, quantityStr: string) => {
       const quantity = parseInt(quantityStr.replace(/[^0-9]/g, ''), 10);
@@ -289,7 +293,7 @@ export default function ControleFrigobarForm() {
       if (success) {
         toast({ title: 'Sucesso!', description: 'Valor recebido atualizado.' });
       } else {
-        fetchHistoryAndEntryData(selectedDate); // Re-fetch to revert
+        fetchHistoryForDay(selectedDate); // Re-fetch to revert
       }
     }, 500);
   };
@@ -476,8 +480,8 @@ export default function ControleFrigobarForm() {
                                  const diferenca = (log.valorRecebido ?? 0) - log.totalValue;
                                 return (
                                 <TableRow key={log.id} className={cn(log.isAntecipado && "bg-blue-50 dark:bg-blue-950/50")}>
-                                    <TableCell className="text-sm font-semibold">
-                                       <div className="flex items-center gap-2">
+                                    <TableCell className="font-semibold">
+                                       <div className="flex items-center gap-2 text-xl">
                                           {log.isAntecipado && <Star className="h-4 w-4 text-yellow-500 fill-yellow-400" />}
                                           {log.uh}
                                        </div>
@@ -573,5 +577,3 @@ export default function ControleFrigobarForm() {
     </div>
   );
 }
-
-    

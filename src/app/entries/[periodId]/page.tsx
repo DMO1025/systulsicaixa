@@ -88,7 +88,7 @@ export default function PeriodEntryPage() {
     form, isLoading, isDataLoading, unitPricesConfig, datesWithEntries, activeSubTabs, setActiveSubTabs,
     activePeriodDefinition, activePeriodConfig, calculatePeriodTotal, calculateSubTabTotal, onSubmit, router,
     autoSaveStatus, lastSaved,
-  } = useDailyEntryForm(activePeriodId);
+  } = useDailyEntryForm(activePeriodId, true); // Pass true to enable lazy loading dates
 
   const renderChannelInputs = useCallback((
     groupedChannels: GroupedChannelConfig[],
@@ -358,3 +358,5 @@ export default function PeriodEntryPage() {
     </div>
   );
 }
+
+    

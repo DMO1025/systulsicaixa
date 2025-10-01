@@ -69,7 +69,7 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
             }
             break;
         case 'controle-frigobar':
-            await generateControleFrigobarExcel(wb, entries, unitPrices, params.companyName);
+            await generateControleFrigobarExcel(wb, entries, unitPrices, params.companyName, params.includeItemsInPdf);
             sheetsAdded = true;
             break;
         default:

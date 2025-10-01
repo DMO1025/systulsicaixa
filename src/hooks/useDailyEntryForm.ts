@@ -20,7 +20,7 @@ import { getSafeNumericValue } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 
-export function useDailyEntryForm(activePeriodId: PeriodId) {
+export function useDailyEntryForm(activePeriodId: PeriodId, lazyLoadDates: boolean = false) {
   const { userRole, operatorShift } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -74,19 +74,31 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [prices, allEntryDates] = await Promise.all([
-          getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig'),
-          getAllEntryDates()
-        ]);
+        const prices = await getSetting<ChannelUnitPricesConfig>('channelUnitPricesConfig');
         setUnitPricesConfig(prices || {});
-        const dates = allEntryDates.map(e => parseISO(e.id)).filter(isValid);
-        setDatesWithEntries(dates);
+
+        if (!lazyLoadDates) {
+            const allEntryDates = await getAllEntryDates();
+            const dates = allEntryDates.map(e => parseISO(e.id)).filter(isValid);
+            setDatesWithEntries(dates);
+        }
+
       } catch (error) {
         toast({ title: "Erro ao Carregar Configurações", description: (error as Error).message, variant: "destructive" });
       }
     };
+    
     fetchInitialData();
-  }, [toast]);
+
+    if (lazyLoadDates) {
+        getAllEntryDates().then(allEntryDates => {
+            const dates = allEntryDates.map(e => parseISO(e.id)).filter(isValid);
+            setDatesWithEntries(dates);
+        }).catch(error => {
+            console.error("Failed to lazy load entry dates:", error);
+        });
+    }
+  }, [toast, lazyLoadDates]);
 
   const loadEntryData = useCallback(async (dateToLoad: Date) => {
     if (!dateToLoad || !isValid(dateToLoad)) return;
@@ -271,3 +283,5 @@ export function useDailyEntryForm(activePeriodId: PeriodId) {
     lastSaved,
   };
 }
+
+    

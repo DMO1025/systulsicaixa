@@ -72,7 +72,7 @@ const exportToExcel = async (params: ExportParams) => {
 
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar' || filterType === 'client-extract' || filterType === 'client-summary') {
+    if (filterType.startsWith('controle') || filterType === 'estornos' || filterType.startsWith('client-')) {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
             : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';

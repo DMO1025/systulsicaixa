@@ -41,6 +41,8 @@ interface ReportToolbarProps {
     setSelectedDezena?: (value: string) => void;
     includeCompanyData: boolean;
     setIncludeCompanyData: (value: boolean) => void;
+    includeItemsInPdf: boolean;
+    setIncludeItemsInPdf: (value: boolean) => void;
     estornoCategory?: string;
     setEstornoCategory?: (value: string) => void;
 }
@@ -69,6 +71,8 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     setSelectedDezena,
     includeCompanyData,
     setIncludeCompanyData,
+    includeItemsInPdf,
+    setIncludeItemsInPdf,
     estornoCategory,
     setEstornoCategory
 }) => {
@@ -302,6 +306,16 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                             </Select>
                         </div>
                     )}
+                    
+                     {filterType === 'controle-frigobar' && (
+                        <div className="flex items-end space-y-2 pb-1">
+                            <div className="flex items-center space-x-2">
+                                <Switch id="include-items-pdf" checked={includeItemsInPdf} onCheckedChange={setIncludeItemsInPdf}/>
+                                <Label htmlFor="include-items-pdf">Incluir Itens no PDF</Label>
+                            </div>
+                        </div>
+                    )}
+
 
                     <div className="space-y-2">
                         <Label htmlFor="companyName" className="flex items-center gap-1.5"><Building className="h-4 w-4 text-muted-foreground"/>Empresa</Label>
@@ -337,5 +351,3 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
 };
 
 export default ReportToolbar;
-
-    

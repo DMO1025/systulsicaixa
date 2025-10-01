@@ -2,13 +2,18 @@
 
 import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, ChannelUnitPricesConfig, CafeManhaNoShowItem, ControleCafeItem, EstornoItem, Company, UnifiedPersonTransaction } from '@/lib/types';
 
+export interface ReportExportData {
+  summary?: any;
+  details?: any;
+}
+
 export interface ExportParams {
     formatType: 'pdf' | 'excel';
     filterType: FilterType;
     entries: DailyLogEntry[];
     estornos?: EstornoItem[];
     personTransactions?: UnifiedPersonTransaction[];
-    reportData: ReportData | null;
+    reportData: ReportData | ReportExportData | null;
     date?: Date;
     month?: Date;
     range?: { from?: Date; to?: Date };
@@ -21,6 +26,7 @@ export interface ExportParams {
     unitPrices: ChannelUnitPricesConfig;
     toast?: (options: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
     includeCompanyData: boolean;
+    includeItemsInPdf?: boolean;
     estornoCategory?: string;
 }
 

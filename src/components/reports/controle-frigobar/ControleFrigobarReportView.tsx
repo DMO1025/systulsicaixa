@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -17,24 +17,30 @@ import type { DailyLogEntry, FrigobarConsumptionLog, FrigobarItem } from '@/lib/
 import { getSetting } from '@/services/settingsService';
 import { Users, DollarSign, Briefcase, ShoppingCart, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { ReportExportData } from '@/lib/utils/reports/types';
+
 
 const formatCurrency = (value?: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const formatQty = (value?: number) => Number(value || 0).toLocaleString('pt-BR');
 
-const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[] }> = ({ entries }) => {
+
+const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[], onDataCalculated: (data: ReportExportData) => void }> = ({ entries, onDataCalculated }) => {
   const [frigobarItems, setFrigobarItems] = useState<FrigobarItem[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function fetchItems() {
       const items = await getSetting('frigobarItems');
       if (Array.isArray(items)) {
-        setFrigobarItems(items);
+        setFrigobarItems(items.sort((a,b) => a.name.localeCompare(b.name)));
       }
     }
     fetchItems();
   }, []);
 
-  const allLogs = useMemo(() => {
+  const { allLogs, totals, checkouts, itemsSummary } = useMemo(() => {
     const logs: (FrigobarConsumptionLog & { entryDate: string })[] = [];
+    const dailyData: Record<string, { previstos?: number, prorrogados?: number }> = {};
+    
     entries.forEach(entry => {
       const frigobarData = entry.controleFrigobar as any;
       if (frigobarData?.logs && Array.isArray(frigobarData.logs)) {
@@ -45,52 +51,88 @@ const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[] }> = ({ en
           });
         });
       }
-    });
-    return logs.sort((a, b) => parseISO(a.timestamp).getTime() - parseISO(b.timestamp).getTime());
-  }, [entries]);
-
-  const { totals, checkouts } = useMemo(() => {
-    const dailyData: Record<string, { previstos?: number, prorrogados?: number }> = {};
-    entries.forEach(entry => {
-        const frigobarData = entry.controleFrigobar as any;
-        if(frigobarData) {
-            dailyData[entry.id as string] = {
-                previstos: frigobarData.checkoutsPrevistos,
-                prorrogados: frigobarData.checkoutsProrrogados,
-            };
-        }
+      if (frigobarData) {
+          dailyData[entry.id as string] = {
+              previstos: frigobarData.checkoutsPrevistos,
+              prorrogados: frigobarData.checkoutsProrrogados,
+          };
+      }
     });
 
-    return {
-        totals: allLogs.reduce((acc, log) => {
-            acc.totalConsumo += log.totalValue || 0;
-            acc.totalRecebido += log.valorRecebido || 0;
-            return acc;
-        }, { totalConsumo: 0, totalRecebido: 0 }),
-        checkouts: {
-            previstos: Object.values(dailyData).reduce((sum, day) => sum + (day.previstos || 0), 0),
-            prorrogados: Object.values(dailyData).reduce((sum, day) => sum + (day.prorrogados || 0), 0),
-            antecipados: allLogs.filter(log => log.isAntecipado).length,
+    const sortedLogs = logs.sort((a, b) => {
+      const uhA = parseInt(a.uh, 10);
+      const uhB = parseInt(b.uh, 10);
+
+      if (!isNaN(uhA) && !isNaN(uhB)) {
+        if (uhA !== uhB) {
+          return uhA - uhB;
         }
+      }
+      
+      const uhCompare = a.uh.localeCompare(b.uh, undefined, {numeric: true});
+      if (uhCompare !== 0) {
+        return uhCompare;
+      }
+      
+      return parseISO(a.timestamp).getTime() - parseISO(b.timestamp).getTime();
+    });
+
+
+    const calculatedCheckouts = {
+        previstos: Object.values(dailyData).reduce((sum, day) => sum + (day.previstos || 0), 0),
+        prorrogados: Object.values(dailyData).reduce((sum, day) => sum + (day.prorrogados || 0), 0),
+        antecipados: sortedLogs.filter(log => log.isAntecipado).length,
     };
-  }, [allLogs, entries]);
 
-  const itemsSummary = useMemo(() => {
-    const summary: Record<string, { name: string, qtd: number, valor: number }> = {};
-    allLogs.forEach(log => {
-      Object.entries(log.items).forEach(([itemId, quantity]) => {
-        const itemInfo = frigobarItems.find(i => i.id === itemId);
-        if (itemInfo) {
-          if (!summary[itemId]) {
-            summary[itemId] = { name: itemInfo.name, qtd: 0, valor: 0 };
-          }
-          summary[itemId].qtd += quantity;
-          summary[itemId].valor += quantity * itemInfo.price;
+    const calculatedTotals = sortedLogs.reduce((acc, log) => {
+        acc.consumo += log.totalValue || 0;
+        acc.recebido += log.valorRecebido || 0;
+        return acc;
+    }, { consumo: 0, recebido: 0 });
+
+    const calculatedItemsSummaryMap = sortedLogs.reduce((acc, log) => {
+        Object.entries(log.items).forEach(([itemId, quantity]) => {
+            const itemInfo = frigobarItems.find(i => i.id === itemId);
+            if (itemInfo) {
+                if (!acc[itemId]) {
+                    acc[itemId] = { name: itemInfo.name, qtd: 0, valor: 0 };
+                }
+                acc[itemId].qtd += quantity;
+                acc[itemId].valor += quantity * itemInfo.price;
+            }
+        });
+        return acc;
+    }, {} as Record<string, { name: string; qtd: number; valor: number }>);
+    const sortedItemsSummary = Object.values(calculatedItemsSummaryMap).sort((a,b) => a.name.localeCompare(b.name));
+
+    const totalItems = sortedItemsSummary.reduce((sum, item) => sum + item.qtd, 0);
+    const totalUhsAtendidas = new Set(sortedLogs.map(log => log.uh)).size;
+    
+    return { 
+        allLogs: sortedLogs, 
+        totals: {
+            ...calculatedTotals,
+            diferenca: calculatedTotals.recebido - calculatedTotals.consumo,
+            totalItems,
+            totalUhsAtendidas,
+        },
+        checkouts: calculatedCheckouts,
+        itemsSummary: sortedItemsSummary,
+    };
+  }, [entries, frigobarItems]);
+  
+  useEffect(() => {
+    onDataCalculated({
+        summary: {
+            checkouts,
+            financeiro: totals,
+            itemsSummary,
+        },
+        details: {
+            allLogs,
         }
-      });
     });
-    return Object.values(summary).sort((a,b) => a.name.localeCompare(b.name));
-  }, [allLogs, frigobarItems]);
+  }, [allLogs, totals, checkouts, itemsSummary, onDataCalculated]);
 
   const totalItemsQtd = itemsSummary.reduce((acc, item) => acc + item.qtd, 0);
 
@@ -156,10 +198,10 @@ const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[] }> = ({ en
                   <TableFooter>
                       <TableRow className="font-bold bg-muted/50">
                           <TableCell colSpan={3}>TOTAIS</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.totalConsumo)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.totalRecebido)}</TableCell>
-                          <TableCell className={`text-right font-extrabold ${(totals.totalRecebido - totals.totalConsumo) < 0 ? 'text-destructive' : 'text-green-600'}`}>
-                              {formatCurrency(totals.totalRecebido - totals.totalConsumo)}
+                          <TableCell className="text-right">{formatCurrency(totals.consumo)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(totals.recebido)}</TableCell>
+                          <TableCell className={`text-right font-extrabold ${totals.diferenca < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                              {formatCurrency(totals.diferenca)}
                           </TableCell>
                       </TableRow>
                   </TableFooter>
@@ -170,40 +212,30 @@ const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[] }> = ({ en
       </div>
 
       <div className="lg:col-span-1 space-y-4">
-        <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Check-outs</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground"/>
-              </CardHeader>
-              <CardContent className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                      <p className="text-2xl font-bold">{checkouts.previstos}</p>
-                      <p className="text-xs text-muted-foreground">Previstos</p>
-                  </div>
-                   <div>
-                      <p className="text-2xl font-bold">{checkouts.prorrogados}</p>
-                      <p className="text-xs text-muted-foreground">Prorrogados</p>
-                  </div>
-                   <div>
-                      <p className="text-2xl font-bold">{checkouts.antecipados}</p>
-                      <p className="text-xs text-muted-foreground">Antecipados</p>
-                  </div>
-              </CardContent>
-        </Card>
-        <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Totais Financeiros</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground"/>
-              </CardHeader>
-              <CardContent>
-                  <div className="flex justify-between items-baseline"><p className="text-xs text-muted-foreground">Total Consumo</p><p className="text-lg font-bold text-destructive">{formatCurrency(totals.totalConsumo)}</p></div>
-                  <div className="flex justify-between items-baseline"><p className="text-xs text-muted-foreground">Total Recebido</p><p className="text-lg font-bold text-green-600">{formatCurrency(totals.totalRecebido)}</p></div>
-                   <div className="flex justify-between items-baseline border-t mt-1 pt-1">
-                      <p className="text-sm font-bold">DIFERENÇA</p>
-                      <p className={`text-lg font-bold ${totals.totalRecebido - totals.totalConsumo < 0 ? 'text-destructive' : 'text-green-600'}`}>{formatCurrency(totals.totalRecebido - totals.totalConsumo)}</p>
-                  </div>
-              </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+            <Card>
+                <Table>
+                    <TableHeader><TableRow><TableHead className="font-semibold">Resumo Financeiro</TableHead><TableHead className="text-right font-semibold">Valor</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        <TableRow><TableCell className="text-sm">Total de Quartos Atendidos</TableCell><TableCell className="text-right text-sm font-semibold">{formatQty(totals.totalUhsAtendidas)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm">Total de Itens Vendidos</TableCell><TableCell className="text-right text-sm font-semibold">{formatQty(totals.totalItems)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm">Total Consumido (R$)</TableCell><TableCell className="text-right text-sm font-semibold">{formatCurrency(totals.consumo)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm">Total Recebido (R$)</TableCell><TableCell className="text-right text-sm font-semibold">{formatCurrency(totals.recebido)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm font-bold">Diferença Total (R$)</TableCell><TableCell className={`text-right text-sm font-bold ${totals.diferenca < 0 ? 'text-destructive' : 'text-green-600'}`}>{formatCurrency(totals.diferenca)}</TableCell></TableRow>
+                    </TableBody>
+                </Table>
+            </Card>
+            <Card>
+                <Table>
+                    <TableHeader><TableRow><TableHead className="font-semibold">Resumo Check-outs</TableHead><TableHead className="text-right font-semibold">Quantidade</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        <TableRow><TableCell className="text-sm">Check-outs Previstos</TableCell><TableCell className="text-right text-sm font-semibold">{formatQty(checkouts.previstos)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm">Check-outs Prorrogados</TableCell><TableCell className="text-right text-sm font-semibold">{formatQty(checkouts.prorrogados)}</TableCell></TableRow>
+                        <TableRow><TableCell className="text-sm">Check-outs Antecipados</TableCell><TableCell className="text-right text-sm font-semibold">{formatQty(checkouts.antecipados)}</TableCell></TableRow>
+                    </TableBody>
+                </Table>
+            </Card>
+        </div>
 
         {itemsSummary.length > 0 && (
            <Card>
@@ -233,7 +265,7 @@ const ControleFrigobarReportView: React.FC<{ entries: DailyLogEntry[] }> = ({ en
                        <TableRow className="font-bold bg-muted/50">
                           <TableCell>TOTAL</TableCell>
                           <TableCell className="text-right">{totalItemsQtd}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.totalConsumo)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(totals.consumo)}</TableCell>
                       </TableRow>
                     </TableFooter>
                  </Table>
