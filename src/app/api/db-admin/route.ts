@@ -1,5 +1,4 @@
 
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDbPool, DATABASE_INIT_COMMANDS, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME, ESTORNOS_TABLE_NAME } from '@/lib/mysql';
 import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData, SubTabData } from '@/lib/types';
@@ -49,26 +48,40 @@ async function testConnection(request: NextRequest): Promise<NextResponse> {
 }
 
 async function ensureTables(): Promise<NextResponse> {
+    const log: string[] = [];
     try {
       const pool = await getDbPool();
       if (!pool || !(await isMysqlConnected(pool))) {
-        return NextResponse.json({ message: 'Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.' }, { status: 500 });
+        log.push('ERRO: Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.');
+        return NextResponse.json({ message: 'Falha na conexão com MySQL.', log, success: false }, { status: 500 });
       }
+      log.push('Conexão com MySQL bem-sucedida.');
 
       for (const command of DATABASE_INIT_COMMANDS) {
+          const tableNameMatch = command.match(/CREATE TABLE IF NOT EXISTS \`([^\`]+)\`/);
+          const tableName = tableNameMatch ? tableNameMatch[1] : 'desconhecida';
+          log.push(`\n-- Verificando tabela: ${tableName} --`);
+          log.push(`Executando comando SQL: CREATE TABLE IF NOT EXISTS \`${tableName}\` ... (detalhes omitidos)`);
           try {
             await pool.query(command);
+            log.push(`Tabela '${tableName}' verificada/criada com sucesso.`);
           } catch(err: any) {
               // Ignore "Duplicate key name" error which happens if PRIMARY KEY already exists on other tables.
               if(err.code !== 'ER_DUP_KEYNAME') {
+                  log.push(`ERRO ao executar comando para a tabela '${tableName}': ${err.message}`);
                   throw err;
+              } else {
+                  log.push(`AVISO: Chave primária duplicada ignorada para a tabela '${tableName}'. Isso é normal se a tabela já existia.`);
               }
           }
       }
-      return NextResponse.json({ message: 'Tabelas do banco de dados (lançamentos, usuários, configurações, estornos e frigobar) verificadas/criadas com sucesso!' });
+      const successMessage = 'Todas as tabelas do banco de dados (lançamentos, usuários, configurações, estornos) foram verificadas/criadas com sucesso!';
+      log.push(`\n${successMessage}`);
+      return NextResponse.json({ message: successMessage, log, success: true });
     } catch (error: any) {
       console.error('API db-admin/ensure-table erro:', error);
-      return NextResponse.json({ message: `Erro ao verificar/criar tabelas: ${error.message}` }, { status: 500 });
+      log.push(`ERRO GERAL: ${error.message}`);
+      return NextResponse.json({ message: `Erro ao verificar/criar tabelas: ${error.message}`, log, success: false }, { status: 500 });
     }
 }
 
@@ -170,7 +183,7 @@ async function updateMysqlStructure(): Promise<NextResponse> {
 
     } catch (error: any) {
         await connection.rollback();
-        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---');
+        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---`);
         log.push(`  - Causa do erro: ${error.message}`);
         console.error('Erro na atualização da estrutura do MySQL (transação revertida):', error);
         return NextResponse.json({

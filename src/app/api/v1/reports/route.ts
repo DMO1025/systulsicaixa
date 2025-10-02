@@ -1,5 +1,4 @@
 
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAllEntries } from '@/lib/data/entries';
@@ -304,6 +303,7 @@ const extractPersonTransactions = (entries: DailyLogEntry[], consumptionType: st
             (period.subTabs?.faturado?.faturadoItems || []).forEach((item: FaturadoItem) => {
                 if (consumptionType === 'all' || consumptionType === 'faturado-all' || consumptionType === `faturado-${item.type}`) {
                     addTransaction(item.clientName, {
+                        id: item.id,
                         date,
                         origin: `Faturado - ${item.type === 'hotel' ? 'Hotel' : item.type === 'funcionario' ? 'Funcionário' : 'Outros'}`,
                         observation: item.observation || '-',
@@ -317,6 +317,7 @@ const extractPersonTransactions = (entries: DailyLogEntry[], consumptionType: st
         if (showConsumoInterno) {
             (period.subTabs?.consumoInterno?.consumoInternoItems || []).forEach((item: ConsumoInternoItem) => {
                  addTransaction(item.clientName, {
+                    id: item.id,
                     date,
                     origin: `Consumo Interno - ${periodName}`,
                     observation: item.observation || '-',
@@ -447,7 +448,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: error.message || 'Erro interno do servidor.' }, { status: 500, headers: CORS_HEADERS });
     }
 }
-
-    
-
-    

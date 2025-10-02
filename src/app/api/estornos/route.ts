@@ -8,11 +8,12 @@ import { cookies } from 'next/headers';
 import { logAction } from '@/services/auditService';
 import type { EstornoItem, EstornoReason } from '@/lib/types';
 import type mysql from 'mysql2/promise';
+import { v4 as uuidv4 } from 'uuid';
 
 const itemSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   date: z.string(),
-  hora: z.string().optional(),
+  registeredBy: z.string().optional(),
   uh: z.string().optional(),
   nf: z.string().optional(),
   reason: z.enum([
@@ -21,14 +22,15 @@ const itemSchema = z.object({
     'pagamento direto',
     'nao consumido',
     'assinatura divergente',
-    'cortesia'
+    'cortesia',
+    'relancamento',
   ]),
   quantity: z.number(),
-  valorTotalNota: z.number().optional(),
+  valorTotalNota: z.number().optional().nullable(),
   valorEstorno: z.number(),
-  observation: z.string().optional(),
+  observation: z.string().optional().nullable(),
   category: z.string(),
-  registeredBy: z.string().optional(),
+  hora: z.string().optional(),
 });
 
 
@@ -53,10 +55,21 @@ export async function GET(request: NextRequest) {
             [startDateStr, endDateStr]
         );
         
-        let allItems: EstornoItem[] = rows.flatMap(row => safeParse<EstornoItem[]>(row.items) || []);
+        let allItems: EstornoItem[] = rows.flatMap(row => {
+            const parsedItems = safeParse<EstornoItem[]>(row.items) || [];
+            // Clean up observation field for "relancamento"
+            return parsedItems.map(item => {
+                if (item.reason === 'relancamento' && item.observation) {
+                    const prefix = `Relançamento do estorno ID: ${item.id}. `;
+                    if (item.observation.startsWith(prefix)) {
+                        item.observation = item.observation.substring(prefix.length);
+                    }
+                }
+                return item;
+            });
+        });
         
-        // Filter by category if provided
-        if (category) {
+        if (category && category !== 'all') {
             allItems = allItems.filter(item => item.category === category);
         }
         
@@ -68,14 +81,31 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+    let body;
     try {
-        const body = await request.json();
+        body = await request.json();
         const validation = itemSchema.safeParse(body);
         if (!validation.success) {
+            console.error('[LOG DE ERRO] Dados inválidos recebidos na API de estornos:', {
+                bodyRecebido: body,
+                erros: validation.error.format(),
+            });
             return NextResponse.json({ message: 'Dados inválidos.', errors: validation.error.format() }, { status: 400 });
         }
         
         const newItem = validation.data;
+        
+        if (!newItem.id) {
+            newItem.id = uuidv4();
+        }
+
+        // Business logic: 'relancamento' should be a positive value (credit), others are negative (debit).
+        if (newItem.reason === 'relancamento') {
+            newItem.valorEstorno = Math.abs(newItem.valorEstorno);
+        } else {
+            newItem.valorEstorno = -Math.abs(newItem.valorEstorno);
+        }
+        
         const daily_entry_id = newItem.date;
 
         const pool = await getDbPool();
@@ -87,7 +117,6 @@ export async function POST(request: NextRequest) {
         try {
             await connection.beginTransaction();
 
-            // Ensure the parent daily_entries row exists
             const [parentRows] = await connection.query<mysql.RowDataPacket[]>(
                 `SELECT id FROM ${DAILY_ENTRIES_TABLE_NAME} WHERE id = ?`,
                 [daily_entry_id]
@@ -109,7 +138,12 @@ export async function POST(request: NextRequest) {
                 existingItems = safeParse<EstornoItem[]>(rows[0].items) || [];
             }
             
-            existingItems.push(newItem);
+            if (existingItems.some(item => item.id === newItem.id)) {
+                await connection.rollback();
+                return NextResponse.json({ message: `Erro: ID de estorno '${newItem.id}' já existe para esta data.` }, { status: 409 });
+            }
+
+            existingItems.push(newItem as EstornoItem);
 
             const sql = `
               INSERT INTO ${ESTORNOS_TABLE_NAME} (daily_entry_id, items)
@@ -120,8 +154,8 @@ export async function POST(request: NextRequest) {
 
             await connection.commit();
 
-            const username = getCookie('username', { cookies }) || 'sistema';
-            await logAction(username, 'CREATE_ESTORNO', `Estorno adicionado em ${daily_entry_id}: ${newItem.reason} (R$ ${newItem.valorEstorno})`);
+            const actorUsername = newItem.registeredBy || getCookie('username', { cookies }) || 'sistema';
+            await logAction(actorUsername, 'CREATE_ESTORNO', `Estorno adicionado em ${daily_entry_id}: ${newItem.reason} (R$ ${newItem.valorEstorno})`);
 
             return NextResponse.json({ message: 'Estorno salvo com sucesso.' }, { status: 201 });
 
@@ -133,6 +167,7 @@ export async function POST(request: NextRequest) {
         }
     } catch (error: any) {
         console.error('API POST Estornos Error:', error);
+        console.error('[LOG DE ERRO] Payload que causou o erro:', body);
         return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }
@@ -141,7 +176,6 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
     try {
         const body = await request.json();
-        // Allow partial schema for deletion, only ID and date are needed
         const deleteSchema = itemSchema.pick({ id: true, date: true });
         const validation = deleteSchema.safeParse(body);
 

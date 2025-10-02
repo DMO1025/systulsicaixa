@@ -125,20 +125,17 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   }
   
   // Process Estornos
-  const estornosDebito = estornos.filter(item => 
-      item.reason === 'nao consumido' ||
-      item.reason === 'assinatura divergente'
-  );
-
   const detalhesEstornos: Record<string, { qtd: number; valor: number }> = {};
   let totalEstornosValor = 0;
   let totalEstornosQtd = 0;
 
-  for (const item of estornosDebito) {
+  for (const item of estornos) {
     const category = item.category || 'outros';
     if (!detalhesEstornos[category]) {
       detalhesEstornos[category] = { qtd: 0, valor: 0 };
     }
+    // "relancamento" is a credit (positive), others are debits (negative)
+    // We sum them all up, and the signs will handle the math.
     detalhesEstornos[category].qtd += item.quantity || 0;
     detalhesEstornos[category].valor += item.valorEstorno || 0;
     
@@ -151,7 +148,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
     total: { qtd: totalEstornosQtd, valor: totalEstornosValor }
   };
   
-  // Adjust grand totals with estornos that should be debited
+  // Adjust grand totals with the final estorno balance
   totals.grandTotalComCI.valor += totalEstornosValor;
   totals.grandTotalSemCI.valor += totalEstornosValor;
 

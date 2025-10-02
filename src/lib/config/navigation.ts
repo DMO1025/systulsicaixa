@@ -169,17 +169,7 @@ export const REPORTS_GROUPS = [
         ]
       },
       { id: 'controle-frigobar', title: 'Controle de Frigobar', href: REPORTS_PATHS.CONTROLE_FRIGOBAR, icon: Refrigerator },
-      { 
-        id: 'estornos', 
-        title: 'Relatório de Estornos', 
-        href: REPORTS_PATHS.ESTORNOS, 
-        icon: Undo2,
-        subItems: [
-          { id: 'estornos-restaurante', title: 'Restaurante', href: `${REPORTS_PATHS.ESTORNOS}?category=restaurante`, icon: Utensils },
-          { id: 'estornos-frigobar', title: 'Frigobar', href: `${REPORTS_PATHS.ESTORNOS}?category=frigobar`, icon: Refrigerator },
-          { id: 'estornos-room-service', title: 'Room Service', href: `${REPORTS_PATHS.ESTORNOS}?category=room-service`, icon: BedDouble },
-        ]
-      },
+      { id: 'estornos', title: 'Relatório de Estornos', href: REPORTS_PATHS.ESTORNOS, icon: Undo2 },
     ]
   },
    {

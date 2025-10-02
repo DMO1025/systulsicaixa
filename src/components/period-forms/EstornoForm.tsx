@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -20,8 +19,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon, PlusCircle, Trash2, Loader2, History, RotateCw } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { RelaunchModal } from '@/components/shared/RelaunchModal';
 
 
 import type { EstornoItem, EstornoCategory, EstornoReason } from '@/lib/types';
@@ -53,104 +51,15 @@ const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 
   uh: '',
   nf: '',
   reason: 'erro de lancamento',
-  quantity: 1,
+  quantity: 0,
   valorTotalNota: undefined,
   valorEstorno: 0,
   observation: '',
   category: category,
 });
 
-interface RelaunchModalProps {
-  originalItem: EstornoItem;
-  onSuccess: () => void; 
-}
-
-const RelaunchModal: React.FC<RelaunchModalProps> = ({ originalItem, onSuccess }) => {
-  const { toast } = useToast();
-  const { username } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [additionalObservation, setAdditionalObservation] = useState('');
-  
-  const handleConfirmRelaunch = async () => {
-    setIsSaving(true);
-    
-    const { id, ...restOfItem } = originalItem;
-
-    const relaunchPayload = {
-      ...restOfItem,
-      reason: 'relancamento' as EstornoReason,
-      date: format(new Date(), 'yyyy-MM-dd'),
-      hora: format(new Date(), 'HH:mm'),
-      observation: `Relançamento para UH: ${originalItem.uh || 'N/A'}. ${additionalObservation}`.trim(),
-      registeredBy: username || 'sistema',
-      valorEstorno: Math.abs(originalItem.valorEstorno),
-    };
-
-    try {
-        const response = await fetch('/api/estornos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(relaunchPayload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('[LOG DE ERRO RELAUNCH] Payload que causou o erro:', relaunchPayload);
-            console.error('[LOG DE ERRO RELAUNCH] Resposta da API:', errorData);
-            throw new Error(errorData.message || 'Falha ao relançar estorno.');
-        }
-        
-        toast({ title: 'Sucesso!', description: 'Estorno relançado como crédito com sucesso.' });
-        onSuccess();
-        setIsOpen(false);
-        setAdditionalObservation('');
-
-    } catch (error) {
-         toast({ title: "Erro ao Relançar", description: (error as Error).message, variant: "destructive"});
-    } finally {
-        setIsSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-blue-500 h-8 w-8" title="Relançar Estorno">
-          <RotateCw className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Relançar Estorno como Crédito</DialogTitle>
-          <DialogDescription>
-            Isso criará um novo lançamento com o valor positivo de{' '}
-            <span className="font-bold text-green-600">{Math.abs(originalItem.valorEstorno).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>.
-            O estorno original não será alterado.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-2">
-            <Label htmlFor="relaunch-observation">Observação Adicional (Opcional)</Label>
-            <Textarea 
-                id="relaunch-observation"
-                placeholder="Ex: Lançamento correto após verificação do consumo."
-                value={additionalObservation}
-                onChange={(e) => setAdditionalObservation(e.target.value)}
-            />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isSaving}>Cancelar</Button>
-          </DialogClose>
-          <Button onClick={handleConfirmRelaunch} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-            Confirmar Relançamento
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
+const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 
 export default function EstornoForm({ category }: EstornoFormProps) {
@@ -166,6 +75,20 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   
   const [newItem, setNewItem] = useState<Omit<EstornoItem, 'id'>>(createDefaultEstornoItem(category));
 
+  const relaunchedIds = useMemo(() => {
+    const ids = new Set<string>();
+    historyItems.forEach(item => {
+      // Look for the specific pattern in the observation
+      const match = item.observation?.match(/Relançamento do estorno ID: ([\w-]+)/);
+      // Check if the reason is relancamento and a match was found
+      if (item.reason === 'relancamento' && match && match[1]) {
+        ids.add(match[1]);
+      }
+    });
+    return ids;
+  }, [historyItems]);
+
+
   useEffect(() => {
     if (username) {
         setNewItem(prev => ({...prev, registeredBy: username}));
@@ -177,10 +100,11 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
     const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
     try {
-      const response = await fetch(`/api/estornos?category=${category}&startDate=${startDate}&endDate=${endDate}`);
+      const response = await fetch(`/api/estornos?startDate=${startDate}&endDate=${endDate}`);
       if (response.ok) {
         const data: EstornoItem[] = await response.json();
-        setHistoryItems(data.sort((a,b) => parseISO(String(b.date)).getTime() - parseISO(String(a.date)).getTime()));
+        const filteredData = category === 'all' ? data : data.filter(item => item.category === category);
+        setHistoryItems(filteredData.sort((a,b) => parseISO(String(b.date)).getTime() - parseISO(String(a.date)).getTime()));
       } else {
         setHistoryItems([]);
       }
@@ -282,6 +206,26 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     }, { totalItems: 0, totalValor: 0 });
   }, [historyItems]);
 
+  const totals = React.useMemo(() => {
+    const calculated = historyItems.reduce((acc, item) => {
+        // Only sum quantity and valorTotalNota if it's NOT a relancamento
+        if (item.reason !== 'relancamento') {
+            acc.qtd += item.quantity || 0;
+            acc.valorTotalNota += item.valorTotalNota || 0;
+        }
+        // Always sum valorEstorno (which can be positive or negative)
+        acc.valorEstorno += item.valorEstorno || 0;
+        
+        return acc;
+    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0 });
+
+    return {
+        ...calculated,
+        // The difference calculation for the total footer should reflect the sum of all differences
+        diferenca: calculated.valorTotalNota + calculated.valorEstorno,
+    }
+  }, [historyItems]);
+
   return (
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -355,7 +299,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                  <div className="space-y-1.5 md:col-span-3">
                     <Label>Observação</Label>
-                    <Input value={newItem.observation} onChange={e => handleInputChange('observation', e.target.value)} placeholder="Ex: Cliente devolveu, valor incorreto, etc." />
+                    <Input value={newItem.observation || ''} onChange={e => handleInputChange('observation', e.target.value)} placeholder="Ex: Cliente devolveu, valor incorreto, etc." />
                 </div>
                  <div className="flex items-end">
                     <Button onClick={handleAddItem} className="w-full" disabled={isSaving}>
@@ -410,7 +354,14 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                         {historyItems.map((item) => {
                             const valorEstorno = item.valorEstorno || 0;
                             const isCredit = item.reason === 'relancamento';
-                            const showRelaunch = !isCredit;
+                            const showRelaunch = !isCredit && !relaunchedIds.has(item.id);
+                            
+                            let diferenca;
+                            if (isCredit) {
+                                diferenca = (item.valorTotalNota || 0) - valorEstorno;
+                            } else {
+                                diferenca = (item.valorTotalNota || 0) + valorEstorno;
+                            }
 
                             return (
                             <TableRow key={item.id}>
@@ -423,9 +374,9 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                                 <TableCell className="text-xs font-medium capitalize">{item.reason}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{item.observation}</TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
-                                <TableCell className="text-right">{(item.valorTotalNota ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
-                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-green-600" : "text-destructive")}>{valorEstorno.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
-                                <TableCell className="text-right font-bold">{((item.valorTotalNota || 0) + valorEstorno).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(item.valorTotalNota)}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-green-600" : "text-destructive")}>{formatCurrency(valorEstorno)}</TableCell>
+                                <TableCell className="text-right font-bold">{formatCurrency(diferenca)}</TableCell>
                                 <TableCell className="text-right">
                                    <div className="flex justify-end items-center">
                                      {showRelaunch && <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} />}
@@ -453,6 +404,16 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                             </TableRow>
                         )})}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow className="font-bold bg-muted/50">
+                          <TableCell colSpan={5}>TOTAIS</TableCell>
+                          <TableCell className="text-right">{formatQty(totals.qtd)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(totals.valorTotalNota)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(totals.valorEstorno)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(totals.diferenca)}</TableCell>
+                          <TableCell></TableCell>
+                      </TableRow>
+                    </TableFooter>
                     </Table>
                 </div>
             ) : (

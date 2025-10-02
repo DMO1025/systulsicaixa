@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
                 frigobarData.logs[existingLogIndex] = { ...frigobarData.logs[existingLogIndex], ...newLog };
             } else {
                 // Add new log
-                frigobarData.logs.push(newLog);
+                frigobarData.logs.push(newLog as FrigobarConsumptionLog);
             }
 
             const sql = `UPDATE ${DAILY_ENTRIES_TABLE_NAME} SET controleFrigobar = ? WHERE id = ?`;
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
     try {
         const body = await request.json();
-        const deleteSchema = logSchema.pick({ id: true });
+        const deleteSchema = z.object({ id: z.string() });
         const validation = deleteSchema.safeParse(body);
 
         if (!validation.success) {
@@ -132,11 +132,6 @@ export async function DELETE(request: NextRequest) {
         }
         const { id: logIdToDelete } = validation.data;
         
-        // We need to find which daily entry this log belongs to.
-        // This is inefficient. A better schema would store logs in their own table with a foreign key.
-        // For now, we might have to scan a range of dates if we don't know the date.
-        // A simpler approach for now is to require the date on the client, but the log doesn't have it.
-        // Let's assume we need to scan the last X days.
         const pool = await getDbPool();
         if (!pool) throw new Error('Banco de dados não conectado.');
         

@@ -1,5 +1,4 @@
 
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAllEntries as getEntriesFromDb } from '@/lib/data/entries';
 import type { DailyLogEntry } from '@/lib/types';

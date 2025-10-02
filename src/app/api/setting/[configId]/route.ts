@@ -1,5 +1,4 @@
 
-
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Settings } from '@/lib/types';

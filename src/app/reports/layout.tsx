@@ -3,7 +3,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { BarChartBig, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,8 +21,6 @@ import {
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const estornoCategory = searchParams.get('category');
   const { userRole, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -100,7 +98,7 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
                                                     const queryParams = new URLSearchParams(subLink.href.split('?')[1] || '');
                                                     const queryCategory = queryParams.get('category');
                                                     
-                                                    const isSubActive = pathname === pathOnly && (!queryCategory || estornoCategory === queryCategory);
+                                                    const isSubActive = pathname === pathOnly && (!queryCategory);
 
                                                     return (
                                                         <Link

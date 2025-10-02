@@ -71,13 +71,7 @@ export default function ReportsPage() {
   const [includeItemsInPdf, setIncludeItemsInPdf] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
-  const estornoCategoryParam = searchParams.get('category');
-  const [estornoCategory, setEstornoCategory] = useState<string>(estornoCategoryParam || 'all');
-
-  // Update state if URL param changes
-  useEffect(() => {
-    setEstornoCategory(estornoCategoryParam || 'all');
-  }, [estornoCategoryParam]);
+  const [estornoCategory, setEstornoCategory] = useState<string>('all'); // Always 'all' now
 
   const reportInfo = useMemo(() => {
     let groupItems = REPORTS_GROUPS.flatMap(g => g.items);
@@ -166,7 +160,7 @@ export default function ReportsPage() {
             
             let estornosPromise;
             if (filterType === 'estornos') {
-                const estornosUrl = `/api/estornos?startDate=${startDateStr}&endDate=${endDateStr}&category=${estornoCategory || ''}`;
+                const estornosUrl = `/api/estornos?startDate=${startDateStr}&endDate=${endDateStr}&category=all`;
                 estornosPromise = fetch(estornosUrl).then(res => res.json());
             }
 
@@ -187,7 +181,7 @@ export default function ReportsPage() {
         }
     }
     fetchReportData();
-  }, [filterType, selectedDate, selectedMonth, selectedRange, toast, estornoCategory]);
+  }, [filterType, selectedDate, selectedMonth, selectedRange, toast]);
 
 
   const visiblePeriodDefinitions = useMemo(() => {

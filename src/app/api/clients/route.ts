@@ -1,5 +1,4 @@
 
-
 import { NextResponse } from 'next/server';
 import { getDbPool, isMysqlConnected, DAILY_ENTRIES_TABLE_NAME } from '@/lib/mysql';
 import type { FaturadoItem, PeriodData } from '@/lib/types';

@@ -273,23 +273,6 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
 
-                    {filterType === 'estornos' && setEstornoCategory && (
-                        <div className="space-y-2">
-                            <Label htmlFor="estornoCategory">Categoria do Estorno</Label>
-                            <Select value={estornoCategory} onValueChange={setEstornoCategory}>
-                                <SelectTrigger id="estornoCategory" className="w-full">
-                                    <SelectValue placeholder="Selecione a categoria" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
-                                    <SelectItem value="restaurante">Restaurante</SelectItem>
-                                    <SelectItem value="frigobar">Frigobar</SelectItem>
-                                    <SelectItem value="room-service">Room Service</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-
                     {(setSelectedDezena && (filterType === 'controle-cafe' || filterType === 'controle-cafe-no-show')) && (
                         <div className="space-y-2">
                             <Label htmlFor="dezena-select">Imprimir Dezena (PDF)</Label>
@@ -302,6 +285,23 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                     <SelectItem value="1">1ª Dezena</SelectItem>
                                     <SelectItem value="2">2ª Dezena</SelectItem>
                                     <SelectItem value="3">3ª Dezena</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                     {filterType === 'estornos' && setEstornoCategory && (
+                        <div className="space-y-2">
+                            <Label htmlFor="estorno-category">Categoria do Estorno</Label>
+                             <Select value={estornoCategory} onValueChange={setEstornoCategory}>
+                                <SelectTrigger id="estorno-category" className="w-full">
+                                    <SelectValue placeholder="Selecione a categoria"/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="restaurante">Restaurante</SelectItem>
+                                    <SelectItem value="frigobar">Frigobar</SelectItem>
+                                    <SelectItem value="room-service">Room Service</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

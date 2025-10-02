@@ -26,9 +26,9 @@ const itemSchema = z.object({
     'relancamento',
   ]),
   quantity: z.number(),
-  valorTotalNota: z.number().optional(),
+  valorTotalNota: z.number().optional().nullable(),
   valorEstorno: z.number(),
-  observation: z.string().optional(),
+  observation: z.string().optional().nullable(),
   category: z.string(),
   hora: z.string().optional(),
 });
@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
             newItem.id = uuidv4();
         }
 
+        // Business logic: 'relancamento' should be a positive value (credit), others are negative (debit).
         if (newItem.reason === 'relancamento') {
             newItem.valorEstorno = Math.abs(newItem.valorEstorno);
         } else {
@@ -125,6 +126,11 @@ export async function POST(request: NextRequest) {
                 existingItems = safeParse<EstornoItem[]>(rows[0].items) || [];
             }
             
+            if (existingItems.some(item => item.id === newItem.id)) {
+                await connection.rollback();
+                return NextResponse.json({ message: `Erro: ID de estorno '${newItem.id}' já existe para esta data.` }, { status: 409 });
+            }
+
             existingItems.push(newItem as EstornoItem);
 
             const sql = `
