@@ -1,4 +1,5 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDbPool, DATABASE_INIT_COMMANDS, isMysqlConnected, safeStringify, DAILY_ENTRIES_TABLE_NAME, USERS_TABLE_NAME, SETTINGS_TABLE_NAME, ESTORNOS_TABLE_NAME } from '@/lib/mysql';
 import type { MysqlConnectionConfig, DailyLogEntry, Settings, User, PeriodData, SubTabData } from '@/lib/types';
@@ -58,7 +59,7 @@ async function ensureTables(): Promise<NextResponse> {
       log.push('Conexão com MySQL bem-sucedida.');
 
       for (const command of DATABASE_INIT_COMMANDS) {
-          const tableNameMatch = command.match(/CREATE TABLE IF NOT EXISTS \`([^\`]+)\`/);
+          const tableNameMatch = command.match(/CREATE TABLE IF NOT EXISTS `([^`]+)`/);
           const tableName = tableNameMatch ? tableNameMatch[1] : 'desconhecida';
           log.push(`\n-- Verificando tabela: ${tableName} --`);
           log.push(`Executando comando SQL: CREATE TABLE IF NOT EXISTS \`${tableName}\` ... (detalhes omitidos)`);
@@ -183,7 +184,7 @@ async function updateMysqlStructure(): Promise<NextResponse> {
 
     } catch (error: any) {
         await connection.rollback();
-        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---`);
+        log.push('--- ERRO! A transação foi revertida (ROLLBACK). Nenhuma alteração foi salva. ---');
         log.push(`  - Causa do erro: ${error.message}`);
         console.error('Erro na atualização da estrutura do MySQL (transação revertida):', error);
         return NextResponse.json({
