@@ -1,4 +1,5 @@
 
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
@@ -48,14 +49,14 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
         formatQty(item.quantity),
         formatCurrency(item.valorTotalNota),
         formatCurrency(item.valorEstorno),
-        formatCurrency((item.valorTotalNota || 0) - (item.valorEstorno || 0))
+        formatCurrency((item.valorTotalNota || 0) + (item.valorEstorno || 0))
     ]);
     
     const totals = estornos.reduce((acc, item) => {
         acc.qtd += item.quantity || 0;
         acc.valorTotalNota += item.valorTotalNota || 0;
         acc.valorEstorno += item.valorEstorno || 0;
-        acc.diferenca += (item.valorTotalNota || 0) - (item.valorEstorno || 0);
+        acc.diferenca += (item.valorTotalNota || 0) + (item.valorEstorno || 0);
         return acc;
     }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0, diferenca: 0 });
 
@@ -95,6 +96,19 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
            if(totalPages > 1) {
              drawHeaderAndFooter(doc, title, finalFilterText, params, hookData.pageNumber, totalPages);
            }
+        },
+        willDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 7) {
+                 const value = data.cell.raw;
+                 if (typeof value === 'string' && value.includes('-')) {
+                    doc.setTextColor('#E53E3E'); // Red color for negative
+                 } else {
+                     doc.setTextColor('#38A169'); // Green color for positive
+                 }
+            }
+        },
+        didDrawCell: (data) => {
+            doc.setTextColor(40); // Reset to default color
         }
     });
 

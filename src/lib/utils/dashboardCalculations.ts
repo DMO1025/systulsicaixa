@@ -126,7 +126,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   
   // Process Estornos
   const estornosDebito = estornos.filter(item => 
-      item.reason === 'erro de lancamento' ||
+      item.reason === 'nao consumido' ||
       item.reason === 'assinatura divergente'
   );
 
@@ -152,8 +152,8 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   };
   
   // Adjust grand totals with estornos that should be debited
-  totals.grandTotalComCI.valor -= totalEstornosValor;
-  totals.grandTotalSemCI.valor -= totalEstornosValor;
+  totals.grandTotalComCI.valor += totalEstornosValor;
+  totals.grandTotalSemCI.valor += totalEstornosValor;
 
   return totals;
 }

@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format, parseISO, isValid, startOfMonth, endOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
+import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -12,16 +12,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, PlusCircle, Trash2, Loader2, History } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, Loader2, History, RotateCw } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+
 
 import type { EstornoItem, EstornoCategory, EstornoReason } from '@/lib/types';
+
+interface EstornoFormProps {
+  category: EstornoCategory;
+}
 
 const CATEGORY_MAP: Record<string, { title: string; description: string }> = {
   'restaurante': { title: 'Estorno de Restaurante', description: 'Registre estornos de vendas do restaurante (almoço, jantar, etc).' },
@@ -36,10 +43,12 @@ const ESTORNO_REASONS: { value: EstornoReason, label: string }[] = [
     { value: 'nao consumido', label: 'Não Consumido' },
     { value: 'assinatura divergente', label: 'Assinatura Divergente' },
     { value: 'cortesia', label: 'Cortesia' },
+    { value: 'relancamento', label: 'Relançamento' },
 ];
 
 const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 'id'> => ({
   date: format(new Date(), 'yyyy-MM-dd'),
+  hora: format(new Date(), 'HH:mm'),
   registeredBy: '',
   uh: '',
   nf: '',
@@ -51,9 +60,98 @@ const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 
   category: category,
 });
 
-interface EstornoFormProps {
-  category: EstornoCategory;
+interface RelaunchModalProps {
+  originalItem: EstornoItem;
+  onSuccess: () => void; 
 }
+
+const RelaunchModal: React.FC<RelaunchModalProps> = ({ originalItem, onSuccess }) => {
+  const { toast } = useToast();
+  const { username } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [additionalObservation, setAdditionalObservation] = useState('');
+  
+  const handleConfirmRelaunch = async () => {
+    setIsSaving(true);
+    
+    const { id, ...restOfItem } = originalItem;
+
+    const relaunchPayload = {
+      ...restOfItem,
+      reason: 'relancamento' as EstornoReason,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      hora: format(new Date(), 'HH:mm'),
+      observation: `Relançamento para UH: ${originalItem.uh || 'N/A'}. ${additionalObservation}`.trim(),
+      registeredBy: username || 'sistema',
+      valorEstorno: Math.abs(originalItem.valorEstorno),
+    };
+
+    try {
+        const response = await fetch('/api/estornos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(relaunchPayload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('[LOG DE ERRO RELAUNCH] Payload que causou o erro:', relaunchPayload);
+            console.error('[LOG DE ERRO RELAUNCH] Resposta da API:', errorData);
+            throw new Error(errorData.message || 'Falha ao relançar estorno.');
+        }
+        
+        toast({ title: 'Sucesso!', description: 'Estorno relançado como crédito com sucesso.' });
+        onSuccess();
+        setIsOpen(false);
+        setAdditionalObservation('');
+
+    } catch (error) {
+         toast({ title: "Erro ao Relançar", description: (error as Error).message, variant: "destructive"});
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-blue-500 h-8 w-8" title="Relançar Estorno">
+          <RotateCw className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Relançar Estorno como Crédito</DialogTitle>
+          <DialogDescription>
+            Isso criará um novo lançamento com o valor positivo de{' '}
+            <span className="font-bold text-green-600">{Math.abs(originalItem.valorEstorno).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>.
+            O estorno original não será alterado.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-2">
+            <Label htmlFor="relaunch-observation">Observação Adicional (Opcional)</Label>
+            <Textarea 
+                id="relaunch-observation"
+                placeholder="Ex: Lançamento correto após verificação do consumo."
+                value={additionalObservation}
+                onChange={(e) => setAdditionalObservation(e.target.value)}
+            />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isSaving}>Cancelar</Button>
+          </DialogClose>
+          <Button onClick={handleConfirmRelaunch} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+            Confirmar Relançamento
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 export default function EstornoForm({ category }: EstornoFormProps) {
   const { toast } = useToast();
@@ -69,7 +167,6 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   const [newItem, setNewItem] = useState<Omit<EstornoItem, 'id'>>(createDefaultEstornoItem(category));
 
   useEffect(() => {
-    // Set the registeredBy field from auth context when component mounts
     if (username) {
         setNewItem(prev => ({...prev, registeredBy: username}));
     }
@@ -97,7 +194,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   
   useEffect(() => {
     fetchEstornos(selectedMonth);
-  }, [selectedMonth, category]);
+  }, [selectedMonth, category, toast]);
 
   const handleInputChange = (field: keyof Omit<EstornoItem, 'id'>, value: any) => {
     let finalValue = value;
@@ -110,36 +207,26 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     }
     setNewItem(prev => ({...prev, [field]: finalValue}));
   };
-
-  const handleAddItem = async () => {
-    const itemDate = newItem.date;
-    if (!itemDate || !isValid(parseISO(itemDate))) {
-        toast({ title: "Data Inválida", description: "Por favor, selecione uma data válida para o item.", variant: "destructive"});
-        return;
-    }
-    if(!newItem.reason) {
-      toast({ title: "Motivo Obrigatório", description: "Por favor, selecione um motivo para o estorno.", variant: "destructive"});
-      return;
-    }
+  
+ const handleAddItem = async () => {
     setIsSaving(true);
+    
+    const payload = { ...newItem, id: uuidv4() };
+
     try {
-        const payload: EstornoItem = { 
-            ...newItem, 
-            id: uuidv4(), 
-            category, 
-            observation: newItem.observation || '',
-            registeredBy: newItem.registeredBy || username || 'desconhecido',
-        };
-        
         const response = await fetch('/api/estornos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
         if (!response.ok) {
             const errorData = await response.json();
+            console.error('[LOG DE ERRO] Payload que causou o erro:', payload);
+            console.error('[LOG DE ERRO] Resposta da API:', errorData);
             throw new Error(errorData.message || 'Falha ao salvar estorno.');
         }
+        
         toast({ title: 'Sucesso!', description: 'Estorno salvo com sucesso.' });
         setNewItem(createDefaultEstornoItem(category));
         await fetchEstornos(selectedMonth);
@@ -150,7 +237,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
         setIsSaving(false);
     }
   };
-
+  
   const handleDeleteItem = async (itemToDelete: EstornoItem) => {
     try {
         const response = await fetch('/api/estornos', {
@@ -186,6 +273,14 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     const newYear = parseInt(yearValue, 10);
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
   };
+  
+  const monthTotals = useMemo(() => {
+    return historyItems.reduce((acc, item) => {
+      acc.totalItems += item.quantity || 0;
+      acc.totalValor += item.valorEstorno || 0;
+      return acc;
+    }, { totalItems: 0, totalValor: 0 });
+  }, [historyItems]);
 
   return (
     <div className="space-y-6">
@@ -211,24 +306,23 @@ export default function EstornoForm({ category }: EstornoFormProps) {
           <CardTitle>Adicionar Novo Registro de Estorno</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
-                <div className="space-y-1.5">
-                    <Label>Data do Item</Label>
+             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-3 items-end">
+                <div className="space-y-1.5 xl:col-span-2"><Label>Data do Item</Label>
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9", !newItem.date && "text-muted-foreground")}>
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {newItem.date ? format(parseISO(newItem.date), "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                                {newItem.date ? format(parseISO(newItem.date), "dd/MM/yyyy") : <span>Selecione</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={parseISO(newItem.date)} onSelect={(d) => d && handleInputChange('date', d)} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
-                <div className="space-y-1.5"><Label>Usuário</Label><Input value={newItem.registeredBy || ''} onChange={e => handleInputChange('registeredBy', e.target.value)} placeholder="Nome do usuário"/></div>
+                <div className="space-y-1.5 xl:col-span-2"><Label>Usuário</Label><Input value={newItem.registeredBy || ''} onChange={e => handleInputChange('registeredBy', e.target.value)} /></div>
                 <div className="space-y-1.5"><Label>UH</Label><Input value={newItem.uh || ''} onChange={e => handleInputChange('uh', e.target.value)} /></div>
                 <div className="space-y-1.5"><Label>NF</Label><Input value={newItem.nf || ''} onChange={e => handleInputChange('nf', e.target.value)} /></div>
                 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 xl:col-span-2">
                     <Label>Motivo do Estorno</Label>
                     <Select value={newItem.reason} onValueChange={(v: EstornoReason) => handleInputChange('reason', v)}>
                         <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
@@ -238,36 +332,50 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                     </Select>
                 </div>
                  <div className="space-y-1.5">
-                    <Label>Quantidade</Label>
+                    <Label>Qtd.</Label>
                     <Input type="text" inputMode="numeric" value={newItem.quantity} onChange={e => handleInputChange('quantity', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                    <Label>Valor Total da Nota (R$)</Label>
+                    <Label>Valor Nota</Label>
                     <CurrencyInput
                       value={newItem.valorTotalNota}
                       onValueChange={(value) => handleInputChange('valorTotalNota', value)}
                       placeholder="R$ 0,00"
                     />
                 </div>
-                 <div className="space-y-1.5">
-                    <Label>Valor do Estorno (R$)</Label>
+                <div className="space-y-1.5">
+                    <Label>Vlr Estorno</Label>
                     <CurrencyInput
                       value={newItem.valorEstorno}
                       onValueChange={(value) => handleInputChange('valorEstorno', value)}
                       placeholder="R$ 0,00"
                     />
                 </div>
-                 <div className="space-y-1.5 md:col-span-2 xl:col-span-3">
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                 <div className="space-y-1.5 md:col-span-3">
                     <Label>Observação</Label>
                     <Input value={newItem.observation} onChange={e => handleInputChange('observation', e.target.value)} placeholder="Ex: Cliente devolveu, valor incorreto, etc." />
                 </div>
-                 <div className="flex items-end xl:col-span-2">
+                 <div className="flex items-end">
                     <Button onClick={handleAddItem} className="w-full" disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4"/>}
                         Adicionar e Salvar
                     </Button>
                  </div>
             </div>
+             <div className="border-t pt-4 flex justify-end items-center gap-6 text-sm">
+                <div className="text-right">
+                    <span className="text-muted-foreground">Total de Itens Estornados no Mês:</span>
+                    <span className="font-bold ml-2">{monthTotals.totalItems.toLocaleString('pt-BR')}</span>
+                </div>
+                 <div className="text-right">
+                    <span className="text-muted-foreground">Valor Total Estornado no Mês:</span>
+                    <span className={cn("font-bold ml-2", monthTotals.totalValor < 0 ? "text-destructive" : "text-green-600")}>
+                        {monthTotals.totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                </div>
+             </div>
         </CardContent>
       </Card>
       
@@ -294,11 +402,16 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                             <TableHead className="text-right">Qtd.</TableHead>
                             <TableHead className="text-right">Valor Total Nota</TableHead>
                             <TableHead className="text-right">Valor do Estorno</TableHead>
-                            <TableHead className="text-right w-[50px]">Ação</TableHead>
+                            <TableHead className="text-right">Diferença</TableHead>
+                            <TableHead className="text-right w-[100px]">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {historyItems.map((item) => {
+                            const valorEstorno = item.valorEstorno || 0;
+                            const isCredit = item.reason === 'relancamento';
+                            const showRelaunch = !isCredit;
+
                             return (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs font-medium">{format(parseISO(String(item.date)), 'dd/MM/yyyy')}</TableCell>
@@ -308,30 +421,34 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                                   {item.nf && <div>NF: {item.nf}</div>}
                                 </TableCell>
                                 <TableCell className="text-xs font-medium capitalize">{item.reason}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{item.observation}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{item.observation}</TableCell>
                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                 <TableCell className="text-right">{(item.valorTotalNota ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
-                                <TableCell className="text-right text-destructive font-semibold">{(item.valorEstorno ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-green-600" : "text-destructive")}>{valorEstorno.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
+                                <TableCell className="text-right font-bold">{((item.valorTotalNota || 0) + valorEstorno).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL'})}</TableCell>
                                 <TableCell className="text-right">
-                                   <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button type="button" variant="ghost" size="icon">
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Tem certeza que deseja remover este estorno? Esta ação não pode ser desfeita.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteItem(item)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                   </AlertDialog>
+                                   <div className="flex justify-end items-center">
+                                     {showRelaunch && <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} />}
+                                     <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                          <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8">
+                                              <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                  Tem certeza que deseja remover este estorno? Esta ação não pode ser desfeita.
+                                              </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                              <AlertDialogAction onClick={() => handleDeleteItem(item)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                     </AlertDialog>
+                                   </div>
                                 </TableCell>
                             </TableRow>
                         )})}

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -135,10 +134,10 @@ export default function ReportsPage() {
 
         if (filterType === 'date' && selectedDate && isValid(selectedDate)) {
             startDateStr = endDateStr = format(selectedDate, 'yyyy-MM-dd');
-        } else if ((filterType === 'range' || filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar') && selectedRange?.from && isValid(selectedRange.from)) {
+        } else if ((filterType === 'range' || filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar' || filterType.startsWith('client-')) && selectedRange?.from && isValid(selectedRange.from)) {
             startDateStr = format(selectedRange.from, 'yyyy-MM-dd');
             endDateStr = selectedRange.to ? format(selectedRange.to, 'yyyy-MM-dd') : startDateStr;
-        } else if (filterType === 'month' || filterType === 'period' || filterType.startsWith('client-')) {
+        } else if (filterType === 'month' || filterType === 'period') {
             if (isValid(selectedMonth)) {
                 startDateStr = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
                 endDateStr = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
@@ -495,5 +494,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
