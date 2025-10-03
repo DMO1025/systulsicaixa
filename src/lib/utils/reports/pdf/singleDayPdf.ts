@@ -98,7 +98,7 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams) => 
         : 0;
     
     autoTable(doc, {
-        margin: { top: headerHeight },
+        margin: { top: headerHeight + 50 }, // Added extra margin
         body: [
             ['Receita Total (com CI)', 'Receita Líquida (sem CI)', 'Ticket Médio (sem CI)'],
             [formatCurrency(totals.grandTotal.comCI.valor), formatCurrency(totals.grandTotal.semCI.valor), formatCurrency(ticketMedio)]
@@ -170,6 +170,7 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams) => 
         
         doc.addPage();
         let pageStartY = drawHeaderAndFooter(doc, `Detalhes do Período: ${pDef.label}`, dateRangeStr, params, index + 2, periodsWithData.length + 1);
+        pageStartY += 50; // Extra margin
 
         const bodyData = pDef.id === 'eventos'
             ? renderEventosDataVertical(periodData as EventosPeriodData)
@@ -196,7 +197,7 @@ export const generateSingleDayReportPdf = (doc: jsPDF, params: ExportParams) => 
         autoTable(doc, {
             head: [['Observações Gerais do Dia']],
             body: [[entry.generalObservations]],
-            startY: obsStartY,
+            startY: obsStartY + 50,
         });
     }
 };

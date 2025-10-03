@@ -14,10 +14,13 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.WorkBook | null> => {
-    const { filterType, entries, reportData, toast, unitPrices, personTransactions } = params;
+    const { filterType, entries, reportData, toast, unitPrices, personTransactions, estornos } = params;
     const wb = XLSX.utils.book_new();
 
-    if (entries.length === 0 && filterType !== 'history' && params.estornos?.length === 0 && personTransactions?.length === 0) {
+    const noData = entries.length === 0 && (!estornos || estornos.length === 0) && (!personTransactions || personTransactions.length === 0);
+    const noFrigobarData = filterType === 'controle-frigobar' && (!reportData || !reportData.details || !(reportData.details as any).allLogs || (reportData.details as any).allLogs.length === 0);
+
+    if (noData && !noFrigobarData) {
         if (toast) toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
         return null;
     }
@@ -63,8 +66,8 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
             sheetsAdded = true;
             break;
         case 'estornos':
-            if(params.estornos) {
-                generateEstornosExcel(wb, params.estornos, params.companyName);
+            if(estornos) {
+                generateEstornosExcel(wb, estornos, params.companyName, params.estornoCategory);
                 sheetsAdded = true;
             }
             break;

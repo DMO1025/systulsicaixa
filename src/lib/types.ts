@@ -120,7 +120,7 @@ export interface ControleCafeItem {
 }
 
 // --- Estorno Structure ---
-export type EstornoCategory = 'restaurante' | 'frigobar' | 'room-service';
+export type EstornoCategory = 'restaurante' | 'frigobar' | 'room-service' | 'all';
 export type EstornoReason = 'duplicidade' | 'erro de lancamento' | 'pagamento direto' | 'nao consumido' | 'assinatura divergente' | 'cortesia' | 'relancamento';
 
 

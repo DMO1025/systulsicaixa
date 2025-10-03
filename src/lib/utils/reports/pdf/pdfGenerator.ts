@@ -28,7 +28,7 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     const consumptionLabel = params.consumptionType ? params.consumptionType.replace('faturado-', '').replace('ci', 'consumo-interno') : '';
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle-cafe') || filterType === 'estornos' || filterType === 'controle-frigobar' || filterType === 'client-extract' || filterType === 'client-summary') {
+    if (filterType.startsWith('controle') || filterType === 'estornos' || filterType.startsWith('client-') || filterType === 'controle-frigobar') {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
             : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
@@ -40,6 +40,13 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
         dateRangeFilenameStr = format(month, 'yyyy-MM');
     }
     
+    const categoryTitles: Record<string, string> = {
+        'restaurante': 'Restaurante',
+        'frigobar': 'Frigobar',
+        'room-service': 'Room_Service',
+        'all': '',
+    };
+    const estornoCategoryLabel = params.estornoCategory && params.estornoCategory !== 'all' ? categoryTitles[params.estornoCategory] : '';
 
     switch (filterType) {
         case 'date':
@@ -77,7 +84,7 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
             await generateNoShowPdf(doc, params);
             break;
         case 'estornos':
-            filename = getFilename(['Relatorio_Estornos', params.estornoCategory, dateRangeFilenameStr], 'pdf');
+            filename = getFilename(['Relatorio_Estornos', estornoCategoryLabel, dateRangeFilenameStr], 'pdf');
             generateEstornosPdf(doc, params);
             break;
         case 'controle-frigobar':
@@ -91,7 +98,11 @@ export const generatePdf = async (params: Omit<ExportParams, 'formatType'> & { f
     }
     
     // Final check to prevent saving empty PDFs.
-    if (doc.getNumberOfPages() > 0 && doc.internal.pages[1]) {
+    // The getNumberOfPages might not be available on all jsPDF versions/types, so we cast to any.
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    const firstPageContent = (doc as any).internal.pages[1];
+
+    if (pageCount > 0 && firstPageContent) {
         doc.save(filename);
     } else {
         if(params.toast) params.toast({ title: 'Nada para Exportar', description: 'Nenhum dado foi encontrado para gerar o PDF com os filtros atuais.', variant: 'default'});

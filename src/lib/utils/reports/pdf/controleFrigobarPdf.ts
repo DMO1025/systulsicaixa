@@ -34,7 +34,8 @@ export const generateControleFrigobarPdf = async (doc: jsPDF, params: ExportPara
     doc.text(dateRangeStr, 40, 75);
 
     // Resumos
-    const startYResumos = 100;
+    let startYResumos = 100;
+    startYResumos += 30; // Extra margin
 
     autoTable(doc, {
         startY: startYResumos,
@@ -98,7 +99,7 @@ export const generateControleFrigobarPdf = async (doc: jsPDF, params: ExportPara
     ]];
 
     autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 50,
+        startY: (doc as any).lastAutoTable.finalY + 80,
         margin: { left: 40, right: 40 },
         head: head,
         body: body,
@@ -143,5 +144,3 @@ export const generateControleFrigobarPdf = async (doc: jsPDF, params: ExportPara
         });
     }
 };
-
-    

@@ -55,6 +55,7 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
         
         const subTitle = `${title} - ${dezena}ª Dezena`;
         let startY = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, 1, 1);
+        startY += 50;
 
         const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Obs']];
         const body = itemsForDezena.map(item => [item.entryDate, item.horario || '-', item.hospede || '-', item.uh || '-', item.reserva || '-', formatCurrency(item.valor), item.observation || '-']);

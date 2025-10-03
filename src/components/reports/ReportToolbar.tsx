@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -13,7 +14,7 @@ import { Download, CalendarIcon, Refrigerator, FileCheck2, Wallet, Users, ListFi
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { cn } from '@/lib/utils';
-import type { FilterType, PeriodId, DateRange, Company } from '@/lib/types';
+import type { FilterType, PeriodId, DateRange, Company, EstornoReason } from '@/lib/types';
 import { getPeriodIcon, type PeriodDefinition } from '@/lib/config/periods';
 import { Switch } from '@/components/ui/switch';
 
@@ -45,7 +46,19 @@ interface ReportToolbarProps {
     setIncludeItemsInPdf: (value: boolean) => void;
     estornoCategory?: string;
     setEstornoCategory?: (value: string) => void;
+    estornoReason?: string;
+    setEstornoReason?: (value: string) => void;
 }
+
+const ESTORNO_REASONS: { value: EstornoReason, label: string }[] = [
+    { value: 'duplicidade', label: 'Duplicidade' },
+    { value: 'erro de lancamento', label: 'Erro de Lançamento' },
+    { value: 'pagamento direto', label: 'Pagamento Direto' },
+    { value: 'nao consumido', label: 'Não Consumido' },
+    { value: 'assinatura divergente', label: 'Assinatura Divergente' },
+    { value: 'cortesia', label: 'Cortesia' },
+    { value: 'relancamento', label: 'Relançamento' },
+];
 
 const ReportToolbar: React.FC<ReportToolbarProps> = ({
     filterType,
@@ -74,7 +87,9 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
     includeItemsInPdf,
     setIncludeItemsInPdf,
     estornoCategory,
-    setEstornoCategory
+    setEstornoCategory,
+    estornoReason,
+    setEstornoReason
 }) => {
     const selectedYear = selectedMonth.getFullYear();
     const selectedMonthIndex = selectedMonth.getMonth();
@@ -302,6 +317,23 @@ const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                     <SelectItem value="restaurante">Restaurante</SelectItem>
                                     <SelectItem value="frigobar">Frigobar</SelectItem>
                                     <SelectItem value="room-service">Room Service</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    
+                    {filterType === 'estornos' && setEstornoReason && (
+                        <div className="space-y-2">
+                            <Label htmlFor="estorno-reason">Motivo do Estorno</Label>
+                             <Select value={estornoReason} onValueChange={setEstornoReason}>
+                                <SelectTrigger id="estorno-reason" className="w-full">
+                                    <SelectValue placeholder="Selecione o motivo"/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    {ESTORNO_REASONS.map(reason => (
+                                        <SelectItem key={reason.value} value={reason.value}>{reason.label}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

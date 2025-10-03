@@ -1,5 +1,4 @@
 
-
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { generatePdf } from './pdf/pdfGenerator';
@@ -65,14 +64,14 @@ export const getControleCafeItems = (entries: DailyLogEntry[], type: 'no-show' |
 };
 
 const exportToExcel = async (params: ExportParams) => {
-    const { filterType, date, month, range, reportData } = params;
+    const { filterType, date, month, range, reportData, toast } = params;
     
     const wb = await generateExcelWorkbook(params);
-    if (!wb) return; // Error was already toasted inside the generator
+    if (!wb) return; 
 
     let dateRangeFilenameStr = '';
     
-    if (filterType.startsWith('controle') || filterType === 'estornos' || filterType.startsWith('client-')) {
+    if (filterType.startsWith('controle') || filterType === 'estornos' || filterType.startsWith('client-') || filterType === 'controle-frigobar') {
         dateRangeFilenameStr = range?.from 
             ? `${format(range.from, 'yyyy-MM-dd')}_a_${range.to ? format(range.to, 'yyyy-MM-dd') : format(range.from, 'yyyy-MM-dd')}`
             : month ? format(month, 'yyyy-MM') : 'periodo_indefinido';
@@ -87,6 +86,13 @@ const exportToExcel = async (params: ExportParams) => {
 
     const consumptionLabel = getConsumptionTypeLabel(params.consumptionType) || '';
     const personName = params.selectedClient && params.selectedClient !== 'all' ? params.selectedClient : 'Todas_Pessoas';
+    const categoryTitles: Record<string, string> = {
+        'restaurante': 'Restaurante',
+        'frigobar': 'Frigobar',
+        'room-service': 'Room_Service',
+        'all': '',
+    };
+    const estornoCategoryLabel = params.estornoCategory && params.estornoCategory !== 'all' ? categoryTitles[params.estornoCategory] : '';
 
     const filenameMap: Record<string, string[]> = {
         'range': ['Relatorio_Geral', dateRangeFilenameStr],
@@ -96,7 +102,7 @@ const exportToExcel = async (params: ExportParams) => {
         'client-summary': ['Resumo_Pessoas', consumptionLabel, dateRangeFilenameStr],
         'controle-cafe': ['Controle_Cafe', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
         'controle-cafe-no-show': ['Controle_No_Show', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
-        'estornos': ['Relatorio_Estornos', params.estornoCategory || 'Todos', dateRangeFilenameStr],
+        'estornos': ['Relatorio_Estornos', estornoCategoryLabel, dateRangeFilenameStr],
         'controle-frigobar': ['Controle_Frigobar', dateRangeFilenameStr],
         'date': ['Relatorio_Dia', dateRangeFilenameStr],
     };
@@ -107,9 +113,16 @@ const exportToExcel = async (params: ExportParams) => {
 
 
 export const exportReport = async (params: ExportParams) => {
-    if (params.entries.length === 0 && params.estornos?.length === 0 && params.personTransactions?.length === 0) {
-      if(params.toast) params.toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
-      return;
+    const { toast, filterType, entries, estornos, personTransactions, reportData } = params;
+
+    const noData = entries.length === 0 && (!estornos || estornos.length === 0) && (!personTransactions || personTransactions.length === 0);
+
+    // Special check for 'controle-frigobar' as it doesn't use the standard data props
+    const noFrigobarData = filterType === 'controle-frigobar' && (!reportData || !reportData.details || !(reportData.details as any).allLogs || (reportData.details as any).allLogs.length === 0);
+
+    if (noData && !noFrigobarData) {
+        if(toast) toast({ title: "Nenhum dado para exportar", description: "Filtre por um período com dados antes de exportar.", variant: "destructive" });
+        return;
     }
 
     if (params.formatType === 'pdf') {

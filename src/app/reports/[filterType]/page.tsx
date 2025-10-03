@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,7 +11,7 @@ import { ptBR } from 'date-fns/locale/pt-BR';
 import type { DateRange } from 'react-day-picker';
 import { REPORTS_GROUPS } from '@/lib/config/navigation';
 
-import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company, UnifiedPersonTransaction, ReportExportData } from '@/lib/types';
+import type { DailyLogEntry, PeriodId, DashboardItemVisibilityConfig, ReportData, ChartConfig, FilterType, ChannelUnitPricesConfig, EstornoItem, Company, UnifiedPersonTransaction, ReportExportData, EstornoReason } from '@/lib/types';
 import { PERIOD_DEFINITIONS, getPeriodIcon } from '@/lib/config/periods';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { getAllDailyEntries, getAllEntryDates } from '@/services/dailyEntryService';
@@ -71,7 +72,8 @@ export default function ReportsPage() {
   const [includeItemsInPdf, setIncludeItemsInPdf] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
-  const [estornoCategory, setEstornoCategory] = useState<string>('all'); // Always 'all' now
+  const [estornoCategory, setEstornoCategory] = useState<string>('all');
+  const [estornoReason, setEstornoReason] = useState<string>('all');
 
   const reportInfo = useMemo(() => {
     let groupItems = REPORTS_GROUPS.flatMap(g => g.items);
@@ -321,6 +323,8 @@ export default function ReportsPage() {
         includeCompanyData,
         estornos: estornosData,
         includeItemsInPdf,
+        estornoCategory,
+        estornoReason,
     });
   };
 
@@ -361,7 +365,7 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'estornos') {
-        return <EstornosReportView estornos={estornosData} category={estornoCategory} />;
+        return <EstornosReportView estornos={estornosData} category={estornoCategory} reason={estornoReason} />;
     }
 
     if (filterType === 'controle-cafe-no-show') {
@@ -473,6 +477,8 @@ export default function ReportsPage() {
             setIncludeItemsInPdf={setIncludeItemsInPdf}
             estornoCategory={estornoCategory}
             setEstornoCategory={setEstornoCategory}
+            estornoReason={estornoReason}
+            setEstornoReason={setEstornoReason}
         />
       )}
 

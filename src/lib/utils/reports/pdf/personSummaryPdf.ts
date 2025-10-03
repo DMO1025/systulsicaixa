@@ -50,7 +50,8 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
     const finalFilterText = `${dateRangeStr} | Tipo de Consumo: ${consumptionLabel}`;
     const title = 'Resumo de Consumo por Pessoa';
     
-    const headerHeight = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
+    let startY = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
+    startY += 50;
 
     autoTable(doc, {
         head: [['Pessoa', 'Total de Itens', 'Valor Total']],
@@ -60,7 +61,7 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
         showFoot: 'lastPage',
         headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
         footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
-        margin: { top: headerHeight },
+        margin: { top: startY },
         didDrawPage: (hookData) => {
            const totalPages = (doc as any).internal.getNumberOfPages();
            if(totalPages > 1) {

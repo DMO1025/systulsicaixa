@@ -17,8 +17,8 @@ export const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, 
         return y + size * 1.2;
     };
     
-    // Header - Only draw on the first page
-    if (pageNumber === 1) {
+    // Header - Only draw on the first page of a "section" (or every page if simple report)
+    if (pageNumber === 1 || totalPages === 1) {
         if (companyName) {
             headerHeight = addText(companyName, 14, headerHeight, 'bold');
             headerHeight += 2; 
@@ -47,7 +47,7 @@ export const drawHeaderAndFooter = (doc: jsPDF, title: string, dateStr: string, 
         headerHeight = addText(title, 10, headerHeight);
         headerHeight = addText(dateStr, 9, headerHeight);
     } else {
-        // For subsequent pages, just reserve a minimal top margin
+        // For subsequent pages of the same table, just reserve a minimal top margin
         headerHeight = 30;
     }
 

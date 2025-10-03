@@ -1,5 +1,4 @@
 
-
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -45,7 +44,8 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
         { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'right' } }
     ]];
     
-    const headerHeight = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
+    let startY = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
+    startY += 50; // Extra margin
 
     autoTable(doc, {
         head: head,
@@ -63,7 +63,7 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
             3: { cellWidth: 'auto' },
             4: { cellWidth: 60, halign: 'right' },
         },
-        margin: { top: headerHeight },
+        margin: { top: startY },
         didDrawPage: (hookData) => {
            const totalPages = (doc as any).internal.getNumberOfPages();
            if(totalPages > 1) {

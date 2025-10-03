@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -6,13 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { format, parseISO } from 'date-fns';
 import type { EstornoItem, EstornoReason } from '@/lib/types';
-import { Undo2, Hash, DollarSign } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Undo2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 
 interface EstornosReportViewProps {
   estornos: EstornoItem[];
   category?: string;
+  reason?: string;
 }
 
 const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -29,14 +31,18 @@ const ESTORNO_REASON_LABELS: Record<EstornoReason, string> = {
 };
 
 
-const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, category }) => {
+const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, category, reason }) => {
   
   const filteredEstornos = React.useMemo(() => {
-    if (!category || category === 'all') {
-      return estornos;
+    let items = estornos;
+    if (category && category !== 'all') {
+      items = items.filter(item => item.category === category);
     }
-    return estornos.filter(item => item.category === category);
-  }, [estornos, category]);
+    if (reason && reason !== 'all') {
+      items = items.filter(item => item.reason === reason);
+    }
+    return items;
+  }, [estornos, category, reason]);
 
   const sortedEstornos = React.useMemo(() => {
     return filteredEstornos.sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
@@ -49,35 +55,55 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
   }
 
   const title = `Relatório de Estornos${category && category !== 'all' ? ` - ${categoryTitles[category] || category}` : ''}`;
-  const description = `Lista de todos os estornos registrados para o período e categoria selecionados.`;
+  const description = `Lista de todos os estornos registrados para o período e filtros selecionados.`;
 
 
   const totals = React.useMemo(() => {
     return sortedEstornos.reduce((acc, item) => {
-        // Only sum quantity and valorTotalNota if it's NOT a relancamento
         if (item.reason !== 'relancamento') {
             acc.qtd += item.quantity || 0;
             acc.valorTotalNota += item.valorTotalNota || 0;
         }
-        // Always sum valorEstorno (which can be positive or negative)
         acc.valorEstorno += item.valorEstorno || 0;
         
+        let diferenca;
+        if (!item.valorTotalNota || item.valorTotalNota === 0) {
+            diferenca = 0;
+        } else if (item.reason === 'relancamento') {
+             diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
+        } else {
+             diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
+        }
+        acc.diferenca += diferenca;
+        
         return acc;
-    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0 });
+    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0, diferenca: 0 });
   }, [sortedEstornos]);
   
-  const finalTotals = {
-      ...totals,
-      diferenca: totals.valorTotalNota + totals.valorEstorno,
-  };
-
-
+  const summaryByReason = React.useMemo(() => {
+    const reasonSummary: Record<string, { qtd: number; valor: number }> = {};
+    sortedEstornos.forEach(item => {
+        const reasonLabel = ESTORNO_REASON_LABELS[item.reason] || item.reason;
+        if (!reasonSummary[reasonLabel]) {
+            reasonSummary[reasonLabel] = { qtd: 0, valor: 0 };
+        }
+        if(item.reason !== 'relancamento') {
+             reasonSummary[reasonLabel].qtd += item.quantity || 0;
+        }
+        reasonSummary[reasonLabel].valor += item.valorEstorno || 0;
+    });
+    return Object.entries(reasonSummary);
+  }, [sortedEstornos]);
+  
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle>{title}</CardTitle>
+            <div className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-primary"/>
+              <CardTitle>{title}</CardTitle>
+            </div>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -98,8 +124,11 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
               <TableBody>
                 {sortedEstornos.length > 0 ? sortedEstornos.map((item) => {
                     const isCredit = item.reason === 'relancamento';
+                    
                     let diferenca;
-                     if (isCredit) {
+                    if (!item.valorTotalNota || item.valorTotalNota === 0) {
+                        diferenca = 0;
+                    } else if (isCredit) {
                         diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
                     } else {
                         diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
@@ -110,14 +139,14 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
                             <TableCell className="text-xs font-medium">{format(parseISO(item.date), 'dd/MM/yyyy')}</TableCell>
                             <TableCell className="text-xs capitalize">{item.registeredBy || '-'}</TableCell>
                             <TableCell className="text-xs">
-                            {item.uh && <div>UH: {item.uh}</div>}
-                            {item.nf && <div>NF: {item.nf}</div>}
+                              {item.uh && <div>UH: {item.uh}</div>}
+                              {item.nf && <div>NF: {item.nf}</div>}
                             </TableCell>
                             <TableCell className="text-xs font-medium capitalize">{ESTORNO_REASON_LABELS[item.reason] || item.reason}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{item.observation}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-pre-wrap">{item.observation}</TableCell>
                             <TableCell className="text-right text-xs">{formatQty(item.quantity)}</TableCell>
                             <TableCell className="text-right text-xs">{formatCurrency(item.valorTotalNota)}</TableCell>
-                            <TableCell className={`text-right text-xs font-semibold ${isCredit ? 'text-green-600' : 'text-destructive'}`}>{formatCurrency(item.valorEstorno)}</TableCell>
+                            <TableCell className={cn("text-right text-xs font-semibold", isCredit ? "text-green-600" : "text-destructive")}>{formatCurrency(item.valorEstorno)}</TableCell>
                             <TableCell className="text-right text-xs font-bold">{formatCurrency(diferenca)}</TableCell>
                         </TableRow>
                     )
@@ -129,14 +158,14 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
                   </TableRow>
                 )}
               </TableBody>
-               {sortedEstornos.length > 0 && (
+              {sortedEstornos.length > 0 && (
                 <TableFooter>
                   <TableRow className="font-bold bg-muted/50">
                     <TableCell colSpan={5}>TOTAIS</TableCell>
-                    <TableCell className="text-right">{formatQty(finalTotals.qtd)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(finalTotals.valorTotalNota)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(finalTotals.valorEstorno)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(finalTotals.diferenca)}</TableCell>
+                    <TableCell className="text-right">{formatQty(totals.qtd)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.valorTotalNota)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.valorEstorno)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.diferenca)}</TableCell>
                   </TableRow>
                 </TableFooter>
               )}
@@ -145,36 +174,47 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
         </Card>
       </div>
 
-      <div className="lg:col-span-1 space-y-4">
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Resumo de Estornos</CardTitle>
-            <Undo2 className="h-4 w-4 text-muted-foreground"/>
-          </CardHeader>
-          <CardContent className="space-y-4">
-              <div className="flex justify-between items-baseline pt-2">
-                <p className="text-sm text-muted-foreground">Itens Estornados</p>
-                <p className="text-lg font-bold">{formatQty(finalTotals.qtd)}</p>
-              </div>
-              <div className="flex justify-between items-baseline">
-                <p className="text-sm text-muted-foreground">Valor Total das Notas</p>
-                <p className="text-lg font-bold">{formatCurrency(finalTotals.valorTotalNota)}</p>
-              </div>
-              <div className="flex justify-between items-baseline">
-                <p className="text-sm text-muted-foreground">Balanço de Estornos</p>
-                <p className={`text-lg font-bold ${finalTotals.valorEstorno < 0 ? 'text-destructive' : 'text-green-600'}`}>{formatCurrency(finalTotals.valorEstorno)}</p>
-              </div>
-              <div className="flex justify-between items-baseline border-t pt-2 mt-2">
-                <p className="text-sm font-bold">DIFERENÇA</p>
-                <p className="text-lg font-bold">{formatCurrency(finalTotals.diferenca)}</p>
-              </div>
-          </CardContent>
-        </Card>
+      <div className="lg:col-span-1 space-y-6">
+         <Card>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="font-semibold text-foreground">Resumo Financeiro</TableHead>
+                        <TableHead className="text-right font-semibold text-foreground">Valor</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow><TableCell>Total de Itens Estornados</TableCell><TableCell className="text-right">{formatQty(totals.qtd)}</TableCell></TableRow>
+                    <TableRow><TableCell>Valor Total das Notas</TableCell><TableCell className="text-right">{formatCurrency(totals.valorTotalNota)}</TableCell></TableRow>
+                    <TableRow><TableCell>Balanço de Estornos</TableCell><TableCell className="text-right">{formatCurrency(totals.valorEstorno)}</TableCell></TableRow>
+                    <TableRow className="font-bold bg-muted/50"><TableCell>Diferença Final</TableCell><TableCell className="text-right">{formatCurrency(totals.diferenca)}</TableCell></TableRow>
+                </TableBody>
+            </Table>
+          </Card>
+          <Card>
+             <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="font-semibold text-foreground">Resumo por Motivo</TableHead>
+                        <TableHead className="text-right font-semibold text-foreground">Qtd</TableHead>
+                        <TableHead className="text-right font-semibold text-foreground">Valor</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {summaryByReason.map(([reasonLabel, data]) => (
+                        <TableRow key={reasonLabel}>
+                            <TableCell>{reasonLabel}</TableCell>
+                            <TableCell className="text-right">{formatQty(data.qtd)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(data.valor)}</TableCell>
+                        </TableRow>
+                    ))}
+                    {summaryByReason.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum dado.</TableCell></TableRow>}
+                </TableBody>
+            </Table>
+          </Card>
       </div>
     </div>
   );
 };
 
 export default EstornosReportView;
-
-    

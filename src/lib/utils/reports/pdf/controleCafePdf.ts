@@ -59,7 +59,7 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
     const totalPagesForThisExport = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d))).length;
 
     for (const dezena of dezenasToProcess) {
-        const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, dezena));
+        const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, d));
         
         if (itemsForDezena.length === 0) continue;
         
@@ -69,7 +69,8 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
         }
         
         const subTitle = `${title} - ${dezena}ª Dezena`;
-        const headerHeight = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, pageCounter, totalPagesForThisExport);
+        let startY = drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, pageCounter, totalPagesForThisExport);
+        startY += 50;
 
         const head = [['Data', 'Adultos', 'Criança 01', 'Criança 02', 'Cont. Manual', 'Sem Check-in', 'Total Dia', 'Valor Dia (R$)']];
         const dezenaTotals: DezenaTotals = { adultoQtd: 0, crianca01Qtd: 0, crianca02Qtd: 0, contagemManual: 0, semCheckIn: 0, totalGeral: 0, totalValor: 0 };
@@ -109,7 +110,7 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
             headStyles: { halign: 'center' }, 
             bodyStyles: { halign: 'center' },
             footStyles: { halign: 'center', fillColor: [230, 230, 230], textColor: 0 },
-            margin: { top: headerHeight },
+            margin: { top: startY },
             didDrawPage: (hookData) => {
                 if (totalPagesForThisExport > 1) {
                     drawHeaderAndFooter(doc, subTitle, dateRangeStr, params, hookData.pageNumber, totalPagesForThisExport);
@@ -121,10 +122,10 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
         autoTable(doc, {
             body: [
                 [{ content: 'RESUMO FISCAL', colSpan: 2, styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }],
-                ['Total Adultos', formatQty(dezenaTotals.adultoQtd)],
-                ['Total Crianças', formatQty(totalCriancas)],
-                ['Total Contagem Manual', formatQty(dezenaTotals.contagemManual)],
-                ['Total Sem Check-in', formatQty(dezenaTotals.semCheckIn)],
+                ['Total Adultos:', formatQty(dezenaTotals.adultoQtd)],
+                ['Total Crianças:', formatQty(totalCriancas)],
+                ['Total Contagem Manual:', formatQty(dezenaTotals.contagemManual)],
+                ['Total Sem Check-in:', formatQty(dezenaTotals.semCheckIn)],
                 [{ content: 'Total de Pessoas', styles: { fontStyle: 'bold' } }, { content: formatQty(dezenaTotals.totalGeral), styles: { fontStyle: 'bold' } }],
                 [{ content: 'Valor Total (R$)', styles: { fontStyle: 'bold' } }, { content: formatCurrency(dezenaTotals.totalValor), styles: { fontStyle: 'bold' } }],
             ],

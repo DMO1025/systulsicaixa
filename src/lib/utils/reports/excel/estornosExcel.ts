@@ -4,7 +4,15 @@ import type { EstornoItem } from '../types';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export const generateEstornosExcel = (wb: XLSX.WorkBook, estornos: EstornoItem[], companyName?: string) => {
+export const generateEstornosExcel = (wb: XLSX.WorkBook, estornos: EstornoItem[], companyName?: string, category?: string) => {
+    
+    const categoryTitles: Record<string, string> = {
+        'restaurante': 'Restaurante',
+        'frigobar': 'Frigobar',
+        'room-service': 'Room Service',
+    };
+    const categoryTitle = category && category !== 'all' ? categoryTitles[category] : 'Todas';
+
     const dataForSheet = estornos.map(item => ({
         'Empresa': companyName,
         'Data': format(parseISO(item.date), 'dd/MM/yyyy', { locale: ptBR }),
@@ -16,12 +24,14 @@ export const generateEstornosExcel = (wb: XLSX.WorkBook, estornos: EstornoItem[]
         'Valor Total Nota': item.valorTotalNota,
         'Valor Estorno': item.valorEstorno,
         'Observação': item.observation,
-        'Categoria': item.category,
+        'Categoria': categoryTitle,
     }));
 
     const totals = estornos.reduce((acc, item) => {
-        acc.qtd += item.quantity || 0;
-        acc.valorTotalNota += item.valorTotalNota || 0;
+        if(item.reason !== 'relancamento') {
+          acc.qtd += item.quantity || 0;
+          acc.valorTotalNota += item.valorTotalNota || 0;
+        }
         acc.valorEstorno += item.valorEstorno || 0;
         return acc;
     }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0 });
@@ -40,8 +50,7 @@ export const generateEstornosExcel = (wb: XLSX.WorkBook, estornos: EstornoItem[]
         'Categoria': '',
     });
 
+    const sheetName = `Estornos_${categoryTitle}`.substring(0, 31);
     const ws = XLSX.utils.json_to_sheet(dataForSheet);
-    XLSX.utils.book_append_sheet(wb, ws, 'Relatorio_Estornos');
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
 };
-
-    

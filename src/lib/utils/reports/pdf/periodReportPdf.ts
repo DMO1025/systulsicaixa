@@ -39,7 +39,8 @@ export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams) => {
         const finalFilterText = `${dateRangeStr} | Categoria: ${tabDef.label}`;
         
         const totalPages = availableCategories.length;
-        const headerHeight = drawHeaderAndFooter(doc, title, finalFilterText, params, catIndex + 1, totalPages);
+        let startY = drawHeaderAndFooter(doc, title, finalFilterText, params, catIndex + 1, totalPages);
+        startY += 60; // Extra margin
 
         const headers = [tabDef.cols.map(c => c.label)];
         const body = items.map(item => tabDef.cols.map(c => {
@@ -72,7 +73,7 @@ export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams) => {
             headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
             footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
             showFoot: 'lastPage',
-            margin: { top: headerHeight },
+            margin: { top: startY },
              didDrawPage: (hookData) => {
                 if (hookData.pageNumber > 1) { // Only draw header again if it's a new page for the same table
                     drawHeaderAndFooter(doc, title, finalFilterText, params, catIndex + 1, totalPages);
