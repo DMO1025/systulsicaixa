@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DailyLogEntry, EventosPeriodData, PeriodData, SalesChannelId } from '../types';
-import { processEntryForTotals } from '@/lib/utils/calculations';
+import { processEntryForTotals } from '@/lib/utils/api/v1/calculations';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
 
@@ -113,5 +113,3 @@ export const generateSingleDayReportExcel = (wb: XLSX.WorkBook, entry: DailyLogE
 
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 };
-
-    

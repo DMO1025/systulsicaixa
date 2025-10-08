@@ -33,6 +33,8 @@ import {
   UserX,
   Building,
   Type,
+  Settings,
+  ClipboardList as ClipboardListIcon,
 } from 'lucide-react';
 
 export const PATHS = {
@@ -52,6 +54,7 @@ export const ADMIN_SETTINGS_PATHS = {
   VISIBILITY: `${PATHS.ADMIN_SETTINGS_BASE}/visibility`,
   DASHBOARD_VISIBILITY: `${PATHS.ADMIN_SETTINGS_BASE}/dashboard-visibility`,
   SUMMARY_CARD: `${PATHS.ADMIN_SETTINGS_BASE}/summary-card`,
+  SUMMARY_CARD_VERSION: `${PATHS.ADMIN_SETTINGS_BASE}/summary-card-version`,
   BILLED_CLIENTS: `${PATHS.ADMIN_SETTINGS_BASE}/billed-clients`,
   COMPANIES: `${PATHS.ADMIN_SETTINGS_BASE}/companies`,
   FRIGOBAR_ITEMS: `${PATHS.ADMIN_SETTINGS_BASE}/frigobar-items`,
@@ -67,12 +70,8 @@ export const ADMIN_SETTINGS_PATHS = {
 } as const;
 
 export const REPORTS_PATHS = {
-  // Main report types
-  MONTH: `${PATHS.REPORTS_BASE}/month`,
   RANGE: `${PATHS.REPORTS_BASE}/range`,
-  DATE: `${PATHS.REPORTS_BASE}/date`,
   PERIOD: `${PATHS.REPORTS_BASE}/period`,
-  // Detailed/specialized reports
   CLIENT_EXTRACT: `${PATHS.REPORTS_BASE}/client-extract`,
   CLIENT_SUMMARY: `${PATHS.REPORTS_BASE}/client-summary`,
   CONTROLE_CAFE: `${PATHS.REPORTS_BASE}/controle-cafe`,
@@ -112,28 +111,39 @@ export const BASE_NAV_ITEMS = [
 
 export const ADMIN_SETTINGS_GROUPS = [
     {
-      title: 'Interface e Acesso',
+      title: 'Aparência e Acesso',
       items: [
-        { id: 'appName', title: 'Nome do Aplicativo', href: ADMIN_SETTINGS_PATHS.APP_NAME, icon: Type },
         { id: 'users', title: 'Perfil & Operadores', href: ADMIN_SETTINGS_PATHS.USERS, icon: Users },
-        { id: 'visibility', title: 'Visibilidade dos Cards', href: ADMIN_SETTINGS_PATHS.VISIBILITY, icon: Eye },
+        { id: 'app-name', title: 'Nome do Aplicativo', href: ADMIN_SETTINGS_PATHS.APP_NAME, icon: Type },
+        { id: 'visibility', title: 'Visibilidade de Cards', href: ADMIN_SETTINGS_PATHS.VISIBILITY, icon: Eye },
         { id: 'dashboard-visibility', title: 'Visibilidade do Dashboard', href: ADMIN_SETTINGS_PATHS.DASHBOARD_VISIBILITY, icon: LayoutList },
-        { id: 'summary-card', title: 'Itens do Resumo', href: ADMIN_SETTINGS_PATHS.SUMMARY_CARD, icon: ListChecks },
+        { id: 'summary-card', title: 'Itens do Resumo Lateral', href: ADMIN_SETTINGS_PATHS.SUMMARY_CARD, icon: ListChecks },
+        { id: 'summary-card-version', title: 'Versão do Resumo Lateral', href: ADMIN_SETTINGS_PATHS.SUMMARY_CARD_VERSION, icon: ClipboardListIcon },
       ]
     },
     {
-      title: 'Dados e Configuração',
+      title: 'Cadastros Gerais',
       items: [
         { id: 'companies', title: 'Empresas', href: ADMIN_SETTINGS_PATHS.COMPANIES, icon: Building },
         { id: 'billed-clients', title: 'Pessoas/Setores Faturados', href: ADMIN_SETTINGS_PATHS.BILLED_CLIENTS, icon: Briefcase },
-        { id: 'noshow-clients', title: 'Clientes No-Show', href: ADMIN_SETTINGS_PATHS.NOSHOW_CLIENTS, icon: UserMinus },
+        { id: 'noshow-clients', title: 'Clientes (No-Show)', href: ADMIN_SETTINGS_PATHS.NOSHOW_CLIENTS, icon: UserMinus },
         { id: 'frigobar-items', title: 'Itens de Frigobar', href: ADMIN_SETTINGS_PATHS.FRIGOBAR_ITEMS, icon: Refrigerator },
         { id: 'unit-prices', title: 'Preços Unitários', href: ADMIN_SETTINGS_PATHS.UNIT_PRICES, icon: DollarSign },
+      ]
+    },
+    {
+      title: 'Importação e Exportação',
+      items: [
         { id: 'data-templates', title: 'Modelos de Dados', href: ADMIN_SETTINGS_PATHS.DATA_TEMPLATES, icon: FileSpreadsheet },
         { id: 'data-import', title: 'Importação de Dados', href: ADMIN_SETTINGS_PATHS.DATA_IMPORT, icon: Upload },
-        { id: 'migration', title: 'Migração de Dados', href: ADMIN_SETTINGS_PATHS.MIGRATION, icon: ArrowRightLeft },
+      ]
+    },
+    {
+      title: 'Sistema e Conexões',
+      items: [
         { id: 'database', title: 'Banco de Dados', href: ADMIN_SETTINGS_PATHS.DATABASE, icon: Database },
         { id: 'api-access', title: 'Acesso API', href: ADMIN_SETTINGS_PATHS.API_ACCESS, icon: KeyRound },
+        { id: 'migration', title: 'Migração e Ferramentas', href: ADMIN_SETTINGS_PATHS.MIGRATION, icon: ArrowRightLeft },
       ]
     }
 ];
@@ -142,10 +152,8 @@ export const REPORTS_GROUPS = [
   {
     title: 'Relatórios Financeiros',
     items: [
-      { id: 'month', title: 'Geral (Mês Inteiro)', href: REPORTS_PATHS.MONTH, icon: BarChartBig },
-      { id: 'range', title: 'Por Intervalo de Datas', href: REPORTS_PATHS.RANGE, icon: CalendarRange },
-      { id: 'date', title: 'Por Data Específica', href: REPORTS_PATHS.DATE, icon: CalendarDays },
-      { id: 'period', title: 'Por Período', href: REPORTS_PATHS.PERIOD, icon: ListFilter },
+      { id: 'range', title: 'Geral (por Intervalo)', href: REPORTS_PATHS.RANGE, icon: BarChartBig },
+      { id: 'period', title: 'Por Período (no Mês)', href: REPORTS_PATHS.PERIOD, icon: ListFilter },
     ]
   },
   {

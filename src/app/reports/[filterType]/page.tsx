@@ -52,7 +52,7 @@ export default function ReportsPage() {
   const [personTransactions, setPersonTransactions] = useState<UnifiedPersonTransaction[]>([]);
   const [reportExportData, setReportExportData] = useState<ReportExportData | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService' | 'almoco'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -494,3 +494,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

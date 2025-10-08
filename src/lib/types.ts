@@ -276,6 +276,7 @@ export interface MysqlConnectionConfig {
 
 export type DashboardItemVisibilityConfig = Record<string, boolean>;
 export type SummaryCardItemsConfig = Partial<Record<SummaryCardItemId, boolean>>;
+export type EventosInRestauranteSetting = 0 | 1;
 
 export interface ApiAccessConfig {
     apiKey: string;
@@ -335,16 +336,16 @@ export interface GeneralReportDailyItem {
     date: string;
     createdAt?: string | Date;
     lastModifiedAt?: string | Date;
-    periodTotals: Partial<Record<PeriodId | 'roomService', { qtd: number; valor: number }>>;
+    periodTotals: Partial<Record<PeriodId | 'roomService' | 'estornos', { qtd: number; valor: number }>>;
     totalComCI: number;
     totalSemCI: number;
     totalReajusteCI: number;
     totalQtd: number;
     totalCIQtd: number;
-    totalCIValor: number;
+    totalCIValor?: number;
 }
 export interface GeneralReportSummary {
-    periodTotals: Partial<Record<PeriodId | 'roomService', { qtd: number; valor: number }>>;
+    periodTotals: Partial<Record<PeriodId | 'roomService' | 'estornos', { qtd: number; valor: number }>>;
     grandTotalComCI: number;
     grandTotalSemCI: number;
     grandTotalReajusteCI: number;
@@ -398,6 +399,7 @@ export interface Settings {
     mysqlConnectionConfig?: MysqlConnectionConfig;
     dashboardItemVisibilityConfig?: DashboardItemVisibilityConfig;
     summaryCardItemsConfig?: SummaryCardItemsConfig;
+    eventosNoServicoRestaurante?: EventosInRestauranteSetting;
     billedClients?: BilledClient[];
     noShowClients?: BilledClient[];
     apiAccessConfig?: ApiAccessConfig;

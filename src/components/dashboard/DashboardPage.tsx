@@ -14,7 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import { processEntriesForDashboard } from '@/lib/utils/dashboardCalculations';
 import { DASHBOARD_ACCUMULATED_ITEMS_CONFIG } from '@/lib/config/dashboard';
 import { PATHS, REPORTS_PATHS } from '@/lib/config/navigation';
-import * as calculations from '@/lib/utils/calculations/index';
+import { processEntryForTotals } from '@/lib/utils/calculations/index';
 
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import DailyTotalsTable from '@/components/dashboard/DailyTotalsTable';
@@ -216,7 +216,7 @@ export default function DashboardPage() {
         const monthTotals = processEntriesForDashboard(consolidatedEntries, allEstornos);
         
         const dailyTotalsData = consolidatedEntries.map(entry => {
-          const entryTotals = calculations.processEntryForTotals(entry);
+          const entryTotals = processEntryForTotals(entry);
           let formattedDate = "Data Inválida";
           if (entry.id && typeof entry.id === 'string' && entry.id.match(/^\d{4}-\d{2}-\d{2}$/)) {
             const [year, month, day] = entry.id.split('-');
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                     const entryMonthKey = `${entryYearUTC}-${String(entryMonthUTC + 1).padStart(2, '0')}`;
             
                     if (monthlyAggregates[entryMonthKey]) {
-                        const entryTotals = calculations.processEntryForTotals(entry);
+                        const entryTotals = processEntryForTotals(entry);
                         monthlyAggregates[entryMonthKey].valorComCI += entryTotals.grandTotal.comCI.valor;
                         monthlyAggregates[entryMonthKey].qtdComCI += entryTotals.grandTotal.comCI.qtd;
                         monthlyAggregates[entryMonthKey].valorCI += entryTotals.totalCI.valor;

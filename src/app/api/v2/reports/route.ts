@@ -1,15 +1,15 @@
 
-import { NextResponse, type NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
-import { getAllEntries as getAllEntriesFromDataLayer } from '@/lib/data/entries';
-import { getSetting as getSettingFromDataLayer } from '@/lib/data/settings';
-import { generateGeneralReportForApi } from '@/lib/utils/api/v1/reportGenerators';
 
-import type { DailyLogEntry, FilterType, EstornoItem, FrigobarConsumptionLog, FrigobarPeriodData, FrigobarItem, UnifiedPersonTransaction, PeriodId } from '@/lib/types';
+import { NextResponse, type NextRequest } from 'next/server';
+import { getAllEntries as getAllEntriesFromDataLayer } from '@/lib/data/entries';
+import { generateGeneralReportForApiV2 } from '@/lib/utils/api/v2/reportGenerators';
+
+import type { DailyLogEntry, FilterType, EstornoItem, FrigobarConsumptionLog, FrigobarPeriodData, FrigobarItem, UnifiedPersonTransaction, PeriodId, DashboardItemVisibilityConfig, ChannelUnitPricesConfig } from '@/lib/types';
 import { isValid, parse, format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { getDbPool, isMysqlConnected, ESTORNOS_TABLE_NAME, DAILY_ENTRIES_TABLE_NAME, safeParse } from '@/lib/mysql';
 import type mysql from 'mysql2/promise';
 import { generatePeriodReportData } from '@/lib/reports/period/generator';
+import { getSetting as getSettingFromDataLayer } from '@/lib/data/settings';
 
 import { extractPersonTransactions } from '@/lib/reports/person/generator';
 
@@ -18,7 +18,7 @@ const CORS_HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
     'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-control-allow-credentials': 'true',
 };
 
 export async function OPTIONS(request: NextRequest) {
@@ -106,13 +106,20 @@ export async function GET(request: NextRequest) {
         }
         
         if (filterType === 'controle-cafe' || filterType === 'controle-cafe-no-show') {
-            const entries = await getAllEntriesFromDataLayer({ 
+            const allEntries = await getAllEntriesFromDataLayer({ 
                 startDate: startDateStr, 
                 endDate: endDateStr, 
                 fields: 'id,date,controleCafeDaManha,cafeManhaNoShow'
-            }) as DailyLogEntry[];
+            });
+            
+            const relevantData = allEntries.map(entry => ({
+              id: entry.id,
+              date: entry.date,
+              controleCafeDaManha: entry.controleCafeDaManha,
+              cafeManhaNoShow: entry.cafeManhaNoShow,
+            }));
 
-            return NextResponse.json({ type: filterType, data: { dailyBreakdowns: entries } }, { headers: CORS_HEADERS });
+            return NextResponse.json({ type: filterType, data: { dailyBreakdowns: relevantData } }, { headers: CORS_HEADERS });
         }
 
 
@@ -160,12 +167,25 @@ export async function GET(request: NextRequest) {
         }
         
         // This is the default case for 'range'
-        const reportData = await generateGeneralReportForApi(entries);
+        const pool = await getDbPool();
+        let estornos: EstornoItem[] = [];
+        if (pool && (await isMysqlConnected(pool)) && startDateStr && endDateStr) {
+            const [rows] = await pool.query<mysql.RowDataPacket[]>(
+                `SELECT items FROM ${ESTORNOS_TABLE_NAME} WHERE daily_entry_id BETWEEN ? AND ?`,
+                [startDateStr, endDateStr]
+            );
+            estornos = rows.flatMap(row => safeParse<EstornoItem[]>(row.items) || []);
+        }
+
+        const visibilityConfig = await getSettingFromDataLayer<DashboardItemVisibilityConfig>('dashboardItemVisibilityConfig');
+        const unitPricesConfig = await getSettingFromDataLayer<ChannelUnitPricesConfig>('channelUnitPricesConfig');
+        
+        const reportData = await generateGeneralReportForApiV2(entries, estornos, visibilityConfig, unitPricesConfig);
         return NextResponse.json({ type: 'general', data: reportData }, { headers: CORS_HEADERS });
 
 
     } catch (error: any) {
-        console.error("API v1/reports Error:", error);
+        console.error("API v2/reports Error:", error);
         return NextResponse.json({ message: error.message || 'Erro interno do servidor.' }, { status: 500, headers: CORS_HEADERS });
     }
 }

@@ -4,7 +4,7 @@ import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { ExportParams, PeriodData, EventosPeriodData, SalesChannelId } from '../types';
-import { processEntryForTotals as calculateTotals } from '@/lib/utils/calculations';
+import { processEntryForTotals as calculateTotals } from '@/lib/utils/api/v1/calculations';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { SALES_CHANNELS, EVENT_LOCATION_OPTIONS, EVENT_SERVICE_TYPE_OPTIONS } from '@/lib/config/forms';
 import { drawHeaderAndFooter } from './pdfUtils';

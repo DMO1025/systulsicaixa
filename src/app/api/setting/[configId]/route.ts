@@ -2,7 +2,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Settings } from '@/lib/types';
-import { getSetting, saveSetting } from '@/lib/data/settings';
+import { getSetting as getSettingFromData, saveSetting as saveSettingToData } from '@/lib/data/settings';
 import { revalidateTag } from 'next/cache';
 import { getCookie } from 'cookies-next';
 import { cookies } from 'next/headers';
@@ -16,6 +16,7 @@ const validConfigIds = z.enum([
   'mysqlConnectionConfig',
   'dashboardItemVisibilityConfig',
   'summaryCardItemsConfig',
+  'eventosNoServicoRestaurante',
   'billedClients',
   'noShowClients',
   'apiAccessConfig',
@@ -36,11 +37,11 @@ export async function GET(request: NextRequest, { params }: { params: { configId
   const validatedConfigId = parsedConfigId.data as ValidConfigId;
 
   try {
-    const configValue = await getSetting(validatedConfigId);
+    const configValue = await getSettingFromData(validatedConfigId);
     if (configValue === null || configValue === undefined) {
-      return NextResponse.json({ config: {} });
+      return NextResponse.json(null, { status: 404 });
     }
-    return NextResponse.json({ config: configValue });
+    return NextResponse.json(configValue);
   } catch (error: any) {
     return NextResponse.json({ message: error.message, details: error.toString() }, { status: 500 });
   }
@@ -63,15 +64,15 @@ export async function POST(request: NextRequest, { params }: { params: { configI
     return NextResponse.json({ message: 'Payload JSON inválido.' }, { status: 400 });
   }
 
-  if (!requestBody || typeof requestBody.config === 'undefined') {
-    return NextResponse.json({ message: 'Payload deve conter a propriedade "config".' }, { status: 400 });
+  if (requestBody === null || typeof requestBody.configValue === 'undefined') {
+    return NextResponse.json({ message: 'Payload deve conter a propriedade "configValue".' }, { status: 400 });
   }
 
-  const configValue = requestBody.config as Settings[ValidConfigId];
+  const configValue = requestBody.configValue as Settings[ValidConfigId];
 
   try {
     const username = getCookie('username', { cookies }) || 'sistema';
-    await saveSetting(validatedConfigId, configValue);
+    await saveSettingToData(validatedConfigId, configValue);
     
     await logAction(username, 'SAVE_SETTING', `Configuração '${validatedConfigId}' foi salva.`);
 

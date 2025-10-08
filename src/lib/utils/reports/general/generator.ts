@@ -3,7 +3,7 @@
 import type { DailyLogEntry, GeneralReportViewData, PeriodId } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { format, parseISO } from 'date-fns';
-import { processEntryForTotals } from '@/lib/utils/api/v1/calculations';
+import { processEntryForTotals } from '@/lib/utils/calculations';
 
 
 export function generateGeneralReport(entries: DailyLogEntry[]): GeneralReportViewData {

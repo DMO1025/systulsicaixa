@@ -9,172 +9,172 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { KeyRound, Loader2, RefreshCw, Copy, Server, Globe, Calendar as CalendarIcon } from 'lucide-react'; 
+import { KeyRound, Loader2, RefreshCw, Copy, Server, Globe, Calendar as CalendarIcon, Wand2, CheckCircle, BarChartHorizontal, Calendar, Users, FileText, FileClock, ChevronRight, Refrigerator, Coffee, Undo2, UserX, ListFilter } from 'lucide-react';
 import { getSetting } from '@/services/settingsService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import type { PeriodId, FilterType, DateRange } from '@/lib/types';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import Link from 'next/link';
 
-
-const CodeBlock = ({ code }: { code: string }) => {
+const CodeBlock = ({ code, className, wrap = false }: { code: string, className?: string, wrap?: boolean }) => {
+    const { toast } = useToast();
+    const handleCopyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: "Copiado!", description: "O código foi copiado para a área de transferência." });
+    };
     return (
-        <pre className="p-3 rounded-md bg-muted text-muted-foreground text-xs overflow-x-auto max-h-96">
-            <code>{code}</code>
-        </pre>
+        <div className={cn("relative", className)}>
+            <pre className={cn(
+                "p-4 rounded-md bg-muted text-muted-foreground text-xs max-h-[400px]",
+                wrap ? "whitespace-pre-wrap break-all" : "overflow-x-auto"
+            )}>
+                <code>{code}</code>
+            </pre>
+            <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => handleCopyToClipboard(code)}>
+                <Copy className="h-4 w-4" />
+            </Button>
+        </div>
     );
 };
 
-const exampleApiResponseByFilter: Record<FilterType, { description: string; json: string }> = {
-    month: {
-        description: 'Abaixo está um exemplo da estrutura de dados retornada pela API para um filtro "Geral (Mês Inteiro)".',
-        json: `{
-  "type": "general",
-  "data": {
-    "dailyBreakdowns": [
-      {
-        "date": "01/07/2024",
-        "periodTotals": {
-          "madrugada": { "qtd": 2, "valor": 55.5 },
-          "cafeDaManha": { "qtd": 10, "valor": 150 },
-          "almocoPrimeiroTurno": { "qtd": 25, "valor": 750.2 },
-          "jantar": { "qtd": 30, "valor": 1200 }
-        },
-        "totalComCI": 2155.7,
-        "totalSemCI": 2055.7,
-        "totalReajusteCI": 10,
-        "totalQtd": 67,
-        "totalCIQtd": 5
-      }
+const filterOptions = [
+    { value: 'range', label: 'Geral (por Intervalo)', icon: BarChartHorizontal, description: 'Retorna um resumo geral para um intervalo de datas personalizado.' },
+    { value: 'period', label: 'Por Período (no Mês)', icon: ListFilter, description: 'Retorna os dados detalhados para um período específico dentro de um mês.' },
+    { value: 'client-extract', label: 'Por Pessoa (Extrato)', icon: Users, description: 'Retorna uma lista detalhada de transações (faturado/C.I.) por pessoa.' },
+    { value: 'client-summary', label: 'Por Pessoa (Resumo)', icon: FileText, description: 'Retorna um resumo consolidado do total consumido por pessoa.' },
+    { value: 'controle-cafe', label: 'Controle Café (Presença)', icon: Coffee, description: 'Retorna os registros de contagem de pessoas no café da manhã.' },
+    { value: 'controle-cafe-no-show', label: 'Controle Café (No-Show)', icon: UserX, description: 'Retorna os registros de no-show do café da manhã.' },
+    { value: 'controle-frigobar', label: 'Controle Frigobar', icon: Refrigerator, description: 'Retorna todos os logs de consumo de frigobar no período.' },
+    { value: 'estornos', label: 'Relatório de Estornos', icon: Undo2, description: 'Retorna todos os estornos registrados no período.' },
+];
+
+const PARAMETERS_CONFIG: Record<string, { key: string, type: string, description: string, example: string }[]> = {
+    range: [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'range' },
+        { key: 'startDate', type: 'string', description: 'Data de início do intervalo.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final do intervalo (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
     ],
-    "summary": {
-      "periodTotals": {
-        "madrugada": { "qtd": 50, "valor": 1250.75 }
-      },
-      "grandTotalComCI": 53000.75,
-      "grandTotalSemCI": 50500.75,
-      "grandTotalReajusteCI": 250,
-      "grandTotalQtd": 1650,
-      "grandTotalCIQtd": 100
-    },
-    "reportTitle": "GERAL (MÊS)"
-  }
-}`
-    },
-    date: {
-        description: 'Para o filtro "Por Data Específica", a API retorna o objeto completo do lançamento diário.',
-        json: `{
-  "id": "2024-07-15",
-  "date": "2024-07-15T00:00:00.000Z",
-  "generalObservations": "Dia movimentado com evento da Empresa X.",
-  "madrugada": {
-    "channels": {
-      "madrugadaRoomServiceValorServico": { "vtotal": 150.50 }
-    }
-  },
-  "cafeDaManha": {
-    "channels": {
-      "cdmListaHospedes": { "qtd": 50, "vtotal": 750 }
-    }
-  }
-}`
-    },
-    range: {
-        description: 'O filtro "Por Intervalo de Datas" retorna a mesma estrutura do relatório "Geral (Mês Inteiro)", consolidando os dados do intervalo.',
-        json: `{
-  "type": "general",
-  "data": {
-    "dailyBreakdowns": [
-      {
-        "date": "15/07/2024",
-        "periodTotals": { "jantar": { "qtd": 30, "valor": 1200 } }
-      },
-      {
-        "date": "16/07/2024",
-        "periodTotals": { "jantar": { "qtd": 35, "valor": 1400 } }
-      }
+     period: [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'period' },
+        { key: 'month', type: 'string', description: 'Mês do relatório no formato AAAA-MM.', example: format(new Date(), 'yyyy-MM') },
+        { key: 'periodId', type: 'string', description: 'ID do período a ser filtrado (veja lista abaixo).', example: 'almocoPrimeiroTurno' },
     ],
-    "summary": {
-      "periodTotals": { "jantar": { "qtd": 65, "valor": 2600 } }
-    },
-    "reportTitle": "GERAL (INTERVALO)"
-  }
-}`
-    },
-    period: {
-        description: 'Para o filtro "Por Período", a API retorna um detalhamento diário para cada sub-categoria do período selecionado.',
-        json: `{
-  "type": "period",
-  "data": {
-    "dailyBreakdowns": {
-      "roomService": [
-        { "date": "01/07/2024", "qtd": 2, "valor": 155.5 },
-        { "date": "02/07/2024", "qtd": 3, "valor": 250 }
-      ],
-      "hospedes": [
-        { "date": "01/07/2024", "qtd": 10, "valor": 450 }
-      ]
-    },
-    "summary": {
-      "roomService": { "qtd": 5, "total": 405.5 },
-      "hospedes": { "qtd": 10, "total": 450 }
-    },
-    "reportTitle": "JANTAR"
-  }
-}`
-    },
-    'client-extract': {
-        description: 'O filtro "Por Pessoa (Extrato Detalhado)" retorna uma lista (array) de todas as transações individuais para o tipo de consumo selecionado.',
-        json: `[
-  {
-    "personName": "Demetrios",
-    "date": "05/07/2024",
-    "origin": "Faturado - Hotel",
-    "observation": "Consumo frigobar",
-    "quantity": 1,
-    "value": 75.50
-  },
-  {
-    "personName": "Demetrios",
-    "date": "10/07/2024",
-    "origin": "Consumo Interno - Jantar",
-    "observation": "Jantar diretoria",
-    "quantity": 4,
-    "value": 320.00
-  }
-]`
-    },
-    'client-summary': {
-        description: 'O filtro "Por Pessoa (Resumo Mensal)" retorna um objeto com os totais consolidados por pessoa.',
-        json: `{
-  "Demetrios": {
-    "qtd": 5,
-    "valor": 395.50
-  },
-  "Felipe": {
-    "qtd": 1,
-    "valor": 45.00
-  }
-}`
-    },
-    'controle-cafe': {
-      description: 'Retorna os dados do controle de café da manhã.',
-      json: `[]`
-    },
-    'controle-cafe-no-show': {
-      description: 'Retorna os dados de no-show do café da manhã.',
-      json: `[]`
-    },
-    'history': {
-        description: 'Este filtro não é acessível via API no momento.',
-        json: `{ "message": "Endpoint não disponível." }`
-    }
+    'client-extract': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'client-extract' },
+        { key: 'startDate', type: 'string', description: 'Data de início.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+        { key: 'consumptionType', type: 'string', description: 'Tipo de consumo (all, ci, faturado-all, etc.).', example: 'all' },
+        { key: 'personName', type: 'string', description: 'Nome específico da pessoa (opcional).', example: 'Demetrios' },
+    ],
+    'client-summary': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'client-summary' },
+        { key: 'startDate', type: 'string', description: 'Data de início.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+        { key: 'consumptionType', type: 'string', description: 'Tipo de consumo (all, ci, faturado-all, etc.).', example: 'all' },
+    ],
+    'controle-cafe': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'controle-cafe' },
+        { key: 'startDate', type: 'string', description: 'Data de início do intervalo.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final do intervalo (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+    ],
+    'controle-cafe-no-show': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'controle-cafe-no-show' },
+        { key: 'startDate', type: 'string', description: 'Data de início do intervalo.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final do intervalo (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+    ],
+    'estornos': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'estornos' },
+        { key: 'startDate', type: 'string', description: 'Data de início do intervalo.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final do intervalo (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+        { key: 'category', type: 'string', description: 'Categoria do estorno (restaurante, frigobar, etc.).', example: 'all' },
+    ],
+    'controle-frigobar': [
+        { key: 'filterType', type: 'string', description: 'Tipo de filtro.', example: 'controle-frigobar' },
+        { key: 'startDate', type: 'string', description: 'Data de início do intervalo.', example: format(startOfMonth(new Date()), 'yyyy-MM-dd') },
+        { key: 'endDate', type: 'string', description: 'Data final do intervalo (opcional).', example: format(new Date(), 'yyyy-MM-dd') },
+    ],
+    'history': { key: '', type: '', description: '', example: '' } as any,
 };
+
+const exampleApiResponseByFilter: Record<string, string> = {
+    range: `{
+  "type": "general",
+  "data": { "dailyBreakdowns": [...], "summary": {...} }
+}`,
+    period: `{
+  "type": "period",
+  "data": { "dailyBreakdowns": {...}, "summary": {...} }
+}`,
+    'client-extract': `{
+  "type": "client-extract",
+  "data": {
+    "availablePeople": ["Demetrios", "Outra Pessoa"],
+    "dailyBreakdowns": [
+      {
+        "personName": "Demetrios",
+        "date": "05/07/2024",
+        "origin": "Faturado - Hotel",
+        "value": 75.50,
+        "...": "outros campos"
+      }
+    ]
+  }
+}`,
+    'client-summary': `{
+  "type": "client-summary",
+  "data": {
+    "dailyBreakdowns": [
+      { "personName": "Demetrios", "qtd": 5, "valor": 395.50 }
+    ]
+  }
+}`,
+    'controle-cafe': `{
+  "type": "controle-cafe",
+  "data": {
+    "dailyBreakdowns": [
+      { "id": "2024-07-01", "controleCafeDaManha": { "adultoQtd": 50 } }
+    ]
+  }
+}`,
+    'controle-cafe-no-show': `{
+  "type": "controle-cafe-no-show",
+  "data": {
+    "dailyBreakdowns": [
+      { "id": "2024-07-01", "cafeManhaNoShow": { "items": [...] } }
+    ]
+  }
+}`,
+    'estornos': `{
+  "type": "estornos",
+  "data": {
+    "dailyBreakdowns": [
+      { "id": "uuid-...", "date": "2024-07-01", "reason": "duplicidade", "valorEstorno": -50.00 }
+    ]
+  }
+}`,
+    'controle-frigobar': `{
+  "type": "controle-frigobar",
+  "data": {
+    "dailyBreakdowns": [
+      { "id": "uuid-...", "uh": "101", "items": { "Agua sem Gas": 2 }, "totalValue": 25.50 }
+    ]
+  }
+}`,
+    'history': `{ "message": "Endpoint não disponível." }`,
+};
+
+const periodIdsForApi = PERIOD_DEFINITIONS
+    .filter(p => p.type === 'entry')
+    .map(p => ({ id: p.id, label: p.label }));
+
 
 export default function ApiAccessSettingsPage() {
   const { userRole, isLoading: authLoading } = useAuth();
@@ -186,15 +186,10 @@ export default function ApiAccessSettingsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiDomain, setApiDomain] = useState<string>('');
 
-  // State for API query builder
-  const [filterType, setFilterType] = useState<FilterType>('month');
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>({ from: startOfMonth(new Date()), to: new Date()});
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all'>('all');
-  const [selectedClient, setSelectedClient] = useState('all');
-  const [consumptionType, setConsumptionType] = useState('all');
-
+  const [activeFilterType, setActiveFilterType] = useState<string>('range');
+  
+  const activeFilterInfo = filterOptions.find(f => f.value === activeFilterType);
+  const activeParams = PARAMETERS_CONFIG[activeFilterType] || [];
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -247,39 +242,20 @@ export default function ApiAccessSettingsPage() {
     toast({ title: "Copiado!", description: "O texto foi copiado para a área de transferência." });
   };
 
-  const { exampleUrl, curlExample } = useMemo(() => {
-    const baseUrl = `${apiDomain}/api/v1/reports`;
+  const { curlExample, fullUrl } = useMemo(() => {
+    const baseUrl = `${apiDomain}/api/v2/reports`;
     const params = new URLSearchParams();
-    params.set('filterType', filterType);
-
-    switch(filterType) {
-        case 'date':
-            if (selectedDate) params.set('date', format(selectedDate, 'yyyy-MM-dd'));
-            break;
-        case 'range':
-        case 'client-extract':
-        case 'client-summary':
-            if (selectedRange?.from) params.set('startDate', format(selectedRange.from, 'yyyy-MM-dd'));
-            if (selectedRange?.to) params.set('endDate', format(selectedRange.to, 'yyyy-MM-dd'));
-            if (filterType === 'client-extract' || filterType === 'client-summary') {
-                params.set('consumptionType', consumptionType);
-                if (filterType === 'client-extract' && selectedClient !== 'all') {
-                    params.set('personName', selectedClient);
-                }
-            }
-            break;
-        case 'month':
-        case 'period':
-            params.set('month', format(selectedMonth, 'yyyy-MM'));
-            if (filterType === 'period') params.set('periodId', selectedPeriod);
-            break;
-    }
+    
+    (PARAMETERS_CONFIG[activeFilterType] || []).forEach(param => {
+        params.set(param.key, param.example);
+    });
     
     const url = `${baseUrl}?${params.toString()}`;
-    const curl = `curl -X GET "${url}" \\\n-H "Authorization: Bearer ${apiKey || 'SUA_CHAVE_API'}"`;
+    const curl = `curl -X GET "${url}" \\\
+\n-H "Authorization: Bearer ${apiKey || 'SUA_CHAVE_API'}"`;
     
-    return { exampleUrl: url, curlExample: curl };
-  }, [apiDomain, filterType, selectedDate, selectedRange, selectedMonth, selectedPeriod, consumptionType, selectedClient, apiKey]);
+    return { curlExample: curl, fullUrl: url };
+  }, [apiDomain, activeFilterType, apiKey]);
   
   if (authLoading || isLoading) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -291,35 +267,24 @@ export default function ApiAccessSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <KeyRound className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Acesso via API</h1>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Sua Chave de API</CardTitle>
+          <div className="flex items-center gap-3">
+             <KeyRound className="h-6 w-6 text-primary" />
+            <CardTitle>Sua Chave de API (v2)</CardTitle>
+          </div>
           <CardDescription>Use esta chave para autenticar suas requisições à API de relatórios. Mantenha-a segura.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             {apiKey ? (
-                <div className="flex items-center gap-2">
-                    <Input 
-                        type="text"
-                        value={apiKey}
-                        readOnly
-                        className="font-mono text-sm"
-                    />
-                    <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(apiKey)}>
-                        <Copy className="h-4 w-4" />
-                    </Button>
+                <div className="flex items-center gap-2 max-w-lg">
+                    <Input type="text" value={apiKey} readOnly className="font-mono text-sm" />
+                    <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(apiKey)}><Copy className="h-4 w-4" /></Button>
                 </div>
             ) : (
                  <Alert variant="default" className="bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
                     <AlertTitle>Nenhuma Chave de API Encontrada</AlertTitle>
-                    <AlertDescription>
-                        Você ainda não gerou uma chave de API. Clique no botão abaixo para criar sua primeira chave.
-                    </AlertDescription>
+                    <AlertDescription>Você ainda não gerou uma chave de API. Clique no botão abaixo para criar sua primeira chave.</AlertDescription>
                 </Alert>
             )}
              <Button onClick={handleGenerateKey} disabled={isGenerating}>
@@ -330,150 +295,118 @@ export default function ApiAccessSettingsPage() {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-            <CardTitle>Como Usar a API</CardTitle>
-            <CardDescription>Siga os passos abaixo para consultar os dados de relatórios de forma programática.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="space-y-2">
-                <Label htmlFor="domain-input" className="flex items-center gap-2 mb-1"><Globe className="h-4 w-4"/>Domínio da Aplicação</Label>
-                <Input 
-                    id="domain-input"
-                    type="text"
-                    value={apiDomain}
-                    readOnly
-                    className="text-muted-foreground"
-                />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <aside className="lg:col-span-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Endpoints</h3>
+            <div className="space-y-1">
+                {filterOptions.map(option => (
+                    <button 
+                        key={option.value}
+                        onClick={() => setActiveFilterType(option.value)}
+                        className={cn(
+                            "w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                            activeFilterType === option.value 
+                                ? "bg-primary/10 text-primary" 
+                                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        )}
+                    >
+                        <option.icon className="h-5 w-5" />
+                        <span>{option.label}</span>
+                         <ChevronRight className={cn(
+                            "ml-auto h-4 w-4 transition-opacity",
+                            activeFilterType === option.value ? "opacity-100" : "opacity-0"
+                         )} />
+                    </button>
+                ))}
             </div>
-             <div>
-                <Label className="mb-1">Parâmetros de Query</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                   Monte a URL de requisição usando os seletores abaixo.
-                </p>
-                <div className="p-4 border rounded-md space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="filterType-select">Tipo de Filtro</Label>
-                             <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
-                                <SelectTrigger id="filterType-select"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="month">Geral (Mês Inteiro)</SelectItem>
-                                    <SelectItem value="date">Por Data Específica</SelectItem>
-                                    <SelectItem value="range">Por Intervalo de Datas</SelectItem>
-                                    <SelectItem value="period">Por Período (no Mês)</SelectItem>
-                                    <SelectItem value="client-extract">Por Pessoa (Extrato)</SelectItem>
-                                    <SelectItem value="client-summary">Por Pessoa (Resumo)</SelectItem>
-                                </SelectContent>
-                            </Select>
+        </aside>
+
+        <main className="lg:col-span-9">
+            <div className="space-y-8">
+                <div>
+                    <h2 className="text-xl font-bold">{activeFilterInfo?.label}</h2>
+                    <p className="text-muted-foreground mt-1">{activeFilterInfo?.description}</p>
+                    
+                    <div className="mt-4 space-y-4">
+                       <div>
+                            <Label>Exemplo (cURL)</Label>
+                            <CodeBlock code={curlExample} className="mt-1"/>
                         </div>
-                        
-                        {(filterType === 'month' || filterType === 'period') && (
-                             <div className="space-y-1.5">
-                                <Label>Mês/Ano</Label>
-                                <Input type="month" value={format(selectedMonth, 'yyyy-MM')} onChange={(e) => setSelectedMonth(new Date(e.target.value + '-02'))} />
+                        <div>
+                            <Label>Endpoint</Label>
+                            <div className="flex items-start gap-2 mt-1">
+                               <div className="flex-grow">
+                                 <CodeBlock code={fullUrl} wrap={true} />
+                               </div>
+                               <Button asChild variant="outline" size="icon">
+                                 <Link href={fullUrl} target="_blank" rel="noopener noreferrer">
+                                   <Globe className="h-4 w-4" />
+                                 </Link>
+                               </Button>
                             </div>
-                        )}
-                        
-                        {filterType === 'date' && (
-                            <div className="space-y-1.5">
-                                <Label>Data</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ptBR} /></PopoverContent>
-                                </Popover>
-                            </div>
-                        )}
-
-                         {(filterType === 'range' || filterType.startsWith('client')) && (
-                             <div className="space-y-1.5">
-                                <Label>Intervalo</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !selectedRange && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {selectedRange?.from ? (selectedRange.to ? `${format(selectedRange.from, "dd/MM/yy", { locale: ptBR })} - ${format(selectedRange.to, "dd/MM/yy", { locale: ptBR })}` : format(selectedRange.from, "PPP", { locale: ptBR })) : <span>Escolha um intervalo</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={selectedRange?.from} selected={selectedRange} onSelect={setSelectedRange} numberOfMonths={2} locale={ptBR}/></PopoverContent>
-                                </Popover>
-                            </div>
-                        )}
-
-                        {filterType === 'period' && (
-                             <div className="space-y-1.5">
-                                <Label>Período</Label>
-                                <Select value={selectedPeriod} onValueChange={(value: PeriodId | 'all') => setSelectedPeriod(value)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todos os Períodos</SelectItem>
-                                        {PERIOD_DEFINITIONS.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                        {(filterType === 'client-extract' || filterType === 'client-summary') && (
-                            <div className="space-y-1.5">
-                                <Label>Tipo de Consumo</Label>
-                                <Select value={consumptionType} onValueChange={setConsumptionType}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todos</SelectItem>
-                                        <SelectItem value="ci">Apenas Consumo Interno</SelectItem>
-                                        <SelectItem value="faturado-all">Apenas Faturado (Todos)</SelectItem>
-                                        <SelectItem value="faturado-hotel">Apenas Faturado (Hotel)</SelectItem>
-                                        <SelectItem value="faturado-funcionario">Apenas Faturado (Funcionário)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div>
-                <Label className="flex items-center gap-2 mb-1"><Server className="h-4 w-4"/>Endpoint da API</Label>
-                <div className="flex items-center gap-2">
-                    <Input readOnly value={`GET ${exampleUrl}`} className="font-mono text-xs"/>
-                    <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(exampleUrl)}>
-                        <Copy className="h-4 w-4" />
-                    </Button>
+
+                <div>
+                    <h3 className="text-lg font-semibold mb-2">Parâmetros da Requisição</h3>
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Parâmetro</TableHead>
+                                    <TableHead>Tipo</TableHead>
+                                    <TableHead>Descrição</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {activeParams.map(param => (
+                                    <TableRow key={param.key}>
+                                        <TableCell className="font-mono text-xs">{param.key}</TableCell>
+                                        <TableCell className="font-mono text-xs text-muted-foreground">{param.type}</TableCell>
+                                        <TableCell className="text-xs">{param.description}</TableCell>
+                                    </TableRow>
+                                ))}
+                                 {activeParams.length === 0 && (
+                                     <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-xs text-muted-foreground">Nenhum parâmetro necessário para este endpoint.</TableCell>
+                                    </TableRow>
+                                 )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+                 {activeFilterType === 'period' && (
+                    <div>
+                        <h3 className="text-lg font-semibold mb-2">IDs de Período Disponíveis (`periodId`)</h3>
+                         <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID do Período</TableHead>
+                                        <TableHead>Nome</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {periodIdsForApi.map(period => (
+                                        <TableRow key={period.id}>
+                                            <TableCell className="font-mono text-xs">{period.id}</TableCell>
+                                            <TableCell className="text-xs">{period.label}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                )}
+                <div>
+                    <h3 className="text-lg font-semibold mb-2">Exemplo de Resposta (JSON)</h3>
+                    <CodeBlock code={exampleApiResponseByFilter[activeFilterType] || "{}"} wrap={true} />
                 </div>
             </div>
-             <div>
-                <Label className="mb-1">Autenticação</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                    Inclua sua chave no cabeçalho (header) `Authorization` como um Bearer token.
-                </p>
-                <CodeBlock code={`Authorization: Bearer ${apiKey || 'SUA_CHAVE_API'}`} />
-            </div>
-             <div>
-                <Label className="mb-1">Exemplo de Requisição (cURL)</Label>
-                <div className="flex items-center gap-2">
-                    <Input readOnly value={curlExample} className="font-mono text-xs"/>
-                     <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(curlExample)}>
-                        <Copy className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
-            <div>
-                <Label className="mb-1">Exemplo de Saída (JSON)</Label>
-                 <p className="text-sm text-muted-foreground mb-2">
-                    {exampleApiResponseByFilter[filterType]?.description || "Selecione um filtro para ver um exemplo."}
-                </p>
-                <CodeBlock code={exampleApiResponseByFilter[filterType]?.json || "{}"} />
-            </div>
-        </CardContent>
-      </Card>
-      
+        </main>
+      </div>
+
     </div>
   );
 }
-
-    
-
-    

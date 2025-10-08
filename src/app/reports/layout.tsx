@@ -42,7 +42,7 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
     const defaultValues = [];
     for (const group of REPORTS_GROUPS) {
         for (const item of group.items) {
-             if (item.href === pathname || (item.subItems && item.subItems.some(sub => pathname.startsWith(sub.href.split('?')[0])))) {
+             if (pathname.startsWith(item.href) || (item.subItems && item.subItems.some(sub => pathname.startsWith(sub.href.split('?')[0])))) {
                 defaultValues.push(group.title);
                 break; 
             }
@@ -105,7 +105,7 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
                                                             key={subLink.id}
                                                             href={subLink.href}
                                                             className={cn("flex items-center gap-3 rounded-r-lg pl-4 pr-2 py-2 text-muted-foreground transition-all text-sm hover:text-primary hover:bg-primary/10",
-                                                                isSubActive ? "bg-primary/10 text-primary font-semibold" : "font-medium"
+                                                                pathname === subLink.href ? "bg-primary/10 text-primary font-semibold" : "font-medium"
                                                             )}
                                                         >
                                                             <subLink.icon className="h-4 w-4"/>

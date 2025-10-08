@@ -21,9 +21,9 @@ async function handleResponse(response: Response, defaultError: string) {
     return response.json();
 }
 
-export async function getSetting<T extends keyof Settings>(configId: T): Promise<Settings[T] | null> {
+export async function getSetting<K extends keyof Settings>(configId: K): Promise<Settings[K] | null> {
     try {
-        const response = await fetch(`/api/setting/${configId}`);
+        const response = await fetch(`/api/setting/${configId}`, { cache: 'no-store' });
         if (!response.ok) {
             // A 404 is a normal case (setting not found), return null.
             if (response.status === 404) {
@@ -33,8 +33,8 @@ export async function getSetting<T extends keyof Settings>(configId: T): Promise
             throw new Error(`Failed to fetch setting ${configId}. Status: ${response.status}`);
         }
         const data = await response.json();
-        // The API returns { config: value }, so we extract it.
-        return data.config || null;
+        // The API returns the value directly.
+        return data || null;
     } catch (error) {
         console.error(`Error in getSetting for ${configId}:`, error);
         // Re-throw the error so the calling component can handle it if needed
@@ -42,12 +42,12 @@ export async function getSetting<T extends keyof Settings>(configId: T): Promise
     }
 }
 
-export async function saveSetting<T extends keyof Settings>(configId: T, configValue: Settings[T]): Promise<void> {
+export async function saveSetting<K extends keyof Settings>(configId: K, configValue: Settings[K]): Promise<void> {
     try {
         const response = await fetch(`/api/setting/${configId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ config: configValue }),
+            body: JSON.stringify({ configValue }),
         });
         
         await handleResponse(response, `Failed to save setting ${configId}.`);

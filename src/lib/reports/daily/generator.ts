@@ -1,5 +1,5 @@
 import type { DailyLogEntry, PeriodData, EventosPeriodData, FaturadoItem, ConsumoInternoItem } from '@/lib/types';
-import { processEntryForTotals as calculateTotals } from '@/lib/utils/calculations';
+import { processEntryForTotals as calculateTotals } from '@/lib/utils/api/v1/calculations';
 
 // This file is dedicated to generating the data structure for a single-day report.
 // Currently, the single day report view component handles its own data processing directly.

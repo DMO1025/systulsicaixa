@@ -3,7 +3,7 @@
 "use client";
 
 import type { DailyLogEntry, EstornoItem } from '@/lib/types';
-import { processEntryForTotals } from './calculations';
+import { processEntryForTotals } from './calculations/index';
 
 export interface DashboardTotals {
   roomService: { qtdPedidos: number; qtdPratos: number; valor: number };

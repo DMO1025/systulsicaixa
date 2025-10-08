@@ -1,4 +1,5 @@
 
+
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
@@ -27,7 +28,7 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
       filteredEstornos = filteredEstornos.filter(item => item.category === estornoCategory);
     }
     if (estornoReason && estornoReason !== 'all') {
-      filteredEstornos = filteredEstornos.filter(item => item.reason === reason);
+      filteredEstornos = filteredEstornos.filter(item => item.reason === estornoReason);
     }
     
     const categoryTitles: Record<string, string> = {

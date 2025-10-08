@@ -10,8 +10,8 @@ export default function ReportsRootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to the default report page which is 'month'
-    router.replace(REPORTS_PATHS.MONTH);
+    // Redirect to the default report page which is 'range'
+    router.replace(REPORTS_PATHS.RANGE);
   }, [router]);
 
   return (

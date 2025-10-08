@@ -1,4 +1,5 @@
 
+
 import { getSafeNumericValue } from '@/lib/utils';
 import type { DailyLogEntry, PeriodId, PeriodReportViewData, DailyCategoryDataItem, PeriodData, FaturadoItem, ConsumoInternoItem } from '@/lib/types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';

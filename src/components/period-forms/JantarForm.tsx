@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useMemo } from 'react';
@@ -15,7 +14,7 @@ import type { IndividualPeriodConfig as PeriodConfig, IndividualSubTabConfig as 
 import { getSubTabDefinition } from '@/lib/config/forms';
 import { getSafeNumericValue } from '@/lib/utils';
 import { Package, Utensils, Building, ClipboardList, Truck, Wallet, FileCheck2, Refrigerator } from 'lucide-react';
-import { processEntryForTotals } from '@/lib/utils/calculations';
+import { processEntryForTotals } from '@/lib/utils/calculations/index';
 import type { DailyLogEntry } from '@/lib/types';
 import FaturadoForm from './FaturadoForm';
 import ConsumoInternoForm from './ConsumoInternoForm';
