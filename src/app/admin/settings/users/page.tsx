@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Loader2, PlusCircle, Trash2, Edit, BarChart3, BookOpen, Globe } from 'lucide-react';
+import { Users, Loader2, PlusCircle, Trash2, Edit, BarChart3, BookOpen, Globe, ClipboardCheck, Undo2 } from 'lucide-react';
 import type { User, PageId, OperatorShift, UserRole } from '@/lib/types';
 import { getOperators, createOperator, updateOperator, deleteOperator } from '@/services/userService';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -25,6 +25,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const AVAILABLE_PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'entry', label: 'Lançamento Diário', icon: BookOpen },
+  { id: 'controls', label: 'Controles Diários', icon: ClipboardCheck },
+  { id: 'estornos', label: 'Estornos', icon: Undo2 },
   { id: 'reports', label: 'Relatórios', icon: Globe },
 ] as const;
 
@@ -141,7 +143,7 @@ export default function UsersSettingsPage() {
           username: values.username,
           role: values.role as UserRole,
           shifts: isAdmin ? [] : (values.shifts as OperatorShift[] || []),
-          allowedPages: isAdmin ? ['dashboard', 'entry', 'reports'] : (values.allowedPages as PageId[] || []),
+          allowedPages: isAdmin ? ['dashboard', 'entry', 'reports', 'controls', 'estornos'] : (values.allowedPages as PageId[] || []),
       };
 
       if (values.password) {
@@ -399,3 +401,7 @@ export default function UsersSettingsPage() {
     </div>
   );
 }
+
+    
+
+    

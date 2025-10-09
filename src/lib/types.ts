@@ -152,7 +152,7 @@ export interface EstornoEntry {
 
 
 export interface SubTabData {
-  channels?: Partial<Record<SalesChannelId, SalesItem>>;
+  channels?: Partial<Record<SalesChannelId, SalesItem>>; 
   faturadoItems?: FaturadoItem[];
   consumoInternoItems?: ConsumoInternoItem[];
 }

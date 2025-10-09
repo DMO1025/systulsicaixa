@@ -87,11 +87,12 @@ export async function POST(request: NextRequest) {
             newItem.id = uuidv4();
         }
 
-        // Business logic: 'relancamento' should be a positive value (credit), others are negative (debit).
-        if (newItem.reason === 'relancamento') {
-            newItem.valorEstorno = Math.abs(newItem.valorEstorno);
-        } else {
+        // Business logic: Only 'erro de lancamento' and 'nao consumido' are debits (negative).
+        // All others are for control or are credits (positive).
+        if (newItem.reason === 'erro de lancamento' || newItem.reason === 'nao consumido') {
             newItem.valorEstorno = -Math.abs(newItem.valorEstorno);
+        } else {
+            newItem.valorEstorno = Math.abs(newItem.valorEstorno);
         }
         
         const daily_entry_id = newItem.date;

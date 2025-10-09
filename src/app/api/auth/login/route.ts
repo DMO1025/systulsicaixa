@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // For administrator
     return NextResponse.json({ 
       role: user.role,
-      allowedPages: user.allowedPages || ['dashboard', 'entry', 'reports']
+      allowedPages: user.allowedPages || ['dashboard', 'entry', 'reports', 'controls', 'estornos']
     });
 
   } catch (error) {
@@ -46,3 +46,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Ocorreu um erro no servidor durante o login.' }, { status: 500 });
   }
 }
+
+    

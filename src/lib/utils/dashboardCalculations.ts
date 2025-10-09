@@ -24,6 +24,10 @@ export interface DashboardTotals {
     detalhes: Record<string, { qtd: number; valor: number }>;
     total: { qtd: number; valor: number };
   };
+  debitosReaisEstorno: {
+    detalhes: Record<string, { qtd: number; valor: number }>;
+    total: { qtd: number; valor: number };
+  };
   totalCIAlmoco: { qtd: number; valor: number };
   totalCIJantar: { qtd: number; valor: number };
   totalReajusteCI: number;
@@ -50,6 +54,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
     eventosDireto: { qtd: 0, valor: 0 },
     eventosHotel: { qtd: 0, valor: 0 },
     totalEstornos: { detalhes: {}, total: { qtd: 0, valor: 0 } },
+    debitosReaisEstorno: { detalhes: {}, total: { qtd: 0, valor: 0 } },
     totalCIAlmoco: { qtd: 0, valor: 0 },
     totalCIJantar: { qtd: 0, valor: 0 },
     totalReajusteCI: 0,
@@ -125,32 +130,37 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   }
   
   // Process Estornos
-  const detalhesEstornos: Record<string, { qtd: number; valor: number }> = {};
-  let totalEstornosValor = 0;
-  let totalEstornosQtd = 0;
-
-  for (const item of estornos) {
+  estornos.forEach(item => {
     const category = item.category || 'outros';
-    if (!detalhesEstornos[category]) {
-      detalhesEstornos[category] = { qtd: 0, valor: 0 };
-    }
-    // "relancamento" is a credit (positive), others are debits (negative)
-    // We sum them all up, and the signs will handle the math.
-    detalhesEstornos[category].qtd += item.quantity || 0;
-    detalhesEstornos[category].valor += item.valorEstorno || 0;
     
-    totalEstornosQtd += item.quantity || 0;
-    totalEstornosValor += item.valorEstorno || 0;
-  }
+    // Total Estornos (para controle)
+    if (!totals.totalEstornos.detalhes[category]) {
+      totals.totalEstornos.detalhes[category] = { qtd: 0, valor: 0 };
+    }
+    totals.totalEstornos.detalhes[category].qtd += item.quantity || 0;
+    totals.totalEstornos.detalhes[category].valor += item.valorEstorno || 0;
+    totals.totalEstornos.total.qtd += item.quantity || 0;
+    totals.totalEstornos.total.valor += item.valorEstorno || 0;
 
-  totals.totalEstornos = { 
-    detalhes: detalhesEstornos,
-    total: { qtd: totalEstornosQtd, valor: totalEstornosValor }
-  };
+    // Débitos Reais (para dashboard)
+    if (item.reason === 'erro_de_lancamento' || item.reason === 'nao_consumido' || item.reason === 'erro de lancamento' || item.reason === 'nao consumido') {
+      if (!totals.debitosReaisEstorno.detalhes[category]) {
+        totals.debitosReaisEstorno.detalhes[category] = { qtd: 0, valor: 0 };
+      }
+      totals.debitosReaisEstorno.detalhes[category].qtd += item.quantity || 0;
+      totals.debitosReaisEstorno.detalhes[category].valor += item.valorEstorno || 0;
+      totals.debitosReaisEstorno.total.qtd += item.quantity || 0;
+      totals.debitosReaisEstorno.total.valor += item.valorEstorno || 0;
+    }
+  });
+
+  const debitosReaisValor = totals.debitosReaisEstorno.total.valor;
+  const creditosRelancamento = estornos.filter(e => e.reason === 'relancamento' || e.reason === 'relancamento').reduce((sum, item) => sum + (item.valorEstorno || 0), 0);
   
-  // Adjust grand totals with the final estorno balance
-  totals.grandTotalComCI.valor += totalEstornosValor;
-  totals.grandTotalSemCI.valor += totalEstornosValor;
+  const valorAjusteDashboard = debitosReaisValor + creditosRelancamento;
+  
+  totals.grandTotalComCI.valor += valorAjusteDashboard;
+  totals.grandTotalSemCI.valor += valorAjusteDashboard;
 
   return totals;
 }

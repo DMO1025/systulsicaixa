@@ -17,6 +17,7 @@ export const DASHBOARD_ACCUMULATED_ITEMS_CONFIG = [
   { item: "FRIGOBAR", periodId: "frigobar" },
   { item: "EVENTOS (DIRETO)", periodId: "eventos" },
   { item: "EVENTOS (HOTEL)", periodId: "eventos" },
+  { item: "Controle Estorno" },
 ] as const;
 
 // --- Summary Card Constants ---

@@ -55,19 +55,7 @@ export async function GET(request: NextRequest) {
             [startDateStr, endDateStr]
         );
         
-        let allItems: EstornoItem[] = rows.flatMap(row => {
-            const parsedItems = safeParse<EstornoItem[]>(row.items) || [];
-            // Clean up observation field for "relancamento"
-            return parsedItems.map(item => {
-                if (item.reason === 'relancamento' && item.observation) {
-                    const prefix = `Relançamento do estorno ID: ${item.id}. `;
-                    if (item.observation.startsWith(prefix)) {
-                        item.observation = item.observation.substring(prefix.length);
-                    }
-                }
-                return item;
-            });
-        });
+        let allItems: EstornoItem[] = rows.flatMap(row => safeParse<EstornoItem[]>(row.items) || []);
         
         if (category && category !== 'all') {
             allItems = allItems.filter(item => item.category === category);
@@ -99,11 +87,11 @@ export async function POST(request: NextRequest) {
             newItem.id = uuidv4();
         }
 
-        // Business logic: 'relancamento' should be a positive value (credit), others are negative (debit).
-        if (newItem.reason === 'relancamento') {
-            newItem.valorEstorno = Math.abs(newItem.valorEstorno);
-        } else {
+        // Business logic: Only 'assinatura divergente' and 'pagamento direto' are debits (negative).
+        if (newItem.reason === 'assinatura divergente' || newItem.reason === 'pagamento direto') {
             newItem.valorEstorno = -Math.abs(newItem.valorEstorno);
+        } else {
+            newItem.valorEstorno = Math.abs(newItem.valorEstorno);
         }
         
         const daily_entry_id = newItem.date;

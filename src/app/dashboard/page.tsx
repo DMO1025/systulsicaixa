@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -96,50 +97,48 @@ const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth:
     );
 };
 
-const EstornosTable: React.FC<{ totalEstornos: { detalhes: Record<string, { qtd: number; valor: number }>; total: { qtd: number; valor: number } } }> = ({ totalEstornos }) => {
-  const categoryLabels: Record<string, string> = {
-    'restaurante': 'ESTORNO RESTAURANTE',
-    'frigobar': 'ESTORNO FRIGOBAR',
-    'room-service': 'ESTORNO ROOM SERVICE',
-    'outros': 'OUTROS ESTORNOS'
-  };
-
-  const hasDetails = Object.keys(totalEstornos.detalhes).length > 0;
-
+const EstornosTable: React.FC<{ debitosReais: { detalhes: Record<string, { qtd: number; valor: number }>, total: { qtd: number; valor: number } } }> = ({ debitosReais }) => {
+    const categoryLabels: Record<string, string> = {
+        'restaurante': 'ESTORNO RESTAURANTE',
+        'frigobar': 'ESTORNO FRIGOBAR',
+        'room-service': 'ESTORNO ROOM SERVICE',
+        'outros': 'OUTROS ESTORNOS'
+    };
+    
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-semibold uppercase">CONTROLE DE ESTORNOS</CardTitle>
+        <CardTitle className="text-base font-semibold uppercase">Débitos Reais (Estorno)</CardTitle>
         <Undo2 className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="px-4 py-2 text-xs uppercase">ITEM</TableHead>
+              <TableHead className="px-4 py-2 text-xs uppercase">Categoria</TableHead>
               <TableHead className="px-4 py-2 text-xs uppercase text-right">QTD</TableHead>
-              <TableHead className="px-4 py-2 text-xs uppercase text-right">VALOR DEBITADO</TableHead>
+              <TableHead className="px-4 py-2 text-xs uppercase text-right">VALOR</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {hasDetails && Object.entries(totalEstornos.detalhes).map(([category, data]) => (
-                <TableRow key={category}>
+            {Object.entries(debitosReais.detalhes).map(([category, data]) => (
+                 <TableRow key={category}>
                     <TableCell className="px-4 py-1 text-xs uppercase">{categoryLabels[category] || category.toUpperCase()}</TableCell>
-                    <TableCell className="text-right px-4 py-1 text-xs uppercase">{data.qtd.toLocaleString('pt-BR')}</TableCell>
-                    <TableCell className="text-right px-4 py-1 text-xs uppercase">
-                        <span className="bg-white text-destructive p-1 rounded-md">
-                            - R$ {data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                    <TableCell className="text-right px-4 py-1 text-xs">{data.qtd.toLocaleString('pt-BR')}</TableCell>
+                    <TableCell className="text-right px-4 py-1 text-xs">
+                       <span className={cn("p-1 rounded-md", data.valor < 0 ? "bg-white text-destructive dark:bg-white" : "text-green-600")}>
+                         R$ {data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                       </span>
                     </TableCell>
                 </TableRow>
             ))}
             <TableRow className="font-semibold bg-muted/50">
-              <TableCell className="px-4 py-2 text-xs uppercase">TOTAL ESTORNOS</TableCell>
-              <TableCell className="text-right px-4 py-2 text-xs">{totalEstornos.total.qtd.toLocaleString('pt-BR')}</TableCell>
+              <TableCell className="px-4 py-2 text-xs uppercase">TOTAL</TableCell>
+              <TableCell className="text-right px-4 py-2 text-xs">{debitosReais.total.qtd.toLocaleString('pt-BR')}</TableCell>
               <TableCell className="text-right px-4 py-2 text-xs">
-                <span className="bg-white text-destructive p-1 rounded-md">
-                    - R$ {totalEstornos.total.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
+                 <span className={cn("p-1 rounded-md", debitosReais.total.valor < 0 ? "bg-white text-destructive dark:bg-white" : "text-green-600")}>
+                    R$ {debitosReais.total.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                 </span>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -173,6 +172,7 @@ export default function DashboardPage() {
       totalGeralSemCI: { qtd: 0, valor: 0 },
       totalConsumoInternoGeral: { qtd: 0, valor: 0 },
       totalEstornos: { detalhes: {}, total: { qtd: 0, valor: 0 } },
+      debitosReaisEstorno: { detalhes: {}, total: { qtd: 0, valor: 0 } },
       totalRSValor: 0,
       totalRSQtd: 0,
       totalAlmocoValor: 0,
@@ -274,6 +274,7 @@ export default function DashboardPage() {
                 case "FRIGOBAR": return { ...item, qtdDisplay: monthTotals.frigobar.qtd.toString(), valorTotal: monthTotals.frigobar.valor };
                 case "EVENTOS (DIRETO)": return { ...item, qtdDisplay: monthTotals.eventosDireto.qtd.toString(), valorTotal: monthTotals.eventosDireto.valor };
                 case "EVENTOS (HOTEL)": return { ...item, qtdDisplay: monthTotals.eventosHotel.qtd.toString(), valorTotal: monthTotals.eventosHotel.valor };
+                case "Controle Estorno": return { ...item, qtdDisplay: monthTotals.debitosReaisEstorno.total.qtd.toString(), valorTotal: monthTotals.debitosReaisEstorno.total.valor };
                 default: return item;
             }
         });
@@ -294,6 +295,7 @@ export default function DashboardPage() {
           overallTotalTransactions: monthTotals.grandTotalComCI.qtd,
           totalReajusteCI: monthTotals.totalReajusteCI,
           totalEstornos: monthTotals.totalEstornos,
+          debitosReaisEstorno: monthTotals.debitosReaisEstorno,
           totalRSValor: monthTotals.roomService.valor,
           totalRSQtd: monthTotals.roomService.qtdPedidos,
           totalAlmocoValor: monthTotals.almoco.valor,
@@ -559,7 +561,7 @@ export default function DashboardPage() {
             <DailyTotalsTable dailyTotals={dashboardData.dailyTotals} />
             <div className="space-y-6">
             <MonthlyAccumulatedTable data={dashboardData.acumulativoMensalData} />
-            <EstornosTable totalEstornos={dashboardData.totalEstornos} />
+            <EstornosTable debitosReais={dashboardData.debitosReaisEstorno} />
             <InternalConsumptionTable 
                 ciAlmoco={dashboardData.totalCIAlmoco}
                 ciJantar={dashboardData.totalCIJantar}

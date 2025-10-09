@@ -76,10 +76,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setAllowedPages(storedPages);
         } catch (e) {
             console.error("Failed to parse allowedPages cookie", e);
-            setAllowedPages(storedRole === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls'] : []);
+            setAllowedPages(storedRole === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls', 'estornos'] : []);
         }
       } else if (storedRole === 'administrator') {
-        setAllowedPages(['dashboard', 'entry', 'reports', 'controls']);
+        setAllowedPages(['dashboard', 'entry', 'reports', 'controls', 'estornos']);
       }
     }
     setIsLoading(false);
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCookie('userRole', role, 1);
     setCookie('username', username, 1);
 
-    const pagesToStore = role === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls'] : (pages || []);
+    const pagesToStore = role === 'administrator' ? ['dashboard', 'entry', 'reports', 'controls', 'estornos'] : (pages || []);
     setAllowedPages(pagesToStore);
     setCookie('allowedPages', JSON.stringify(pagesToStore), 1);
     
@@ -179,3 +179,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
