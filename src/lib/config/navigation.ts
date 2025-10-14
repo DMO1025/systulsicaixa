@@ -1,5 +1,4 @@
 
-
 import type { PageId } from '@/lib/types';
 import {
   LayoutDashboard,
@@ -177,7 +176,16 @@ export const REPORTS_GROUPS = [
         ]
       },
       { id: 'controle-frigobar', title: 'Controle de Frigobar', href: REPORTS_PATHS.CONTROLE_FRIGOBAR, icon: Refrigerator },
-      { id: 'estornos', title: 'Relatório de Estornos', href: REPORTS_PATHS.ESTORNOS, icon: Undo2 },
+      { 
+        id: 'estornos', 
+        title: 'Relatório de Estornos', 
+        href: `${REPORTS_PATHS.ESTORNOS}?view=geral`,
+        icon: Undo2,
+        subItems: [
+          { id: 'estornos-geral', title: 'Geral (Detalhado)', href: `${REPORTS_PATHS.ESTORNOS}?view=geral`, icon: ListFilter },
+          { id: 'estornos-consolidado', title: 'Consolidado por Data', href: `${REPORTS_PATHS.ESTORNOS}?view=consolidado`, icon: CalendarDays },
+        ]
+      },
     ]
   },
    {

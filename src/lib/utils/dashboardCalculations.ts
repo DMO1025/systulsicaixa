@@ -129,38 +129,49 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
     totals.totalConsumoInternoGeral.qtd += entryTotals.totalCI.qtd;
   }
   
-  // Process Estornos
-  estornos.forEach(item => {
-    const category = item.category || 'outros';
+  const creditos = estornos.filter(item => item.reason === 'relancamento');
+  
+  const debitosReais = estornos.filter(debit => {
+    if (debit.reason !== 'erro de lancamento' && debit.reason !== 'nao consumido') {
+      return false;
+    }
+    const matchingCreditIndex = creditos.findIndex(credit => 
+        credit.nf === debit.nf && 
+        credit.uh === debit.uh &&
+        Math.abs(credit.valorEstorno) === Math.abs(debit.valorEstorno)
+    );
     
-    // Total Estornos (para controle)
-    if (!totals.totalEstornos.detalhes[category]) {
-      totals.totalEstornos.detalhes[category] = { qtd: 0, valor: 0 };
+    if (matchingCreditIndex !== -1) {
+        creditos.splice(matchingCreditIndex, 1);
+        return false;
     }
-    totals.totalEstornos.detalhes[category].qtd += item.quantity || 0;
-    totals.totalEstornos.detalhes[category].valor += item.valorEstorno || 0;
-    totals.totalEstornos.total.qtd += item.quantity || 0;
-    totals.totalEstornos.total.valor += item.valorEstorno || 0;
-
-    // Débitos Reais (para dashboard)
-    if (item.reason === 'erro_de_lancamento' || item.reason === 'nao_consumido' || item.reason === 'erro de lancamento' || item.reason === 'nao consumido') {
-      if (!totals.debitosReaisEstorno.detalhes[category]) {
-        totals.debitosReaisEstorno.detalhes[category] = { qtd: 0, valor: 0 };
-      }
-      totals.debitosReaisEstorno.detalhes[category].qtd += item.quantity || 0;
-      totals.debitosReaisEstorno.detalhes[category].valor += item.valorEstorno || 0;
-      totals.debitosReaisEstorno.total.qtd += item.quantity || 0;
-      totals.debitosReaisEstorno.total.valor += item.valorEstorno || 0;
-    }
+    
+    return true;
   });
 
-  const debitosReaisValor = totals.debitosReaisEstorno.total.valor;
-  const creditosRelancamento = estornos.filter(e => e.reason === 'relancamento' || e.reason === 'relancamento').reduce((sum, item) => sum + (item.valorEstorno || 0), 0);
+
+  debitosReais.forEach(item => {
+    const category = item.category || 'outros';
+    if (!totals.debitosReaisEstorno.detalhes[category]) {
+      totals.debitosReaisEstorno.detalhes[category] = { qtd: 0, valor: 0 };
+    }
+    totals.debitosReaisEstorno.detalhes[category].qtd += item.quantity || 0;
+    totals.debitosReaisEstorno.detalhes[category].valor += item.valorEstorno || 0;
+    totals.debitosReaisEstorno.total.qtd += item.quantity || 0;
+    totals.debitosReaisEstorno.total.valor += item.valorEstorno || 0;
+  });
+
+  const creditosRelancamento = estornos.filter(e => e.reason === 'relancamento').reduce((sum, item) => sum + (item.valorEstorno || 0), 0);
   
-  const valorAjusteDashboard = debitosReaisValor + creditosRelancamento;
+  // O valor dos débitos reais já é negativo, então somá-lo aos totais irá subtraí-lo.
+  const valorAjusteDashboard = totals.debitosReaisEstorno.total.valor;
   
+  // Apply debit adjustments to grand totals
   totals.grandTotalComCI.valor += valorAjusteDashboard;
   totals.grandTotalSemCI.valor += valorAjusteDashboard;
+  
+  // Add all debitos reais to the "Controle Estorno" total for dashboard display
+  totals.totalEstornos = { ...totals.debitosReaisEstorno };
 
   return totals;
 }

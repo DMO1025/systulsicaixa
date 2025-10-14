@@ -59,7 +59,7 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
     const totalPagesForThisExport = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d))).length;
 
     for (const dezena of dezenasToProcess) {
-        const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, d));
+        const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, dezena));
         
         if (itemsForDezena.length === 0) continue;
         

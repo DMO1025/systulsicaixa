@@ -1,13 +1,13 @@
 
-
 import mysql from 'mysql2/promise';
 import type { Pool, PoolOptions } from 'mysql2/promise';
 import type { Settings, MysqlConnectionConfig } from './types';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { getMysqlConnectionConfig } from '@/lib/data/settings';
+
 
 let pool: Pool | null = null;
+let lastUsedConfig: MysqlConnectionConfig | null = null;
 
 export const DAILY_ENTRIES_TABLE_NAME = 'daily_entries';
 export const SETTINGS_TABLE_NAME = 'settings';
@@ -71,54 +71,38 @@ const generateSchemaCommands = (): string[] => {
 
 export const DATABASE_INIT_COMMANDS = generateSchemaCommands();
 
-async function getMysqlConfigFromFile(): Promise<MysqlConnectionConfig | null> {
-    const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
-    try {
-        await fs.access(path.dirname(SETTINGS_FILE_PATH));
-        const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
-        const settings = JSON.parse(fileContent) as Settings;
-        return settings.mysqlConnectionConfig || null;
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-          return null;
-        }
-        console.error('Error reading mysqlConnectionConfig from settings.json:', error);
-        return null;
-    }
-}
 
+export async function getDbPool(): Promise<Pool | null> {
+  const latestConfig = await getMysqlConnectionConfig();
+  const configChanged = JSON.stringify(lastUsedConfig) !== JSON.stringify(latestConfig);
 
-export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
-  if (pool && !forceNew) {
-    try {
-      const connection = await pool.getConnection();
-      await connection.ping();
-      connection.release();
-      return pool;
-    } catch (pingError) {
-      console.warn('Existing MySQL pool failed ping, attempting to recreate.');
+  if (pool && configChanged) {
+      console.log("MySQL configuration has changed. Recreating connection pool.");
+      try {
+        await pool.end();
+      } catch (e) {
+        console.error("Error ending the stale pool:", e);
+      }
       pool = null;
-    }
   }
   
-  if (pool && forceNew) {
-    await pool.end();
-    pool = null;
+  if (pool) {
+      return pool;
   }
-  
-  const dbConfig = await getMysqlConfigFromFile();
 
-  if (!dbConfig || !dbConfig.host || !dbConfig.user || !dbConfig.database) {
-    pool = null;
+  if (!latestConfig || !latestConfig.host || !latestConfig.user || !latestConfig.database) {
+    lastUsedConfig = null;
     return null;
   }
+  
+  lastUsedConfig = latestConfig; 
 
   const options: PoolOptions = {
-    host: dbConfig.host,
-    port: dbConfig.port || 3306,
-    user: dbConfig.user,
-    password: dbConfig.password,
-    database: dbConfig.database,
+    host: latestConfig.host,
+    port: latestConfig.port || 3306,
+    user: latestConfig.user,
+    password: latestConfig.password,
+    database: latestConfig.database,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -127,22 +111,19 @@ export async function getDbPool(forceNew?: boolean): Promise<Pool | null> {
   };
 
   try {
+    console.log("Creating new MySQL connection pool.");
     pool = mysql.createPool(options);
-    const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
     return pool;
   } catch (error: any) {
-    pool = null;
-    // Don't throw here, as it might be expected during setup.
-    // Return null, and let callers decide how to handle a failed connection.
-    console.error(`MySQL Connection Error: ${error.message}`);
+    console.error(`MySQL Connection Pool Error: ${error.message}`);
+    pool = null; 
+    lastUsedConfig = null;
     return null;
   }
 }
 
 export async function isMysqlConnected(currentPool?: Pool | null): Promise<boolean> {
-    const poolToTest = currentPool || pool;
+    const poolToTest = currentPool || await getDbPool();
     if (!poolToTest) {
         return false;
     }
@@ -153,7 +134,13 @@ export async function isMysqlConnected(currentPool?: Pool | null): Promise<boole
         return true;
     } catch (error: any) {
         if(poolToTest === pool){
+          try {
+            if (pool) await pool.end();
+          } catch(e) {
+            console.error("Error ending the stale pool:", e);
+          }
           pool = null; 
+          lastUsedConfig = null;
         }
         return false;
     }
@@ -163,60 +150,40 @@ export async function isMysqlConnected(currentPool?: Pool | null): Promise<boole
 export function safeStringify(value: any): string | null {
   if (value === undefined || value === null) return null;
   try {
-    // Handling for estornos table structure
-    if (value && Array.isArray(value) && value.length > 0 && ('description' in value[0] && 'category' in value[0])) {
-      return JSON.stringify(value);
-    }
-
     if (typeof value === 'object' && value !== null) {
-      // Check for empty arrays within faturadoItems or consumoInternoItems
-      if (('faturadoItems' in value && Array.isArray(value.faturadoItems) && value.faturadoItems.length === 0) ||
-          ('consumoInternoItems' in value && Array.isArray(value.consumoInternoItems) && value.consumoInternoItems.length === 0)) {
-         // If it only contains empty item arrays and no channels, it's empty
-         if (!value.channels || Object.keys(value.channels).length === 0) return null;
-      }
+      if (Object.keys(value).length === 0 && !Array.isArray(value)) return null;
 
-      if ('items' in value && Array.isArray(value.items)) {
-        const hasObservations = value.periodObservations && value.periodObservations.trim() !== '';
-        if (value.items.length === 0 && !hasObservations) {
-          return JSON.stringify({"items":[]}); // Return an empty items string instead of null for estornos
+      if ('items' in value && Array.isArray(value.items) && value.items.length === 0) {
+        if ('periodObservations' in value && value.periodObservations && value.periodObservations.trim() !== '') {
+        } else {
+           if(Object.keys(value).length <= 2) return null;
         }
-      }
-      
-      const hasMeaningfulData = Object.values(value).some(v => {
-        if (v === null || v === undefined) return false;
-        if (typeof v === 'string' && v.trim() === '') return false;
-        if (Array.isArray(v) && v.length === 0) return false;
-        if (typeof v === 'object' && v !== null && Object.keys(v).length === 0) return false;
-        if(typeof v === 'object' && v !== null && ('faturadoItems' in v || 'consumoInternoItems' in v)) {
-            return (v as any)?.faturadoItems?.length > 0 || (v as any)?.consumoInternoItems?.length > 0;
-        }
-        if(typeof v === 'object' && v !== null && 'channels' in v && Object.keys((v as any).channels).length > 0){
-            return Object.values((v as any).channels).some(ch => ch && ( (ch as any).qtd !== undefined || (ch as any).vtotal !== undefined));
-        }
-        return true;
-      });
-
-      if (!hasMeaningfulData) {
-        return null;
       }
     }
     
     return JSON.stringify(value);
   } catch (e) {
-    return JSON.stringify({serializationError: `Failed to stringify: ${(e as Error).message}`});
+    console.error("Error during safeStringify:", e);
+    return JSON.stringify({ serializationError: `Failed to stringify a value.` });
   }
 }
 
 
 export function safeParse<T>(jsonString: any): T | null {
   if (jsonString === null || jsonString === undefined) return null;
-  // If it's not a string, assume it's already a parsed object
-  if (typeof jsonString !== 'string' || jsonString.trim() === "") return jsonString as T;
+  
+  if (typeof jsonString === 'object') {
+     return jsonString as T; // Assume it's already a parsed object
+  }
+  
+  if (typeof jsonString !== 'string' || jsonString.trim() === "") {
+    return null;
+  }
 
   try {
     const parsed = JSON.parse(jsonString) as T;
     if (parsed && typeof parsed === 'object' && 'serializationError' in parsed) {
+        console.warn("safeParse found a value that failed serialization earlier.");
         return null;
     }
     return parsed;

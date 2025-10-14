@@ -48,10 +48,37 @@ async function testConnection(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-async function ensureTables(): Promise<NextResponse> {
+async function ensureTables(request: NextRequest): Promise<NextResponse> {
     const log: string[] = [];
+    let mysqlConfigFromRequest: MysqlConnectionConfig | undefined;
     try {
-      const pool = await getDbPool();
+      if (request.headers.get('content-type')?.includes('application/json')) {
+        const body = await request.json();
+         if (body && typeof body === 'object' && ('host' in body || 'user' in body || 'database' in body)) {
+            mysqlConfigFromRequest = body as MysqlConnectionConfig;
+        }
+      }
+    } catch (e) {
+      // No body or invalid JSON, which is fine.
+    }
+    
+    let tempPool: mysql.Pool | null = null;
+
+    try {
+      let pool: mysql.Pool | null;
+      if (mysqlConfigFromRequest && mysqlConfigFromRequest.host) {
+          const testOptions: PoolOptions = {
+            host: mysqlConfigFromRequest.host, port: mysqlConfigFromRequest.port || 3306, user: mysqlConfigFromRequest.user,
+            password: mysqlConfigFromRequest.password, database: mysqlConfigFromRequest.database, connectTimeout: 5000,
+          };
+          tempPool = mysql.createPool(testOptions);
+          pool = tempPool;
+          log.push('Usando pool de conexão temporário com dados fornecidos.');
+      } else {
+          pool = await getDbPool();
+          log.push('Usando pool de conexão global.');
+      }
+
       if (!pool || !(await isMysqlConnected(pool))) {
         log.push('ERRO: Não foi possível conectar ao MySQL. Verifique as configurações e tente novamente.');
         return NextResponse.json({ message: 'Falha na conexão com MySQL.', log, success: false }, { status: 500 });
@@ -59,7 +86,7 @@ async function ensureTables(): Promise<NextResponse> {
       log.push('Conexão com MySQL bem-sucedida.');
 
       for (const command of DATABASE_INIT_COMMANDS) {
-          const tableNameMatch = command.match(/CREATE TABLE IF NOT EXISTS `([^`]+)`/);
+          const tableNameMatch = command.match(/CREATE TABLE IF NOT EXISTS \`([^\`]+)\`/);
           const tableName = tableNameMatch ? tableNameMatch[1] : 'desconhecida';
           log.push(`\n-- Verificando tabela: ${tableName} --`);
           log.push(`Executando comando SQL: CREATE TABLE IF NOT EXISTS \`${tableName}\` ... (detalhes omitidos)`);
@@ -67,7 +94,6 @@ async function ensureTables(): Promise<NextResponse> {
             await pool.query(command);
             log.push(`Tabela '${tableName}' verificada/criada com sucesso.`);
           } catch(err: any) {
-              // Ignore "Duplicate key name" error which happens if PRIMARY KEY already exists on other tables.
               if(err.code !== 'ER_DUP_KEYNAME') {
                   log.push(`ERRO ao executar comando para a tabela '${tableName}': ${err.message}`);
                   throw err;
@@ -83,6 +109,11 @@ async function ensureTables(): Promise<NextResponse> {
       console.error('API db-admin/ensure-table erro:', error);
       log.push(`ERRO GERAL: ${error.message}`);
       return NextResponse.json({ message: `Erro ao verificar/criar tabelas: ${error.message}`, log, success: false }, { status: 500 });
+    } finally {
+        if(tempPool) {
+            await tempPool.end();
+            log.push('Pool de conexão temporário encerrado.');
+        }
     }
 }
 
@@ -267,7 +298,7 @@ async function clearFciData(request: NextRequest): Promise<NextResponse> {
         if (updatedCount > 0) revalidateTag('entries');
         
         return NextResponse.json({
-            message: `Limpeza do formato antigo concluída. ${updatedCount} de ${allEntries.length} registros foram atualizados no período selecionado.`,
+            message: `Limpeza do formato antigo concluída. ${updatedCount > 0 ? `${updatedCount} de ${allEntries.length} registros foram atualizados no período selecionado` : `Nenhuma atualização de dados foi necessária.`}`,
             log,
         });
 
@@ -299,7 +330,7 @@ export async function POST(request: NextRequest) {
         return await testConnection(request);
     case 'ensure-table':
     case 'ensure-tables':
-        return await ensureTables();
+        return await ensureTables(request);
     case 'migrate-json-to-mysql':
         return await migrateDataToMysql();
     case 'update-mysql-structure':

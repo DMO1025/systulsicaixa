@@ -192,6 +192,27 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
            if(hookData.pageNumber > 1) {
              drawHeaderAndFooter(doc, title, dateRangeStr, params, hookData.pageNumber, totalPages);
            }
+        },
+        willDrawCell: (data) => {
+            const item = filteredEstornos[data.row.index];
+            if (item) {
+                const relaunchedIds = new Set<string>();
+                filteredEstornos.forEach(i => {
+                    const match = i.observation?.match(/Relançamento do estorno ID: ([\w-]+)/);
+                    if (i.reason === 'relancamento' && match && match[1]) {
+                        relaunchedIds.add(match[1]);
+                    }
+                });
+
+                const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+                const hasBeenRelaunched = relaunchedIds.has(item.id);
+
+                if (isDebit) {
+                    doc.setFillColor(255, 230, 230); // light red
+                } else if (hasBeenRelaunched) {
+                    doc.setFillColor(230, 230, 255); // light purple
+                }
+            }
         }
     });
 };

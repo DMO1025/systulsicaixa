@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -25,9 +26,10 @@ import type { EstornoItem } from '@/lib/types';
 interface RelaunchModalProps {
   originalItem: EstornoItem;
   onSuccess: () => void;
+  disabled?: boolean;
 }
 
-export function RelaunchModal({ originalItem, onSuccess }: RelaunchModalProps) {
+export function RelaunchModal({ originalItem, onSuccess, disabled = false }: RelaunchModalProps) {
   const { toast } = useToast();
   const { username } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -37,10 +39,15 @@ export function RelaunchModal({ originalItem, onSuccess }: RelaunchModalProps) {
   const handleConfirmRelaunch = async () => {
     setIsSaving(true);
 
+    const relaunchRefText = `Relançamento referente à NF: ${originalItem.nf || 'N/A'} / UH: ${originalItem.uh || 'N/A'}.`;
+    const finalObservation = additionalObservation 
+      ? `${relaunchRefText}\n${additionalObservation}`
+      : relaunchRefText;
+
     const payload = {
         originalItemId: originalItem.id,
         originalItemDate: originalItem.date,
-        additionalObservation: additionalObservation,
+        additionalObservation: finalObservation,
         registeredBy: username || 'sistema'
     };
 
@@ -85,7 +92,7 @@ export function RelaunchModal({ originalItem, onSuccess }: RelaunchModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-blue-500 h-8 w-8" title="Relançar Estorno">
+        <Button variant="ghost" size="icon" className="text-blue-500 h-8 w-8 hover:bg-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed" title="Relançar Estorno" disabled={disabled}>
           <RotateCw className="h-4 w-4" />
         </Button>
       </DialogTrigger>

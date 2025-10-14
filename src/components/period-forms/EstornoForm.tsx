@@ -1,8 +1,10 @@
+
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { format, parseISO, isValid, startOfMonth, endOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR } from 'date-fns/locale/pt-BR';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,17 @@ const ESTORNO_REASONS: { value: EstornoReason, label: string }[] = [
     { value: 'relancamento', label: 'Relançamento' },
 ];
 
+const ESTORNO_REASON_LABELS: Record<EstornoReason, string> = {
+    'duplicidade': 'Duplicidade',
+    'erro de lancamento': 'Erro de Lançamento',
+    'pagamento direto': 'Pagamento Direto',
+    'nao consumido': 'Não Consumido',
+    'assinatura divergente': 'Assinatura Divergente',
+    'cortesia': 'Cortesia',
+    'relancamento': 'Relançamento',
+};
+
+
 const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 'id'> => ({
   date: format(new Date(), 'yyyy-MM-dd'),
   hora: format(new Date(), 'HH:mm'),
@@ -58,7 +71,10 @@ const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 
   category: category,
 });
 
-const formatCurrency = (value: number | undefined) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const formatCurrency = (value: number | undefined) => {
+    if (value === undefined || value === null || value === 0) return '-';
+    return `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+}
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
 
 
@@ -78,13 +94,38 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   const relaunchedIds = useMemo(() => {
     const ids = new Set<string>();
     historyItems.forEach(item => {
-      // Look for the specific pattern in the observation
-      const match = item.observation?.match(/Relançamento do estorno ID: ([\w-]+)/);
-      // Check if the reason is relancamento and a match was found
-      if (item.reason === 'relancamento' && match && match[1]) {
-        ids.add(match[1]);
+      if (item.reason === 'relancamento' && item.observation?.includes('Relançamento referente à')) {
+         const idMatch = item.observation.match(/NF:.*? \/ UH:.*?\./);
+         if (idMatch) {
+            // This logic is flawed for ID matching but the goal is to identify which items are credits from relaunches
+            const originalItem = historyItems.find(h => 
+                h.nf === item.nf &&
+                h.uh === item.uh &&
+                h.reason !== 'relancamento'
+            );
+            if (originalItem) {
+                // Heuristic: find an original estorno that this relancamento might be for
+                // A better approach would be to store the original ID
+            }
+         }
+         // A better logic would be to check if an original estorno has a corresponding relancamento.
       }
     });
+
+    historyItems.forEach(debit => {
+        if (debit.reason !== 'relancamento') {
+            const hasMatchingCredit = historyItems.some(credit => 
+                credit.reason === 'relancamento' &&
+                credit.nf === debit.nf &&
+                credit.uh === debit.uh &&
+                Math.abs(credit.valorEstorno) === Math.abs(debit.valorEstorno)
+            );
+            if (hasMatchingCredit) {
+                ids.add(debit.id);
+            }
+        }
+    });
+
     return ids;
   }, [historyItems]);
 
@@ -148,7 +189,18 @@ export default function EstornoForm({ category }: EstornoFormProps) {
             const errorData = await response.json();
             console.error('[LOG DE ERRO] Payload que causou o erro:', payload);
             console.error('[LOG DE ERRO] Resposta da API:', errorData);
-            throw new Error(errorData.message || 'Falha ao salvar estorno.');
+            let errorDetails = '';
+            if (errorData.errors) {
+                errorDetails = Object.entries(errorData.errors).map(([field, errorObj]: [string, any]) => {
+                    if (errorObj && errorObj._errors && Array.isArray(errorObj._errors)) {
+                        return `${field}: ${errorObj._errors.join(', ')}`;
+                    }
+                    return '';
+                }).filter(Boolean).join(' | ');
+            }
+            
+            const displayMessage = errorDetails || errorData.message || 'Falha ao salvar estorno.';
+            throw new Error(displayMessage);
         }
         
         toast({ title: 'Sucesso!', description: 'Estorno salvo com sucesso.' });
@@ -164,10 +216,15 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   
   const handleDeleteItem = async (itemToDelete: EstornoItem) => {
     try {
-        const response = await fetch('/api/estornos', {
+        const response = await fetch(`/api/estornos`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(itemToDelete)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: itemToDelete.id,
+                date: itemToDelete.date
+            })
         });
         if (!response.ok) {
             const errorData = await response.json();
@@ -200,30 +257,36 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   
   const monthTotals = useMemo(() => {
     return historyItems.reduce((acc, item) => {
-      acc.totalItems += item.quantity || 0;
+      if (item.reason !== 'relancamento') {
+          acc.totalItems += item.quantity || 0;
+      }
       acc.totalValor += item.valorEstorno || 0;
       return acc;
     }, { totalItems: 0, totalValor: 0 });
   }, [historyItems]);
 
   const totals = React.useMemo(() => {
-    const calculated = historyItems.reduce((acc, item) => {
-        // Only sum quantity and valorTotalNota if it's NOT a relancamento
+    return historyItems.reduce((acc, item) => {
         if (item.reason !== 'relancamento') {
             acc.qtd += item.quantity || 0;
-            acc.valorTotalNota += item.valorTotalNota || 0;
+            if ((item.valorTotalNota || 0) > 0) {
+              acc.valorTotalNota += item.valorTotalNota || 0;
+            }
         }
-        // Always sum valorEstorno (which can be positive or negative)
         acc.valorEstorno += item.valorEstorno || 0;
         
+        let diferenca = 0;
+        if ((item.valorTotalNota || 0) > 0 && (item.valorEstorno || 0) !== 0) {
+            if (item.reason === 'relancamento') {
+                 diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
+            } else {
+                 diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
+            }
+        }
+        acc.diferenca += diferenca;
+        
         return acc;
-    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0 });
-
-    return {
-        ...calculated,
-        // The difference calculation for the total footer should reflect the sum of all differences
-        diferenca: calculated.valorTotalNota + calculated.valorEstorno,
-    }
+    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0, diferenca: 0 });
   }, [historyItems]);
 
   return (
@@ -352,37 +415,43 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                     </TableHeader>
                     <TableBody>
                         {historyItems.map((item) => {
-                            const valorEstorno = item.valorEstorno || 0;
                             const isCredit = item.reason === 'relancamento';
-                            const showRelaunch = !isCredit && !relaunchedIds.has(item.id);
+                            const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+                            const hasBeenRelaunched = relaunchedIds.has(item.id);
                             
-                            let diferenca;
-                            if (isCredit) {
-                                diferenca = (item.valorTotalNota || 0) - valorEstorno;
-                            } else {
-                                diferenca = (item.valorTotalNota || 0) + valorEstorno;
+                            let diferenca = 0;
+                            if ((item.valorTotalNota || 0) > 0 && (item.valorEstorno || 0) !== 0) {
+                                if (isCredit) {
+                                     diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
+                                } else {
+                                     diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
+                                }
                             }
 
                             return (
-                            <TableRow key={item.id}>
-                                <TableCell className="text-xs font-medium">{format(parseISO(String(item.date)), 'dd/MM/yyyy')}</TableCell>
+                            <TableRow key={item.id} className={cn(
+                                hasBeenRelaunched ? "bg-purple-200 dark:bg-purple-900/40" : 
+                                isCredit ? "bg-green-600 hover:bg-green-700/90 text-white" : 
+                                isDebit ? "bg-red-700 hover:bg-red-800/90 text-white" : ""
+                            )}>
+                                <TableCell className="text-xs font-medium">{format(parseISO(item.date), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell className="text-xs capitalize">{item.registeredBy || '-'}</TableCell>
                                 <TableCell className="text-xs">
                                   {item.uh && <div>UH: {item.uh}</div>}
                                   {item.nf && <div>NF: {item.nf}</div>}
                                 </TableCell>
-                                <TableCell className="text-xs font-medium capitalize">{item.reason}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{item.observation}</TableCell>
-                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                <TableCell className="text-xs font-medium capitalize">{ESTORNO_REASON_LABELS[item.reason] || item.reason}</TableCell>
+                                <TableCell className={cn("text-xs whitespace-pre-wrap", (isDebit || isCredit || hasBeenRelaunched) ? 'text-gray-200' : 'text-muted-foreground')}>{item.observation}</TableCell>
+                                <TableCell className="text-right">{formatQty(item.quantity)}</TableCell>
                                 <TableCell className="text-right">{formatCurrency(item.valorTotalNota)}</TableCell>
-                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-green-600" : "text-destructive")}>{formatCurrency(valorEstorno)}</TableCell>
+                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-white" : isDebit ? 'text-white' : "text-destructive")}>{`R$ ${Number(item.valorEstorno || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</TableCell>
                                 <TableCell className="text-right font-bold">{formatCurrency(diferenca)}</TableCell>
                                 <TableCell className="text-right">
                                    <div className="flex justify-end items-center">
-                                     {showRelaunch && <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} />}
+                                     <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} disabled={isCredit || hasBeenRelaunched} />
                                      <AlertDialog>
                                       <AlertDialogTrigger asChild>
-                                          <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8">
+                                          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed", (isCredit || isDebit || hasBeenRelaunched) ? 'text-white hover:text-destructive' : 'text-destructive')} disabled={hasBeenRelaunched}>
                                               <Trash2 className="h-4 w-4" />
                                           </Button>
                                       </AlertDialogTrigger>

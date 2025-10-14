@@ -87,8 +87,9 @@ export async function POST(request: NextRequest) {
             newItem.id = uuidv4();
         }
 
-        // Business logic: Only 'assinatura divergente' and 'pagamento direto' are debits (negative).
-        if (newItem.reason === 'assinatura divergente' || newItem.reason === 'pagamento direto') {
+        // Business logic: 'relancamento' is a credit (positive).
+        // All other reasons are debits (negative).
+        if (newItem.reason !== 'relancamento') {
             newItem.valorEstorno = -Math.abs(newItem.valorEstorno);
         } else {
             newItem.valorEstorno = Math.abs(newItem.valorEstorno);
@@ -201,10 +202,19 @@ export async function DELETE(request: NextRequest) {
                 return NextResponse.json({ message: 'Item de estorno não encontrado para exclusão.' }, { status: 404 });
             }
             
-            await connection.query(
-                `UPDATE ${ESTORNOS_TABLE_NAME} SET items = ? WHERE daily_entry_id = ?`,
-                [safeStringify(updatedItems), daily_entry_id]
-            );
+            if (updatedItems.length === 0) {
+                // If the list is empty, delete the entire row from the 'estornos' table
+                await connection.query(
+                    `DELETE FROM ${ESTORNOS_TABLE_NAME} WHERE daily_entry_id = ?`,
+                    [daily_entry_id]
+                );
+            } else {
+                // Otherwise, update the row with the modified list
+                await connection.query(
+                    `UPDATE ${ESTORNOS_TABLE_NAME} SET items = ? WHERE daily_entry_id = ?`,
+                    [safeStringify(updatedItems), daily_entry_id]
+                );
+            }
             
             await connection.commit();
 

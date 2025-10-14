@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -72,14 +71,23 @@ export default function ReportsPage() {
   const [includeItemsInPdf, setIncludeItemsInPdf] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
+  const viewType = searchParams.get('view') as 'geral' | 'consolidado' | null;
+
   const [estornoCategory, setEstornoCategory] = useState<string>('all');
   const [estornoReason, setEstornoReason] = useState<string>('all');
 
   const reportInfo = useMemo(() => {
     let groupItems = REPORTS_GROUPS.flatMap(g => g.items);
     groupItems = groupItems.concat(groupItems.flatMap(item => item.subItems || []));
+    
+    // For estornos, find the specific sub-item if view is specified
+    if (filterType === 'estornos' && viewType) {
+        const estornosParent = groupItems.find(item => item.id === 'estornos');
+        return estornosParent?.subItems?.find(sub => sub.href.includes(`view=${viewType}`)) || estornosParent;
+    }
+    
     return groupItems.find(item => item.id === filterType);
-  }, [filterType]);
+  }, [filterType, viewType]);
   
   // Effect for fetching static metadata
   useEffect(() => {
@@ -365,7 +373,7 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'estornos') {
-        return <EstornosReportView estornos={estornosData} category={estornoCategory} reason={estornoReason} />;
+        return <EstornosReportView estornos={estornosData} category={estornoCategory} reason={estornoReason} view={viewType || 'geral'} />;
     }
 
     if (filterType === 'controle-cafe-no-show') {
@@ -494,4 +502,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

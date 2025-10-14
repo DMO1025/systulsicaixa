@@ -99,10 +99,10 @@ const MonthYearSelector = ({ selectedMonth, setSelectedMonth }: { selectedMonth:
 
 const EstornosTable: React.FC<{ debitosReais: { detalhes: Record<string, { qtd: number; valor: number }>, total: { qtd: number; valor: number } } }> = ({ debitosReais }) => {
     const categoryLabels: Record<string, string> = {
-        'restaurante': 'ESTORNO RESTAURANTE',
-        'frigobar': 'ESTORNO FRIGOBAR',
-        'room-service': 'ESTORNO ROOM SERVICE',
-        'outros': 'OUTROS ESTORNOS'
+        'restaurante': 'RESTAURANTE',
+        'frigobar': 'FRIGOBAR',
+        'room-service': 'ROOM SERVICE',
+        'outros': 'OUTROS'
     };
     
   return (
@@ -195,16 +195,12 @@ export default function DashboardPage() {
         const monthStartDate = startOfMonth(selectedMonth);
         const monthEndDate = endOfMonth(selectedMonth);
 
-        const [entriesForMonth, visibilityConfig, ...estornosArrays] = await Promise.all([
+        const [entriesForMonth, visibilityConfig, allEstornos] = await Promise.all([
           getAllDailyEntries(format(monthStartDate, 'yyyy-MM-dd'), format(monthEndDate, 'yyyy-MM-dd')),
           getSetting('dashboardItemVisibilityConfig'),
-          ...['restaurante', 'frigobar', 'room-service'].map(cat =>
-            fetch(`/api/estornos?category=${cat}&startDate=${format(monthStartDate, 'yyyy-MM-dd')}&endDate=${format(monthEndDate, 'yyyy-MM-dd')}`).then(res => res.ok ? res.json() : [])
-          )
+          fetch(`/api/estornos?startDate=${format(monthStartDate, 'yyyy-MM-dd')}&endDate=${format(monthEndDate, 'yyyy-MM-dd')}`).then(res => res.ok ? res.json() : [])
         ]);
         
-        const allEstornos = estornosArrays.flat() as EstornoItem[];
-
         const consolidatedEntriesMap = new Map<string, DailyLogEntry>();
         for (const entry of (entriesForMonth as DailyLogEntry[])) {
             if (entry.id) consolidatedEntriesMap.set(entry.id, entry);

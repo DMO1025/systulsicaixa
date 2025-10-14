@@ -77,7 +77,9 @@ export default function DatabaseSettingsPage() {
         try {
           const storedMysqlConfig = await getSetting('mysqlConnectionConfig');
           if (storedMysqlConfig) {
-            setMysqlConfig(prev => ({...prev, ...storedMysqlConfig}));
+            setMysqlConfig(storedMysqlConfig);
+          } else {
+            setMysqlConfig({ host: '', port: 3306, user: '', password: '', database: '' });
           }
         } catch (error) {
           console.error("Failed to load MySQL config:", error);
