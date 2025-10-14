@@ -15,19 +15,24 @@ export async function POST(request: NextRequest) {
     const user = await findUser(username);
     
     if (!user || user.password !== password) {
+      // It's better not to log failed attempts to avoid log spamming on attacks.
       return NextResponse.json({ message: 'Usuário ou senha inválidos.' }, { status: 401 });
     }
     
-    // Log successful login
-    await logAction(username, 'LOGIN_SUCCESS', `Usuário '${username}' logado com sucesso.`);
-
     if (user.role === 'operator') {
       if (!selectedShift) {
         return NextResponse.json({ message: 'Turno é obrigatório para operadores.' }, { status: 400 });
       }
-      if (!user.shifts.includes(selectedShift as OperatorShift)) {
+      // Ensure user.shifts exists and is an array before checking includes.
+      if (!Array.isArray(user.shifts) || !user.shifts.includes(selectedShift as OperatorShift)) {
         return NextResponse.json({ message: 'Operador não tem permissão para este turno.' }, { status: 403 });
       }
+    }
+    
+    // Log successful login after all validations
+    await logAction(username, 'LOGIN_SUCCESS', `Usuário '${username}' logado com sucesso.`);
+
+    if (user.role === 'operator') {
       return NextResponse.json({ 
         role: user.role, 
         shift: selectedShift,
@@ -46,5 +51,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Ocorreu um erro no servidor durante o login.' }, { status: 500 });
   }
 }
-
-    

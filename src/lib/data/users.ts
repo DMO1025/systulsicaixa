@@ -1,41 +1,45 @@
 
 
 'use server';
+import 'server-only';
 
-import type { User, UserRole, OperatorShift } from '@/lib/types';
+import { getDbPool, isMysqlConnected, USERS_TABLE_NAME, safeParse, safeStringify } from '@/lib/mysql';
 import { getUsersFromFile, saveUsersToFile } from '@/lib/fileDb';
-import { getDbPool, isMysqlConnected, USERS_TABLE_NAME } from '@/lib/mysql';
+import type { User, UserRole, OperatorShift, PageId } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
-import mysql, { type RowDataPacket } from 'mysql2/promise';
+import type mysql from 'mysql2/promise';
 
-async function getUsersFromDb(pool: mysql.Pool): Promise<User[]> {
-    const [rows] = await pool.query<RowDataPacket[]>(`SELECT * FROM ${USERS_TABLE_NAME}`);
-    return rows.map(row => ({
-        ...row,
-        shifts: row.shifts ? JSON.parse(row.shifts) : [],
-        allowedPages: row.allowedPages ? JSON.parse(row.allowedPages) : [],
-    })) as User[];
-}
-
-export async function getAllUsers(): Promise<User[]> {
+async function getUsersFromDb(): Promise<User[]> {
     const pool = await getDbPool();
-    if (await isMysqlConnected(pool)) {
-        return await getUsersFromDb(pool!);
-    } else {
-        return await getUsersFromFile();
+    if (!pool || !(await isMysqlConnected(pool))) {
+        // If DB is not connected, gracefully return an empty array instead of throwing an error.
+        // This prevents crashes on pages like Login that try to fetch users.
+        console.warn('DB not connected, returning empty user list from DB source.');
+        return [];
     }
+    const [rows] = await pool.query<mysql.RowDataPacket[]>(`SELECT * FROM ${USERS_TABLE_NAME}`);
+    return (rows as User[]).map(user => ({
+        ...user,
+        shifts: user.shifts ? safeParse<OperatorShift[]>(user.shifts) || [] : [],
+        allowedPages: user.allowedPages ? safeParse<PageId[]>(user.allowedPages) || [] : [],
+    }));
 }
 
-async function saveUsersToDb(pool: mysql.Pool, users: User[]): Promise<void> {
+async function saveUsersToDb(users: User[]): Promise<void> {
+    const pool = await getDbPool();
+    if (!pool || !(await isMysqlConnected(pool))) {
+        throw new Error('Database not connected. Cannot save users.');
+    }
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
+        // For simplicity, we'll just replace all users. A more complex system might do individual inserts/updates.
         await connection.query(`DELETE FROM ${USERS_TABLE_NAME}`);
         for (const user of users) {
-             await connection.query(
-                `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages) VALUES (?, ?, ?, ?, ?, ?)`,
-                [user.id, user.username, user.password, user.role, JSON.stringify(user.shifts || []), JSON.stringify(user.allowedPages || [])]
-            );
+            const { id, username, password, role, shifts, allowedPages } = user;
+            if (!password) continue; // Should not happen for new users, but a safeguard.
+            const sql = `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages) VALUES (?, ?, ?, ?, ?, ?)`;
+            await connection.query(sql, [id, username, password, role, safeStringify(shifts), safeStringify(allowedPages)]);
         }
         await connection.commit();
     } catch (error) {
@@ -46,74 +50,111 @@ async function saveUsersToDb(pool: mysql.Pool, users: User[]): Promise<void> {
     }
 }
 
-async function saveAllUsers(users: User[]): Promise<void> {
+async function getDataSource() {
     const pool = await getDbPool();
-     if (await isMysqlConnected(pool)) {
-        await saveUsersToDb(pool!, users);
+    return await isMysqlConnected(pool) ? 'db' : 'file';
+}
+
+export async function getAllUsers(): Promise<User[]> {
+    const source = await getDataSource();
+    if (source === 'db') {
+        return getUsersFromDb();
     } else {
-        await saveUsersToFile(users);
+        return getUsersFromFile();
     }
 }
 
-
 export async function findUser(username: string): Promise<User | undefined> {
-  const allUsers = await getAllUsers();
-  return allUsers.find(user => user.username.toLowerCase() === username.toLowerCase());
+    const users = await getAllUsers();
+    return users.find(u => u.username.toLowerCase() === username.toLowerCase());
+}
+
+export async function findUserById(id: string): Promise<User | undefined> {
+    const users = await getAllUsers();
+    return users.find(u => u.id === id);
 }
 
 export async function createUser(userData: Partial<User>): Promise<User> {
-    const allUsers = await getAllUsers();
-    if (allUsers.some(u => u.username.toLowerCase() === userData.username?.toLowerCase())) {
-        throw new Error(`Usuário "${userData.username}" já existe.`);
+    const users = await getAllUsers();
+    if (users.some(u => u.username.toLowerCase() === userData.username?.toLowerCase())) {
+        throw new Error(`Usuário '${userData.username}' já existe.`);
     }
 
     const newUser: User = {
         id: userData.id || uuidv4(),
         username: userData.username!,
         password: userData.password!,
-        role: userData.role || 'operator',
+        role: userData.role!,
         shifts: userData.shifts || [],
         allowedPages: userData.allowedPages || [],
-        createdAt: new Date(),
     };
     
-    allUsers.push(newUser);
-    await saveAllUsers(allUsers);
+    users.push(newUser);
+
+    const source = await getDataSource();
+    if (source === 'db') {
+        // In DB mode, we can insert just the new user for efficiency
+        const pool = await getDbPool();
+        const sql = `INSERT INTO ${USERS_TABLE_NAME} (id, username, password, role, shifts, allowedPages) VALUES (?, ?, ?, ?, ?, ?)`;
+        await pool!.query(sql, [newUser.id, newUser.username, newUser.password, newUser.role, safeStringify(newUser.shifts), safeStringify(newUser.allowedPages)]);
+    } else {
+        await saveUsersToFile(users);
+    }
+    
     return newUser;
 }
 
-export async function updateUser(userId: string, updatedData: Partial<User>): Promise<User> {
-    const allUsers = await getAllUsers();
-    const userIndex = allUsers.findIndex(u => u.id === userId);
+export async function updateUser(userId: string, updates: Partial<User>): Promise<User> {
+    const users = await getAllUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
 
     if (userIndex === -1) {
-        throw new Error(`Usuário com ID ${userId} não encontrado.`);
+        throw new Error('Usuário não encontrado para atualização.');
     }
 
-    const updatedUser = { ...allUsers[userIndex], ...updatedData };
-    // Don't update password if it's empty
-    if (updatedData.password === "" || updatedData.password === null || updatedData.password === undefined) {
-        delete updatedUser.password;
+    // Prevent username change if it already exists
+    if (updates.username && users.some(u => u.username.toLowerCase() === updates.username!.toLowerCase() && u.id !== userId)) {
+        throw new Error(`Nome de usuário '${updates.username}' já está em uso.`);
     }
-    allUsers[userIndex] = updatedUser;
+
+    const updatedUser = { ...users[userIndex], ...updates };
+    // Don't save an empty password, keep the old one if not provided
+    if (updates.password === '' || updates.password === null || updates.password === undefined) {
+        updatedUser.password = users[userIndex].password;
+    }
+    users[userIndex] = updatedUser;
+
+    const source = await getDataSource();
+    if (source === 'db') {
+        const { id, username, password, role, shifts, allowedPages } = updatedUser;
+        const pool = await getDbPool();
+        const sql = `UPDATE ${USERS_TABLE_NAME} SET username = ?, password = ?, role = ?, shifts = ?, allowedPages = ? WHERE id = ?`;
+        await pool!.query(sql, [username, password, role, safeStringify(shifts), safeStringify(allowedPages), id]);
+    } else {
+        await saveUsersToFile(users);
+    }
     
-    await saveAllUsers(allUsers);
     return updatedUser;
 }
 
 export async function deleteUser(userId: string): Promise<{ message: string }> {
-    const allUsers = await getAllUsers();
-    if (userId === '1' && allUsers.find(u => u.id === '1')?.role === 'administrator') {
-        throw new Error("Não é possível remover o usuário administrador principal.");
+    if (userId === '1') {
+        throw new Error("Não é possível remover o usuário administrador padrão.");
+    }
+    const users = await getAllUsers();
+    const newUsers = users.filter(u => u.id !== userId);
+
+    if (users.length === newUsers.length) {
+        throw new Error('Usuário não encontrado para remoção.');
     }
     
-    const initialLength = allUsers.length;
-    const updatedUsers = allUsers.filter(u => u.id !== userId);
-
-    if (updatedUsers.length === initialLength) {
-        throw new Error(`Usuário com ID ${userId} não encontrado.`);
+    const source = await getDataSource();
+     if (source === 'db') {
+        const pool = await getDbPool();
+        await pool!.query(`DELETE FROM ${USERS_TABLE_NAME} WHERE id = ?`, [userId]);
+    } else {
+        await saveUsersToFile(newUsers);
     }
 
-    await saveAllUsers(updatedUsers);
-    return { message: "Usuário removido com sucesso." };
+    return { message: 'Usuário removido com sucesso.' };
 }
