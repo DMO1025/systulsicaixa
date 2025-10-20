@@ -51,7 +51,7 @@ export default function ReportsPage() {
   const [personTransactions, setPersonTransactions] = useState<UnifiedPersonTransaction[]>([]);
   const [reportExportData, setReportExportData] = useState<ReportExportData | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService' | 'almoco'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId | 'all' | 'consumoInterno' | 'faturado' | 'frigobar' | 'roomService'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -71,7 +71,7 @@ export default function ReportsPage() {
   const [includeItemsInPdf, setIncludeItemsInPdf] = useState(true);
 
   const filterType: FilterType = (params.filterType as FilterType) || 'month';
-  const viewType = searchParams.get('view') as 'geral' | 'consolidado' | null;
+  const viewType = searchParams.get('view') as 'geral' | 'consolidado' | 'descritivo' | null;
 
   const [estornoCategory, setEstornoCategory] = useState<string>('all');
   const [estornoReason, setEstornoReason] = useState<string>('all');
@@ -333,6 +333,7 @@ export default function ReportsPage() {
         includeItemsInPdf,
         estornoCategory,
         estornoReason,
+        view: viewType || undefined
     });
   };
 
@@ -385,7 +386,7 @@ export default function ReportsPage() {
     }
 
     if (filterType === 'controle-frigobar') {
-      return <ControleFrigobarReportView entries={filteredEntries} onDataCalculated={setReportExportData} />;
+      return <ControleFrigobarReportView entries={filteredEntries} onDataCalculated={setReportExportData} view={viewType === 'consolidado' ? 'consolidado' : 'descritivo'}/>;
     }
 
     if (filterType === 'client-extract') {
@@ -452,7 +453,7 @@ export default function ReportsPage() {
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{reportInfo?.title || 'Relatórios'}</h1>
-          <p className="text-lg text-muted-foreground pt-1">Gere e analise os dados do sistema.</p>
+          <p className="text-lg text-muted-foreground pt-1">{reportInfo?.description || 'Gere e analise os dados do sistema.'}</p>
         </div>
       </div>
       
@@ -487,6 +488,7 @@ export default function ReportsPage() {
             setEstornoCategory={setEstornoCategory}
             estornoReason={estornoReason}
             setEstornoReason={setEstornoReason}
+            view={viewType || undefined}
         />
       )}
 

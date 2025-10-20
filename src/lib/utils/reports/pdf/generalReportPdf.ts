@@ -83,9 +83,9 @@ export const generateGeneralReportPdf = (doc: jsPDF, params: ExportParams) => {
         body: body,
         foot: footer,
         theme: 'striped',
-        styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', halign: 'center', valign: 'middle' },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
-        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', fontSize: 7, halign: 'center' },
+        styles: { fontSize: 6, cellPadding: 2, overflow: 'linebreak', halign: 'left', valign: 'middle' },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'left', fontSize: 7 },
+        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', fontSize: 7, halign: 'left' },
         showFoot: 'lastPage',
         margin: { top: headerHeight + 50 },
         didDrawPage: (hookData) => {

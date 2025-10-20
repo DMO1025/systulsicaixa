@@ -1,5 +1,4 @@
 
-
 import type jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
@@ -98,8 +97,8 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
         body: summaryFinancialBody,
         startY: headerHeight,
         theme: 'grid',
-        headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
-        columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right' } },
+        headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold', halign: 'left' },
+        columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'left' } },
         tableWidth: 250,
         margin: { left: 40 },
     });
@@ -109,15 +108,17 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
         body: summaryReasonBody,
         startY: headerHeight,
         theme: 'grid',
-        headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold', halign: 'left' },
         columnStyles: { 
             0: { fontStyle: 'bold', cellWidth: 120 },
-            1: { halign: 'right', cellWidth: 40 },
-            2: { halign: 'right', cellWidth: 'auto' }
+            1: { halign: 'left', cellWidth: 40 },
+            2: { halign: 'left', cellWidth: 'auto' }
         },
         tableWidth: 250,
         margin: { left: 320 },
     });
+    
+    const tableStartY = (doc as any).lastAutoTable.finalY + 20;
 
     const headContent = ['Data', 'Usuário', 'UH/NF', 'Motivo', 'Obs.', 'Qtd', 'Vlr. Nota', 'Vlr. Estorno', 'Diferença'];
     if (showCategoryColumn) {
@@ -157,34 +158,33 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
     const footerColSpan = showCategoryColumn ? 6 : 5;
     const footer = [[
         { content: 'TOTAIS', colSpan: footerColSpan, styles: { fontStyle: 'bold' } },
-        { content: formatQty(totals.qtd), styles: { fontStyle: 'bold', halign: 'right' } },
-        formatCurrency(totals.valorTotalNota),
-        { content: formatCurrency(totals.valorEstorno), styles: { fontStyle: 'bold', halign: 'right' } },
-        { content: formatCurrency(totals.diferenca), styles: { fontStyle: 'bold', halign: 'right' } }
+        { content: formatQty(totals.qtd), styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: formatCurrency(totals.valorTotalNota), styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: formatCurrency(totals.valorEstorno), styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: formatCurrency(totals.diferenca), styles: { fontStyle: 'bold', halign: 'left' } }
     ]];
     
-    const tableStartY = (doc as any).lastAutoTable.finalY + 80;
-
     autoTable(doc, {
         head: head,
         body: body,
         foot: footer,
         theme: 'striped',
         showFoot: 'lastPage',
-        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center' },
-        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
+        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', halign: 'left' },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'left' },
+        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'left' },
         columnStyles: {
+            // Adjust cellWidths based on whether category is shown
             0: { cellWidth: 40 }, // Data
             [showCategoryColumn ? 1 : -1]: { cellWidth: 50 }, // Categoria
             [showCategoryColumn ? 2 : 1]: { cellWidth: 50 }, // Usuário
             [showCategoryColumn ? 3 : 2]: { cellWidth: 60 }, // UH/NF
             [showCategoryColumn ? 4 : 3]: { cellWidth: 60 }, // Motivo
             [showCategoryColumn ? 5 : 4]: { cellWidth: 'auto' }, // Obs
-            [showCategoryColumn ? 6 : 5]: { cellWidth: 30, halign: 'right' }, // Qtd
-            [showCategoryColumn ? 7 : 6]: { cellWidth: 50, halign: 'right' }, // Vlr Nota
-            [showCategoryColumn ? 8 : 7]: { cellWidth: 50, halign: 'right' }, // Vlr Estorno
-            [showCategoryColumn ? 9 : 8]: { cellWidth: 50, halign: 'right' }, // Diferença
+            [showCategoryColumn ? 6 : 5]: { cellWidth: 30, halign: 'left' }, // Qtd
+            [showCategoryColumn ? 7 : 6]: { cellWidth: 50, halign: 'left' }, // Vlr Nota
+            [showCategoryColumn ? 8 : 7]: { cellWidth: 50, halign: 'left' }, // Vlr Estorno
+            [showCategoryColumn ? 9 : 8]: { cellWidth: 50, halign: 'left' }, // Diferença
         },
         startY: tableStartY,
         didDrawPage: (hookData) => {
@@ -192,27 +192,6 @@ export const generateEstornosPdf = (doc: jsPDF, params: ExportParams) => {
            if(hookData.pageNumber > 1) {
              drawHeaderAndFooter(doc, title, dateRangeStr, params, hookData.pageNumber, totalPages);
            }
-        },
-        willDrawCell: (data) => {
-            const item = filteredEstornos[data.row.index];
-            if (item) {
-                const relaunchedIds = new Set<string>();
-                filteredEstornos.forEach(i => {
-                    const match = i.observation?.match(/Relançamento do estorno ID: ([\w-]+)/);
-                    if (i.reason === 'relancamento' && match && match[1]) {
-                        relaunchedIds.add(match[1]);
-                    }
-                });
-
-                const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
-                const hasBeenRelaunched = relaunchedIds.has(item.id);
-
-                if (isDebit) {
-                    doc.setFillColor(255, 230, 230); // light red
-                } else if (hasBeenRelaunched) {
-                    doc.setFillColor(230, 230, 255); // light purple
-                }
-            }
         }
     });
 };

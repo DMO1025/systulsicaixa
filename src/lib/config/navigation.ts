@@ -34,6 +34,8 @@ import {
   Type,
   Settings,
   ClipboardList as ClipboardListIcon,
+  Newspaper,
+  Archive,
 } from 'lucide-react';
 
 export const PATHS = {
@@ -78,6 +80,8 @@ export const REPORTS_PATHS = {
   HISTORY: `${PATHS.REPORTS_BASE}/history`,
   ESTORNOS: `${PATHS.REPORTS_BASE}/estornos`,
   CONTROLE_FRIGOBAR: `${PATHS.REPORTS_BASE}/controle-frigobar`,
+  CONTROLE_FRIGOBAR_DESCRITIVO: `${PATHS.REPORTS_BASE}/controle-frigobar?view=descritivo`,
+  CONTROLE_FRIGOBAR_CONSOLIDADO: `${PATHS.REPORTS_BASE}/controle-frigobar?view=consolidado`,
 };
 
 export const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
@@ -151,15 +155,15 @@ export const REPORTS_GROUPS = [
   {
     title: 'Relatórios Financeiros',
     items: [
-      { id: 'range', title: 'Geral (por Intervalo)', href: REPORTS_PATHS.RANGE, icon: BarChartBig },
-      { id: 'period', title: 'Por Período (no Mês)', href: REPORTS_PATHS.PERIOD, icon: ListFilter },
+      { id: 'range', title: 'Resumo Mensal (Financeiro)', href: REPORTS_PATHS.RANGE, icon: BarChartBig },
+      { id: 'period', title: 'Relatório Detalhado (Financeiro)', href: REPORTS_PATHS.PERIOD, icon: ListFilter },
     ]
   },
   {
     title: 'Relatórios de Pessoas',
     items: [
-      { id: 'client-extract', title: 'Extrato Detalhado', href: REPORTS_PATHS.CLIENT_EXTRACT, icon: UserSquare },
-      { id: 'client-summary', title: 'Resumo Mensal', href: REPORTS_PATHS.CLIENT_SUMMARY, icon: Users },
+      { id: 'client-summary', title: 'Resumo Mensal (Pessoas)', href: REPORTS_PATHS.CLIENT_SUMMARY, icon: Users },
+      { id: 'client-extract', title: 'Relatório Detalhado (Pessoas)', href: REPORTS_PATHS.CLIENT_EXTRACT, icon: UserSquare },
     ]
   },
   {
@@ -175,7 +179,16 @@ export const REPORTS_GROUPS = [
           { id: 'controle-cafe-no-show', title: 'No-Show', href: REPORTS_PATHS.CONTROLE_CAFE_NOSHOW, icon: UserX },
         ]
       },
-      { id: 'controle-frigobar', title: 'Controle de Frigobar', href: REPORTS_PATHS.CONTROLE_FRIGOBAR, icon: Refrigerator },
+      { 
+        id: 'controle-frigobar', 
+        title: 'Controle de Frigobar', 
+        href: REPORTS_PATHS.CONTROLE_FRIGOBAR, 
+        icon: Refrigerator,
+        subItems: [
+          { id: 'controle-frigobar-descritivo', title: 'Descritivo', href: REPORTS_PATHS.CONTROLE_FRIGOBAR_DESCRITIVO, icon: Newspaper },
+          { id: 'controle-frigobar-consolidado', title: 'Consolidado', href: REPORTS_PATHS.CONTROLE_FRIGOBAR_CONSOLIDADO, icon: Archive },
+        ]
+      },
       { 
         id: 'estornos', 
         title: 'Relatório de Estornos', 

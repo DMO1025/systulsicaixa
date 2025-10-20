@@ -1,5 +1,4 @@
 
-
 import * as XLSX from 'xlsx';
 import type { ExportParams } from '../types';
 import { generateGeneralReportExcel } from './generalReportExcel';
@@ -72,8 +71,15 @@ export const generateExcelWorkbook = async (params: ExportParams): Promise<XLSX.
             }
             break;
         case 'controle-frigobar':
-            await generateControleFrigobarExcel(wb, entries, unitPrices, params.companyName, params.includeItemsInPdf);
-            sheetsAdded = true;
+            if (reportData) {
+                await generateControleFrigobarExcel(wb, {
+                    reportData: reportData as any,
+                    companyName: params.companyName,
+                    includeItems: params.includeItemsInPdf,
+                    view: params.view
+                });
+                sheetsAdded = true;
+            }
             break;
         default:
             console.warn(`Excel export for filterType "${filterType}" not implemented.`);

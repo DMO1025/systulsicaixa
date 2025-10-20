@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -27,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { FrigobarItem, FrigobarConsumptionLog, FrigobarItemCategory, DailyLogEntry, FrigobarPeriodData } from '@/lib/types';
 import { getSetting } from '@/services/settingsService';
-import { saveDailyEntry, getDailyEntry, getAllDailyEntries, getAllEntryDates } from '@/services/dailyEntryService';
+import { saveDailyEntry, getDailyEntry, getAllEntryDates } from '@/services/dailyEntryService';
 
 const createDefaultNewEntry = (): { uh: string; items: Record<string, number>; isAntecipado: boolean } => ({
   uh: '',
@@ -35,7 +36,7 @@ const createDefaultNewEntry = (): { uh: string; items: Record<string, number>; i
   isAntecipado: false,
 });
 
-const SummaryCard = ({ title, value, icon: Icon, variant = 'default', children }: { title: string, value: string, icon: React.ElementType, variant?: 'default' | 'positive' | 'negative', children?: React.ReactNode }) => {
+const SummaryCard = ({ title, value, icon: Icon, variant = 'default', children }: { title: string, value: string | React.ReactNode, icon: React.ElementType, variant?: 'default' | 'positive' | 'negative', children?: React.ReactNode }) => {
     const variantClasses = {
         default: 'text-primary',
         positive: 'text-green-600 dark:text-green-500',
@@ -100,8 +101,9 @@ export default function ControleFrigobarForm() {
   const [newEntry, setNewEntry] = useState(createDefaultNewEntry());
   const [generalObservations, setGeneralObservations] = useState("");
   
-  const [checkoutsPrevistos, setCheckoutsPrevistos] = useState('');
+  const [checkoutsEfetivados, setCheckoutsEfetivados] = useState('');
   const [checkoutsProrrogados, setCheckoutsProrrogados] = useState('');
+  const [abatimentoAvulso, setAbatimentoAvulso] = useState<number | undefined>(undefined);
 
 
   const fetchFrigobarItems = async () => {
@@ -123,8 +125,9 @@ export default function ControleFrigobarForm() {
         
         setHistoryItems(frigobarData?.logs?.sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()) || []);
         setGeneralObservations(frigobarData?.periodObservations || '');
-        setCheckoutsPrevistos(String(frigobarData?.checkoutsPrevistos ?? ''));
+        setCheckoutsEfetivados(String(frigobarData?.checkoutsEfetivados ?? ''));
         setCheckoutsProrrogados(String(frigobarData?.checkoutsProrrogados ?? ''));
+        setAbatimentoAvulso(frigobarData?.abatimentoAvulso);
 
     } catch (error) {
       toast({ title: 'Erro ao buscar dados do dia', description: (error as Error).message, variant: 'destructive' });
@@ -191,8 +194,9 @@ export default function ControleFrigobarForm() {
               ...(entryForDate.controleFrigobar as any),
               logs: historyItems,
               periodObservations: generalObservations,
-              checkoutsPrevistos: checkoutsPrevistos === '' ? undefined : parseInt(checkoutsPrevistos, 10),
+              checkoutsEfetivados: checkoutsEfetivados === '' ? undefined : parseInt(checkoutsEfetivados, 10),
               checkoutsProrrogados: checkoutsProrrogados === '' ? undefined : parseInt(checkoutsProrrogados, 10),
+              abatimentoAvulso: abatimentoAvulso,
           }
       };
 
@@ -262,8 +266,9 @@ export default function ControleFrigobarForm() {
                   ...(entryForDate.controleFrigobar as any),
                   logs: updatedHistory,
                   periodObservations: generalObservations,
-                  checkoutsPrevistos: checkoutsPrevistos === '' ? undefined : parseInt(checkoutsPrevistos, 10),
+                  checkoutsEfetivados: checkoutsEfetivados === '' ? undefined : parseInt(checkoutsEfetivados, 10),
                   checkoutsProrrogados: checkoutsProrrogados === '' ? undefined : parseInt(checkoutsProrrogados, 10),
+                  abatimentoAvulso: abatimentoAvulso,
               }
           };
           await saveDailyEntry(selectedDate, payload);
@@ -298,10 +303,10 @@ export default function ControleFrigobarForm() {
     }, 500);
   };
   
-  const handleSaveObservation = async () => {
+  const handleSaveDayMeta = async () => {
     const success = await saveCurrentState();
     if(success) {
-        toast({ title: "Observação Salva", description: "Sua observação foi salva com sucesso." });
+        toast({ title: "Dados do Dia Salvos", description: "As informações do dia foram salvas com sucesso." });
     }
   };
 
@@ -328,7 +333,7 @@ export default function ControleFrigobarForm() {
     const uniqueUHsAtendidas = new Set<string>();
     let antecipadosCount = 0;
 
-    const totals = historyItems.reduce((acc, log) => {
+    const totalsFromLogs = historyItems.reduce((acc, log) => {
       if ((log.valorRecebido ?? 0) > 0) {
         uniqueUHsAtendidas.add(log.uh);
       }
@@ -340,16 +345,18 @@ export default function ControleFrigobarForm() {
       acc.items += Object.values(log.items).reduce((sum, qty) => sum + qty, 0);
       return acc;
     }, { consumo: 0, recebido: 0, items: 0 });
+    
+    const finalTotalRecebido = totalsFromLogs.recebido + (abatimentoAvulso || 0);
 
     return {
-      totalConsumo: totals.consumo,
-      totalRecebido: totals.recebido,
-      totalDiferenca: totals.recebido - totals.consumo,
+      totalConsumo: totalsFromLogs.consumo,
+      totalRecebido: finalTotalRecebido,
+      totalDiferenca: finalTotalRecebido - totalsFromLogs.consumo,
       totalUHs: uniqueUHsAtendidas.size,
-      totalItems: totals.items,
+      totalItems: totalsFromLogs.items,
       checkoutsAntecipados: antecipadosCount,
     };
-  }, [historyItems]);
+  }, [historyItems, abatimentoAvulso]);
 
   const bebidaItems = useMemo(() => frigobarItems.filter(item => item.category === 'bebida'), [frigobarItems]);
   const comidaItems = useMemo(() => frigobarItems.filter(item => item.category === 'comida'), [frigobarItems]);
@@ -406,7 +413,7 @@ export default function ControleFrigobarForm() {
                       <CardDescription>Notas sobre o dia que não pertençam a um período específico.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                      <Textarea placeholder="Descreva aqui as observações gerais do dia..." className="resize-y min-h-[100px]" value={generalObservations} onChange={(e) => setGeneralObservations(e.target.value)} onBlur={handleSaveObservation}/>
+                      <Textarea placeholder="Descreva aqui as observações gerais do dia..." className="resize-y min-h-[100px]" value={generalObservations} onChange={(e) => setGeneralObservations(e.target.value)} onBlur={handleSaveDayMeta}/>
                   </CardContent>
               </Card>
             </div>
@@ -554,12 +561,12 @@ export default function ControleFrigobarForm() {
               </CardHeader>
                <CardContent className="space-y-3">
                   <div className="flex justify-between items-center text-sm">
-                      <Label>Previstos</Label>
-                      <Input value={checkoutsPrevistos} onChange={e => setCheckoutsPrevistos(e.target.value)} onBlur={handleSaveObservation} className="h-8 w-20 text-center" />
+                      <Label>Efetivados</Label>
+                      <Input value={checkoutsEfetivados} onChange={e => setCheckoutsEfetivados(e.target.value)} onBlur={handleSaveDayMeta} className="h-8 w-20 text-center" />
                   </div>
                    <div className="flex justify-between items-center text-sm">
                       <Label>Prorrogados</Label>
-                      <Input value={checkoutsProrrogados} onChange={e => setCheckoutsProrrogados(e.target.value)} onBlur={handleSaveObservation} className="h-8 w-20 text-center" />
+                      <Input value={checkoutsProrrogados} onChange={e => setCheckoutsProrrogados(e.target.value)} onBlur={handleSaveDayMeta} className="h-8 w-20 text-center" />
                   </div>
                   <div className="flex justify-between items-center text-sm">
                       <Label>Antecipados</Label>
@@ -567,11 +574,25 @@ export default function ControleFrigobarForm() {
                   </div>
               </CardContent>
             </Card>
+             <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-semibold">Abatimento Avulso</CardTitle>
+                </CardHeader>
+                <CardContent>
+                     <Label>Valor do abatimento</Label>
+                     <CurrencyInput
+                        placeholder="R$ 0,00"
+                        value={abatimentoAvulso}
+                        onValueChange={setAbatimentoAvulso}
+                        onBlur={handleSaveDayMeta}
+                    />
+                </CardContent>
+             </Card>
             <SummaryCard title="Quartos Atendidos" value={String(totalUHs)} icon={Briefcase}/>
             <SummaryCard title="Itens Vendidos" value={String(totalItems)} icon={Refrigerator}/>
-            <SummaryCard title="Total Consumido" value={formatCurrency(totalConsumo)} icon={DollarSign} variant="negative"/>
-            <SummaryCard title="Total Recebido" value={formatCurrency(totalRecebido)} icon={DollarSign} variant="positive"/>
-             <SummaryCard title="Diferença Total" value={formatCurrency(totalDiferenca)} icon={DollarSign} variant={totalDiferenca < 0 ? 'negative' : 'positive'}/>
+            <SummaryCard title="Total Consumido (R$)" value={formatCurrency(totalConsumo)} icon={DollarSign} variant="negative"/>
+            <SummaryCard title="Total Recebido (R$)" value={formatCurrency(totalRecebido)} icon={DollarSign} variant="positive"/>
+             <SummaryCard title="Total Diferença (R$)" value={formatCurrency(totalDiferenca)} icon={DollarSign} variant={totalDiferenca < 0 ? 'negative' : 'positive'}/>
         </div>
       </div>
     </div>

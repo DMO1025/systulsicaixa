@@ -60,23 +60,23 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
         const head = [['Data', 'Horário', 'Hóspede', 'UH', 'Reserva', 'Valor', 'Obs']];
         const body = itemsForDezena.map(item => [item.entryDate, item.horario || '-', item.hospede || '-', item.uh || '-', item.reserva || '-', formatCurrency(item.valor), item.observation || '-']);
         
-        const footer = [[{ content: 'TOTAL', colSpan: 5, styles: { fontStyle: 'bold' } }, { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'right' } }, '']];
+        const footer = [[{ content: 'TOTAL', colSpan: 5, styles: { fontStyle: 'bold' } }, { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'left' } }, '']];
         
         autoTable(doc, { 
             head, 
             body, 
             foot: footer,
             theme: 'striped', 
-            styles: { fontSize: 8 },
-            headStyles: { halign: 'center' },
-            footStyles: { halign: 'center', fillColor: [230, 230, 230], textColor: 0 },
+            styles: { fontSize: 8, halign: 'left' },
+            headStyles: { halign: 'left' },
+            footStyles: { halign: 'left', fillColor: [230, 230, 230], textColor: 0 },
             columnStyles: {
                 0: { cellWidth: 55 }, 
                 1: { cellWidth: 40 },
                 2: { cellWidth: 120 },
                 3: { cellWidth: 30 }, 
                 4: { cellWidth: 65 },
-                5: { cellWidth: 50, halign: 'right' },
+                5: { cellWidth: 50, halign: 'left' },
                 6: { cellWidth: 'auto' },
             },
             margin: { top: startY },
@@ -97,10 +97,10 @@ export const generateNoShowPdf = async (doc: jsPDF, params: ExportParams) => {
             ],
             startY: (doc as any).lastAutoTable.finalY + 15,
             theme: 'grid',
-            styles: { fontSize: 9 },
+            styles: { fontSize: 9, halign: 'left' },
             columnStyles: {
                 0: { fontStyle: 'bold' },
-                1: { halign: 'right' }
+                1: { halign: 'left' }
             },
             tableWidth: 250,
         });

@@ -1,5 +1,4 @@
 
-
 import type { PeriodId as PeriodIdFromConfig, PeriodType as PeriodTypeFromConfig } from './config/periods';
 import type { SalesChannelId as SalesChannelIdFromConfig, PaymentMethodId as PaymentMethodIdFromConfig, EventLocationKey as EventLocationKeyFromConfig, EventServiceTypeKey as EventServiceTypeKeyFromConfig, GroupedChannelConfig as GroupedChannelConfigFromConfig } from './config/forms';
 import type { SummaryCardItemId as SummaryCardItemIdFromConfig } from './config/dashboard';
@@ -77,8 +76,9 @@ export type FrigobarConsumptionItem = FrigobarConsumptionLog;
 export interface FrigobarPeriodData {
   logs: FrigobarConsumptionLog[];
   periodObservations?: string;
-  checkoutsPrevistos?: number;
+  checkoutsEfetivados?: number;
   checkoutsProrrogados?: number;
+  abatimentoAvulso?: number;
 }
 
 
@@ -405,4 +405,9 @@ export interface Settings {
     apiAccessConfig?: ApiAccessConfig;
     frigobarItems?: FrigobarItem[];
     companies?: Company[];
+}
+
+export type ReportExportData = {
+  summary?: any;
+  details?: any;
 }

@@ -40,8 +40,8 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
 
     const footer = [[
         { content: 'TOTAL', colSpan: 3, styles: { fontStyle: 'bold' } },
-        { content: `Registros: ${formatQty(totalRegistros)}`, styles: { fontStyle: 'bold', halign: 'right' } },
-        { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'right' } }
+        { content: `Registros: ${formatQty(totalRegistros)}`, styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: formatCurrency(totalValor), styles: { fontStyle: 'bold', halign: 'left' } }
     ]];
     
     let startY = drawHeaderAndFooter(doc, title, finalFilterText, params, 1, (doc as any).internal.getNumberOfPages());
@@ -53,15 +53,15 @@ export const generatePersonExtractPdf = (doc: jsPDF, params: ExportParams) => {
         foot: footer,
         theme: 'striped',
         showFoot: 'lastPage',
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
+        styles: { fontSize: 8, halign: 'left' },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'left' },
+        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'left' },
         columnStyles: {
             0: { cellWidth: 55 }, 
             1: { cellWidth: 120 },
             2: { cellWidth: 120 }, 
             3: { cellWidth: 'auto' },
-            4: { cellWidth: 60, halign: 'right' },
+            4: { cellWidth: 60, halign: 'left' },
         },
         margin: { top: startY },
         didDrawPage: (hookData) => {

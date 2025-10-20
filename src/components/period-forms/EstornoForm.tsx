@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -72,7 +71,7 @@ const createDefaultEstornoItem = (category: EstornoCategory): Omit<EstornoItem, 
 });
 
 const formatCurrency = (value: number | undefined) => {
-    if (value === undefined || value === null || value === 0) return '-';
+    if (value === undefined || value === null || (value > -0.001 && value < 0.001)) return '-';
     return `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 }
 const formatQty = (value: number | undefined) => Number(value || 0).toLocaleString('pt-BR');
@@ -91,44 +90,6 @@ export default function EstornoForm({ category }: EstornoFormProps) {
   
   const [newItem, setNewItem] = useState<Omit<EstornoItem, 'id'>>(createDefaultEstornoItem(category));
 
-  const relaunchedIds = useMemo(() => {
-    const ids = new Set<string>();
-    historyItems.forEach(item => {
-      if (item.reason === 'relancamento' && item.observation?.includes('Relançamento referente à')) {
-         const idMatch = item.observation.match(/NF:.*? \/ UH:.*?\./);
-         if (idMatch) {
-            // This logic is flawed for ID matching but the goal is to identify which items are credits from relaunches
-            const originalItem = historyItems.find(h => 
-                h.nf === item.nf &&
-                h.uh === item.uh &&
-                h.reason !== 'relancamento'
-            );
-            if (originalItem) {
-                // Heuristic: find an original estorno that this relancamento might be for
-                // A better approach would be to store the original ID
-            }
-         }
-         // A better logic would be to check if an original estorno has a corresponding relancamento.
-      }
-    });
-
-    historyItems.forEach(debit => {
-        if (debit.reason !== 'relancamento') {
-            const hasMatchingCredit = historyItems.some(credit => 
-                credit.reason === 'relancamento' &&
-                credit.nf === debit.nf &&
-                credit.uh === debit.uh &&
-                Math.abs(credit.valorEstorno) === Math.abs(debit.valorEstorno)
-            );
-            if (hasMatchingCredit) {
-                ids.add(debit.id);
-            }
-        }
-    });
-
-    return ids;
-  }, [historyItems]);
-
 
   useEffect(() => {
     if (username) {
@@ -141,11 +102,10 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
     const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
     try {
-      const response = await fetch(`/api/estornos?startDate=${startDate}&endDate=${endDate}`);
+      const response = await fetch(`/api/estornos?startDate=${startDate}&endDate=${endDate}&category=${category}`);
       if (response.ok) {
         const data: EstornoItem[] = await response.json();
-        const filteredData = category === 'all' ? data : data.filter(item => item.category === category);
-        setHistoryItems(filteredData.sort((a,b) => parseISO(String(b.date)).getTime() - parseISO(String(a.date)).getTime()));
+        setHistoryItems(data);
       } else {
         setHistoryItems([]);
       }
@@ -255,30 +215,69 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
   };
   
-  const monthTotals = useMemo(() => {
-    return historyItems.reduce((acc, item) => {
-      if (item.reason !== 'relancamento') {
-          acc.totalItems += item.quantity || 0;
-      }
-      acc.totalValor += item.valorEstorno || 0;
-      return acc;
-    }, { totalItems: 0, totalValor: 0 });
+  const sortedEstornos = React.useMemo(() => {
+    return [...historyItems].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
   }, [historyItems]);
 
-  const totals = React.useMemo(() => {
-    return historyItems.reduce((acc, item) => {
-        if (item.reason !== 'relancamento') {
-            acc.qtd += item.quantity || 0;
-            if ((item.valorTotalNota || 0) > 0) {
-              acc.valorTotalNota += item.valorTotalNota || 0;
-            }
+  const { relaunchedDebitIds, neutralizingCreditIds } = useMemo(() => {
+    const debitIds = new Set<string>();
+    const creditIds = new Set<string>();
+    
+    if (!sortedEstornos || sortedEstornos.length === 0) {
+      return { relaunchedDebitIds: debitIds, neutralizingCreditIds: creditIds };
+    }
+
+    const credits = sortedEstornos.filter(i => i.reason === 'relancamento' && i.uh && i.nf);
+    const debits = sortedEstornos.filter(i => (i.reason === 'erro de lancamento' || i.reason === 'nao consumido') && i.uh && i.nf);
+
+    credits.forEach(credit => {
+      const matchingDebitIndex = debits.findIndex(debit => 
+        debit.uh === credit.uh && 
+        debit.nf === credit.nf &&
+        Math.abs(credit.valorEstorno) === Math.abs(debit.valorEstorno) &&
+        !debitIds.has(debit.id)
+      );
+      
+      if (matchingDebitIndex !== -1) {
+        const originalDebit = debits[matchingDebitIndex];
+        debitIds.add(originalDebit.id);
+        creditIds.add(credit.id);
+        debits.splice(matchingDebitIndex, 1);
+      }
+    });
+
+    return { relaunchedDebitIds: debitIds, neutralizingCreditIds: creditIds };
+  }, [sortedEstornos]);
+
+  const footerTotals = useMemo(() => {
+    const neutralizedItemIds = new Set([...(relaunchedDebitIds ?? []), ...(neutralizingCreditIds ?? [])]);
+    
+    return sortedEstornos.reduce((acc, item) => {
+        const isNeutralized = neutralizedItemIds.has(item.id);
+        if (isNeutralized) {
+            return acc; 
         }
-        acc.valorEstorno += item.valorEstorno || 0;
+
+        if (item.reason !== 'relancamento') {
+          acc.qtd += item.quantity || 0;
+          acc.valorTotalNota += item.valorTotalNota || 0;
+        }
+        
+        const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+        const isCredit = item.reason === 'relancamento';
+
+        if (isCredit) {
+            acc.creditoValor += item.valorEstorno || 0;
+        } else if (isDebit) {
+            acc.debitadoValor += item.valorEstorno || 0;
+        } else {
+            acc.controleValor += item.valorEstorno || 0;
+        }
         
         let diferenca = 0;
-        if ((item.valorTotalNota || 0) > 0 && (item.valorEstorno || 0) !== 0) {
-            if (item.reason === 'relancamento') {
-                 diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
+        if ((item.valorTotalNota || 0) !== 0) {
+            if (isCredit) {
+                 diferenca = (item.valorTotalNota || 0) - Math.abs(item.valorEstorno || 0);
             } else {
                  diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
             }
@@ -286,8 +285,9 @@ export default function EstornoForm({ category }: EstornoFormProps) {
         acc.diferenca += diferenca;
         
         return acc;
-    }, { qtd: 0, valorTotalNota: 0, valorEstorno: 0, diferenca: 0 });
-  }, [historyItems]);
+    }, { qtd: 0, controleValor: 0, debitadoValor: 0, valorTotalNota: 0, diferenca: 0, creditoValor: 0 });
+}, [sortedEstornos, relaunchedDebitIds, neutralizingCreditIds]);
+
 
   return (
     <div className="space-y-6">
@@ -371,18 +371,6 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                     </Button>
                  </div>
             </div>
-             <div className="border-t pt-4 flex justify-end items-center gap-6 text-sm">
-                <div className="text-right">
-                    <span className="text-muted-foreground">Total de Itens Estornados no Mês:</span>
-                    <span className="font-bold ml-2">{monthTotals.totalItems.toLocaleString('pt-BR')}</span>
-                </div>
-                 <div className="text-right">
-                    <span className="text-muted-foreground">Valor Total Estornado no Mês:</span>
-                    <span className={cn("font-bold ml-2", monthTotals.totalValor < 0 ? "text-destructive" : "text-green-600")}>
-                        {monthTotals.totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </span>
-                </div>
-             </div>
         </CardContent>
       </Card>
       
@@ -394,102 +382,122 @@ export default function EstornoForm({ category }: EstornoFormProps) {
             </div>
         </CardHeader>
         <CardContent>
-             {isLoadingHistory ? (
+            {isLoadingHistory ? (
                 <div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-            ) : historyItems.length > 0 ? (
+            ) : sortedEstornos.length > 0 ? (
                 <div className="border rounded-md overflow-x-auto">
                     <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Usuário</TableHead>
-                            <TableHead>Detalhes (UH/NF)</TableHead>
-                            <TableHead>Motivo</TableHead>
-                            <TableHead>Observação</TableHead>
-                            <TableHead className="text-right">Qtd.</TableHead>
-                            <TableHead className="text-right">Valor Total Nota</TableHead>
-                            <TableHead className="text-right">Valor do Estorno</TableHead>
-                            <TableHead className="text-right">Diferença</TableHead>
-                            <TableHead className="text-right w-[100px]">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {historyItems.map((item) => {
-                            const isCredit = item.reason === 'relancamento';
-                            const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
-                            const hasBeenRelaunched = relaunchedIds.has(item.id);
-                            
-                            let diferenca = 0;
-                            if ((item.valorTotalNota || 0) > 0 && (item.valorEstorno || 0) !== 0) {
-                                if (isCredit) {
-                                     diferenca = (item.valorTotalNota || 0) - (item.valorEstorno || 0);
-                                } else {
-                                     diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
-                                }
-                            }
-
-                            return (
-                            <TableRow key={item.id} className={cn(
-                                hasBeenRelaunched ? "bg-purple-200 dark:bg-purple-900/40" : 
-                                isCredit ? "bg-green-600 hover:bg-green-700/90 text-white" : 
-                                isDebit ? "bg-red-700 hover:bg-red-800/90 text-white" : ""
-                            )}>
-                                <TableCell className="text-xs font-medium">{format(parseISO(item.date), 'dd/MM/yyyy')}</TableCell>
-                                <TableCell className="text-xs capitalize">{item.registeredBy || '-'}</TableCell>
-                                <TableCell className="text-xs">
-                                  {item.uh && <div>UH: {item.uh}</div>}
-                                  {item.nf && <div>NF: {item.nf}</div>}
-                                </TableCell>
-                                <TableCell className="text-xs font-medium capitalize">{ESTORNO_REASON_LABELS[item.reason] || item.reason}</TableCell>
-                                <TableCell className={cn("text-xs whitespace-pre-wrap", (isDebit || isCredit || hasBeenRelaunched) ? 'text-gray-200' : 'text-muted-foreground')}>{item.observation}</TableCell>
-                                <TableCell className="text-right">{formatQty(item.quantity)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.valorTotalNota)}</TableCell>
-                                <TableCell className={cn("text-right font-semibold", isCredit ? "text-white" : isDebit ? 'text-white' : "text-destructive")}>{`R$ ${Number(item.valorEstorno || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</TableCell>
-                                <TableCell className="text-right font-bold">{formatCurrency(diferenca)}</TableCell>
-                                <TableCell className="text-right">
-                                   <div className="flex justify-end items-center">
-                                     <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} disabled={isCredit || hasBeenRelaunched} />
-                                     <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed", (isCredit || isDebit || hasBeenRelaunched) ? 'text-white hover:text-destructive' : 'text-destructive')} disabled={hasBeenRelaunched}>
-                                              <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                  Tem certeza que deseja remover este estorno? Esta ação não pode ser desfeita.
-                                              </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => handleDeleteItem(item)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                     </AlertDialog>
-                                   </div>
-                                </TableCell>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Usuário/Data</TableHead>
+                                <TableHead>Detalhes (UH/NF)</TableHead>
+                                <TableHead>Motivo</TableHead>
+                                <TableHead>Observação</TableHead>
+                                <TableHead className="text-right">Qtd.</TableHead>
+                                <TableHead className="text-right">Valor Nota</TableHead>
+                                <TableHead className="text-right">Crédito (Relanç.)</TableHead>
+                                <TableHead className="text-right">Estorno (Controle)</TableHead>
+                                <TableHead className="text-right">Estorno (Débito)</TableHead>
+                                <TableHead className="text-right">Diferença</TableHead>
+                                <TableHead className="text-right w-[100px]">Ações</TableHead>
                             </TableRow>
-                        )})}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow className="font-bold bg-muted/50">
-                          <TableCell colSpan={5}>TOTAIS</TableCell>
-                          <TableCell className="text-right">{formatQty(totals.qtd)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.valorTotalNota)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.valorEstorno)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totals.diferenca)}</TableCell>
-                          <TableCell></TableCell>
-                      </TableRow>
-                    </TableFooter>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedEstornos.map((item) => {
+                                const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+                                const isCredit = item.reason === 'relancamento';
+                                const hasBeenRelaunched = relaunchedDebitIds.has(item.id);
+                                const isNeutralizedCredit = neutralizingCreditIds.has(item.id);
+
+                                let diferenca = 0;
+                                if ((item.valorTotalNota || 0) !== 0 && (item.valorEstorno || 0) !== 0) {
+                                  if (isCredit) {
+                                      diferenca = (item.valorTotalNota || 0) - Math.abs(item.valorEstorno || 0);
+                                  } else {
+                                      diferenca = (item.valorTotalNota || 0) + (item.valorEstorno || 0);
+                                  }
+                                }
+                                
+                                const showNotaValue = item.reason === 'relancamento' ? (item.valorTotalNota || 0) > 0 : true;
+
+                                return (
+                                <TableRow key={item.id} className={cn(
+                                    (hasBeenRelaunched || isNeutralizedCredit) && "bg-purple-100 dark:bg-purple-900/40 opacity-70",
+                                    (isDebit && !hasBeenRelaunched) && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                )}>
+                                    <TableCell className="text-xs">
+                                        <div className="font-medium capitalize">{item.registeredBy || '-'}</div>
+                                        <div className="text-muted-foreground">{format(parseISO(item.date), 'dd/MM/yyyy')}</div>
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      {item.uh && <div>UH: {item.uh}</div>}
+                                      {item.nf && <div>NF: {item.nf}</div>}
+                                    </TableCell>
+                                    <TableCell className="text-xs font-medium capitalize">{ESTORNO_REASON_LABELS[item.reason] || item.reason}</TableCell>
+                                    <TableCell className="text-xs text-muted-foreground whitespace-pre-wrap">{item.observation}</TableCell>
+                                    <TableCell className="text-right text-xs">{item.reason === 'relancamento' ? '-' : formatQty(item.quantity)}</TableCell>
+                                    <TableCell className="text-right text-xs">{showNotaValue ? formatCurrency(item.valorTotalNota) : '-'}</TableCell>
+                                    
+                                    <TableCell className={cn("text-right text-xs font-semibold", isCredit && !isNeutralizedCredit && "text-green-600")}>
+                                      {isCredit && !isNeutralizedCredit ? formatCurrency(item.valorEstorno) : '-'}
+                                    </TableCell>
+                                    <TableCell className={cn("text-right text-xs font-semibold", !isCredit && !isDebit && "text-red-500" )}>
+                                      {(!isCredit && !isDebit) ? formatCurrency(item.valorEstorno) : '-'}
+                                    </TableCell>
+                                    <TableCell className={cn("text-right text-xs font-semibold", isDebit && !hasBeenRelaunched && "text-white")}>
+                                      {(isDebit && !hasBeenRelaunched) ? formatCurrency(item.valorEstorno) : '-'}
+                                    </TableCell>
+
+                                    <TableCell className="text-right text-xs font-bold">{formatCurrency(diferenca)}</TableCell>
+                                    <TableCell className="text-right">
+                                    <div className="flex justify-end items-center">
+                                        <RelaunchModal originalItem={item} onSuccess={() => fetchEstornos(selectedMonth)} disabled={!isDebit || hasBeenRelaunched} />
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" disabled={isDebit && hasBeenRelaunched}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Tem certeza que deseja remover este estorno? Esta ação não pode ser desfeita.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteItem(item)} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
+                      </TableBody>
+                      {sortedEstornos.length > 0 && (
+                          <TableFooter>
+                              <TableRow className="font-bold bg-muted/50">
+                                  <TableCell colSpan={4}>TOTAIS (NÃO-NEUTRALIZADOS)</TableCell>
+                                  <TableCell className="text-right">{formatQty(footerTotals.qtd)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(footerTotals.valorTotalNota)}</TableCell>
+                                  <TableCell className="text-right text-green-600">{formatCurrency(footerTotals.creditoValor)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(footerTotals.controleValor)}</TableCell>
+                                  <TableCell className="text-right text-destructive">{formatCurrency(footerTotals.debitadoValor)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(footerTotals.diferenca)}</TableCell>
+                                  <TableCell></TableCell>
+                              </TableRow>
+                          </TableFooter>
+                      )}
                     </Table>
                 </div>
             ) : (
-                <p className="text-center text-muted-foreground py-4">Nenhum estorno registrado para este mês e categoria.</p>
+                <p className="text-center text-muted-foreground py-4">Nenhum estorno encontrado para o período e categoria selecionados.</p>
             )}
         </CardContent>
-      </Card>
+        </Card>
     </div>
   );
 }

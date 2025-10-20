@@ -1,4 +1,5 @@
 
+
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { generatePdf } from './pdf/pdfGenerator';
@@ -93,6 +94,7 @@ const exportToExcel = async (params: ExportParams) => {
         'all': '',
     };
     const estornoCategoryLabel = params.estornoCategory && params.estornoCategory !== 'all' ? categoryTitles[params.estornoCategory] : '';
+    const viewLabel = params.view ? `_${params.view}` : '';
 
     const filenameMap: Record<string, string[]> = {
         'range': ['Relatorio_Geral', dateRangeFilenameStr],
@@ -103,7 +105,7 @@ const exportToExcel = async (params: ExportParams) => {
         'controle-cafe': ['Controle_Cafe', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
         'controle-cafe-no-show': ['Controle_No_Show', dateRangeFilenameStr, params.selectedDezena && params.selectedDezena !== 'all' ? `${params.selectedDezena}a_Dezena` : ''],
         'estornos': ['Relatorio_Estornos', estornoCategoryLabel, dateRangeFilenameStr],
-        'controle-frigobar': ['Controle_Frigobar', dateRangeFilenameStr],
+        'controle-frigobar': ['Controle_Frigobar', dateRangeFilenameStr, viewLabel],
         'date': ['Relatorio_Dia', dateRangeFilenameStr],
     };
 

@@ -56,12 +56,11 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
 
     let pageCounter = 0;
     
-    const totalPagesForThisExport = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d))).length;
+    const dezenasComDados = dezenasToProcess.filter(d => allItemsForMonth.some(item => filterByDezena(item.entryDate, d)));
+    const totalPagesForThisExport = dezenasComDados.length;
 
-    for (const dezena of dezenasToProcess) {
+    for (const dezena of dezenasComDados) {
         const itemsForDezena = allItemsForMonth.filter(item => filterByDezena(item.entryDate, dezena));
-        
-        if (itemsForDezena.length === 0) continue;
         
         pageCounter++;
         if (pageCounter > 1) {
@@ -106,10 +105,10 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
             body,
             foot: footer,
             theme: 'striped', 
-            styles: { fontSize: 8 }, 
-            headStyles: { halign: 'center' }, 
-            bodyStyles: { halign: 'center' },
-            footStyles: { halign: 'center', fillColor: [230, 230, 230], textColor: 0 },
+            styles: { fontSize: 8, halign: 'left' }, 
+            headStyles: { halign: 'left' }, 
+            bodyStyles: { halign: 'left' },
+            footStyles: { halign: 'left', fillColor: [230, 230, 230], textColor: 0 },
             margin: { top: startY },
             didDrawPage: (hookData) => {
                 if (totalPagesForThisExport > 1) {
@@ -131,10 +130,10 @@ export const generateControleCafePdf = async (doc: jsPDF, params: ExportParams) 
             ],
             startY: (doc as any).lastAutoTable.finalY + 15,
             theme: 'grid',
-            styles: { fontSize: 9 },
+            styles: { fontSize: 9, halign: 'left' },
             columnStyles: {
                 0: { fontStyle: 'bold' },
-                1: { halign: 'right' }
+                1: { halign: 'left' }
             },
             tableWidth: 250,
         });

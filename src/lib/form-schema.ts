@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 import { PERIOD_DEFINITIONS } from '@/lib/config/periods';
 import { PERIOD_FORM_CONFIG } from '@/lib/config/forms';
@@ -66,6 +67,7 @@ const frigobarPeriodDataSchema = z.object({
   periodObservations: z.string().optional(),
   checkoutsPrevistos: z.number().optional(),
   checkoutsProrrogados: z.number().optional(),
+  abatimentoAvulso: z.number().optional(),
 });
 
 
@@ -164,7 +166,7 @@ export const initialDefaultValuesForAllPeriods = (() => {
       return;
     }
     if (periodId === 'controleFrigobar') {
-      defaults.controleFrigobar = { logs: [], periodObservations: '', checkoutsPrevistos: undefined, checkoutsProrrogados: undefined };
+      defaults.controleFrigobar = { logs: [], periodObservations: '', checkoutsPrevistos: undefined, checkoutsProrrogados: undefined, abatimentoAvulso: undefined };
       return;
     }
     

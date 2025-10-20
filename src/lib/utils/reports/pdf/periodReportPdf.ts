@@ -59,7 +59,7 @@ export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams) => {
                 if (col.key === 'qtd' || col.key === 'quantity') footerContent = formatNumber(summary.qtd);
                 else if (col.key === 'valor' || col.key === 'totalValue' || col.key === 'total') footerContent = formatCurrency(summary.total);
                 
-                footerRow.push({ content: footerContent, styles: { fontStyle: 'bold', halign: 'right' } });
+                footerRow.push({ content: footerContent, styles: { fontStyle: 'bold', halign: 'left' } });
             });
             footer.push(footerRow);
         }
@@ -69,9 +69,9 @@ export const generatePeriodReportPdf = (doc: jsPDF, params: ExportParams) => {
             body: body,
             foot: footer,
             theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-            footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 2, halign: 'left' },
+            headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold', halign: 'left' },
+            footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'left' },
             showFoot: 'lastPage',
             margin: { top: startY },
              didDrawPage: (hookData) => {

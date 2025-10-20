@@ -48,6 +48,7 @@ interface ReportToolbarProps {
     setEstornoCategory?: (value: string) => void;
     estornoReason?: string;
     setEstornoReason?: (value: string) => void;
+    view?: 'geral' | 'consolidado' | 'descritivo';
 }
 
 const ESTORNO_REASONS: { value: EstornoReason, label: string }[] = [

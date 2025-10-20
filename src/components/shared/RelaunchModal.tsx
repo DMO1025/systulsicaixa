@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState } from 'react';
@@ -39,7 +38,7 @@ export function RelaunchModal({ originalItem, onSuccess, disabled = false }: Rel
   const handleConfirmRelaunch = async () => {
     setIsSaving(true);
 
-    const relaunchRefText = `Relançamento referente à NF: ${originalItem.nf || 'N/A'} / UH: ${originalItem.uh || 'N/A'}.`;
+    const relaunchRefText = `Relançamento referente à NF: ${originalItem.nf || 'N/A'} / UH: ${originalItem.uh || 'N/A'}`;
     const finalObservation = additionalObservation 
       ? `${relaunchRefText}\n${additionalObservation}`
       : relaunchRefText;

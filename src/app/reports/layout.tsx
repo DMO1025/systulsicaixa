@@ -87,7 +87,11 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
                     <div className="flex flex-col gap-1 mt-1">
                       {group.items.map((link) => {
                         if (link.subItems) {
-                            const isParentActive = link.subItems.some(sub => pathname === sub.href.split('?')[0]);
+                            const isParentActive = link.subItems.some(sub => {
+                                const currentView = searchParams.get('view');
+                                const subLinkView = new URLSearchParams(sub.href.split('?')[1] || '').get('view');
+                                return pathname.startsWith(sub.href.split('?')[0]) && (!subLinkView || currentView === subLinkView);
+                            });
                             
                             return (
                                 <AccordionItem value={`sub-${link.id}`} key={link.id} className="border-none">
@@ -105,8 +109,8 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
                                         <div className="flex flex-col gap-1 border-l-2 border-primary/20">
                                             {link.subItems.map(subLink => {
                                                 const currentView = searchParams.get('view');
-                                                const subLinkView = new URLSearchParams(subLink.href.split('?')[1]).get('view');
-                                                const isSubActive = pathname === subLink.href.split('?')[0] && currentView === subLinkView;
+                                                const subLinkView = new URLSearchParams(subLink.href.split('?')[1] || '').get('view');
+                                                const isSubActive = pathname.startsWith(subLink.href.split('?')[0]) && currentView === subLinkView;
 
                                                 return (
                                                     <Link

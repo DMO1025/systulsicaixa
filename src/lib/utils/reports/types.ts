@@ -1,5 +1,4 @@
 
-
 import type { DailyLogEntry, ReportData, FilterType, PeriodDefinition, ChannelUnitPricesConfig, CafeManhaNoShowItem, ControleCafeItem, EstornoItem, Company, UnifiedPersonTransaction, EstornoReason } from '@/lib/types';
 
 export interface ReportExportData {
@@ -29,6 +28,7 @@ export interface ExportParams {
     includeItemsInPdf?: boolean;
     estornoCategory?: string;
     estornoReason?: string;
+    view?: 'geral' | 'consolidado' | 'descritivo';
 }
 
 // Re-export types needed by generators to avoid circular dependencies

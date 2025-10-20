@@ -36,8 +36,8 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
 
     const footer = [[
         { content: 'TOTAL GERAL', styles: { fontStyle: 'bold' } },
-        { content: formatQty(grandTotals.qtd), styles: { fontStyle: 'bold', halign: 'right' } },
-        { content: formatCurrency(grandTotals.valor), styles: { fontStyle: 'bold', halign: 'right' } }
+        { content: formatQty(grandTotals.qtd), styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: formatCurrency(grandTotals.valor), styles: { fontStyle: 'bold', halign: 'left' } }
     ]];
 
     const consumptionLabel = getConsumptionTypeLabel(consumptionType) || 'Todos';
@@ -59,8 +59,9 @@ export const generatePersonSummaryPdf = (doc: jsPDF, params: ExportParams) => {
         foot: footer,
         theme: 'striped',
         showFoot: 'lastPage',
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'left' },
+        footStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold', halign: 'left' },
+        styles: { halign: 'left' },
         margin: { top: startY },
         didDrawPage: (hookData) => {
            const totalPages = (doc as any).internal.getNumberOfPages();
