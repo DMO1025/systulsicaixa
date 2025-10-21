@@ -150,7 +150,7 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
         dailyAggregates,
         totals: {
             consumo: calculatedTotals.consumo,
-            recebido: totalRecebidoComAbatimento,
+            recebido: calculatedTotals.recebido,
             diferenca: diferencaFinal,
             abatimento: totalAbatimento,
             totalItems,
@@ -178,7 +178,7 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
   }, [allLogs, dailyAggregates, totals, checkouts, itemsSummary, onDataCalculated]);
 
   const totalItemsQtd = itemsSummary.reduce((acc, item) => acc + item.qtd, 0);
-  const subtotal = totals.diferenca;
+  const subtotal = totals.recebido - totals.consumo;
   const finalTotal = totals.diferenca;
   
 
@@ -237,8 +237,8 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
                   <TableCell colSpan={3} className="text-left">TOTAIS</TableCell>
                   <TableCell className="text-left">{formatCurrency(totals.consumo)}</TableCell>
                   <TableCell className="text-left">{formatCurrency(totals.recebido)}</TableCell>
-                  <TableCell className={`font-extrabold ${totals.diferenca < 0 ? 'text-destructive' : 'text-green-600'} text-left`}>
-                      {formatCurrency(totals.diferenca)}
+                  <TableCell className={`font-extrabold ${subtotal < 0 ? 'text-destructive' : 'text-green-600'} text-left`}>
+                      {formatCurrency(subtotal)}
                   </TableCell>
               </TableRow>
           </TableFooter>
@@ -251,20 +251,20 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
       <TableHeader>
         <TableRow>
           <TableHead className="text-left">Data</TableHead>
-          <TableHead className="text-left">Valor Consumo</TableHead>
-          <TableHead className="text-left">Valor Recebido</TableHead>
-          <TableHead className="text-left">Valor Abatido</TableHead>
-          <TableHead className="text-left">Diferença</TableHead>
+          <TableHead className="text-right">Valor Consumo</TableHead>
+          <TableHead className="text-right">Valor Recebido</TableHead>
+          <TableHead className="text-right">Valor Abatido</TableHead>
+          <TableHead className="text-right">Diferença</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {dailyAggregates.length > 0 ? dailyAggregates.map((day) => (
           <TableRow key={day.date}>
             <TableCell className="font-medium text-left">{day.date}</TableCell>
-            <TableCell className="text-left">{formatCurrency(day.consumo)}</TableCell>
-            <TableCell className="text-left">{formatCurrency(day.recebido)}</TableCell>
-            <TableCell className="text-left">{formatCurrency(day.abatimento)}</TableCell>
-            <TableCell className={`font-bold ${day.diferenca < 0 ? 'text-destructive' : 'text-green-600'} text-left`}>
+            <TableCell className="text-right">{formatCurrency(day.consumo)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(day.recebido)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(day.abatimento)}</TableCell>
+            <TableCell className={`font-bold ${day.diferenca < 0 ? 'text-destructive' : 'text-green-600'} text-right`}>
               {formatCurrency(day.diferenca)}
             </TableCell>
           </TableRow>
@@ -280,10 +280,10 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
         <TableFooter>
           <TableRow className="font-bold bg-muted/50">
             <TableCell className="text-left">TOTAL GERAL</TableCell>
-            <TableCell className="text-left">{formatCurrency(totals.consumo)}</TableCell>
-            <TableCell className="text-left">{formatCurrency(totals.recebido - totals.abatimento)}</TableCell>
-            <TableCell className="text-left">{formatCurrency(totals.abatimento)}</TableCell>
-            <TableCell className={`font-extrabold ${totals.diferenca < 0 ? 'text-destructive' : 'text-green-600'} text-left`}>{formatCurrency(totals.diferenca)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(totals.consumo)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(totals.recebido)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(totals.abatimento)}</TableCell>
+            <TableCell className={`font-extrabold ${totals.diferenca < 0 ? 'text-destructive' : 'text-green-600'} text-right`}>{formatCurrency(totals.diferenca)}</TableCell>
           </TableRow>
         </TableFooter>
       )}
@@ -317,7 +317,7 @@ const ControleFrigobarReportView: React.FC<ControleFrigobarReportViewProps> = ({
                     <div className="flex justify-between items-center text-sm"><span>Total de Quartos Atendidos</span><span className="font-semibold">{formatQty(totals.totalUhsAtendidas)}</span></div>
                     <div className="flex justify-between items-center text-sm"><span>Total de Itens Vendidos</span><span className="font-semibold">{formatQty(totals.totalItems)}</span></div>
                     <div className="flex justify-between items-center text-sm"><span>Total Consumido (R$)</span><span className="font-semibold">{formatCurrency(totals.consumo)}</span></div>
-                    <div className="flex justify-between items-center text-sm"><span>Total Recebido (R$)</span><span className="font-semibold">{formatCurrency(totals.recebido - totals.abatimento)}</span></div>
+                    <div className="flex justify-between items-center text-sm"><span>Total Recebido (R$)</span><span className="font-semibold">{formatCurrency(totals.recebido)}</span></div>
                     <div className="flex justify-between items-center text-sm font-semibold border-t pt-2 mt-2"><span>Total Diferença (R$)</span><span className={cn(subtotal < 0 && 'text-destructive')}>{formatCurrency(subtotal)}</span></div>
                     <div className="flex justify-between items-center text-sm"><span>Valor Abatido</span><span className="font-semibold">{formatCurrency(totals.abatimento)}</span></div>
                     <div className="flex justify-between items-center text-base pt-2 border-t font-bold"><span>Total Perda</span><span className={cn(finalTotal < 0 ? 'text-destructive' : 'text-green-600')}>{formatCurrency(finalTotal)}</span></div>
