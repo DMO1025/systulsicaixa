@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
         // Business logic: Only 'erro de lancamento' and 'nao consumido' are debits (negative).
         // All others are for control or are credits (positive).
-        if (newItem.reason === 'erro de lancamento' || newItem.reason === 'nao consumido') {
+        if (newItem.reason === 'assinatura divergente' || newItem.reason === 'nao consumido') {
             newItem.valorEstorno = -Math.abs(newItem.valorEstorno);
         } else {
             newItem.valorEstorno = Math.abs(newItem.valorEstorno);

@@ -132,7 +132,7 @@ export function processEntriesForDashboard(entries: DailyLogEntry[], estornos: E
   const creditos = estornos.filter(item => item.reason === 'relancamento');
   
   const debitosReais = estornos.filter(debit => {
-    if (debit.reason !== 'erro de lancamento' && debit.reason !== 'nao consumido') {
+    if (debit.reason !== 'assinatura divergente' && debit.reason !== 'nao consumido') {
       return false;
     }
     const matchingCreditIndex = creditos.findIndex(credit => 

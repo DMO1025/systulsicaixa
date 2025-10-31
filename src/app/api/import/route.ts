@@ -1,4 +1,5 @@
 
+
 import { type NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
@@ -77,10 +78,10 @@ function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId:
     const errors: ErrorDetail[] = [];
 
     const headerMap = headers.map(header => {
-        const match = header.match(/^(.*) \((Qtd|Valor)\)$/);
+        const match = header.match(/^(.*) \((Qtd|R\$)\)$/);
         if (match) {
             const label = match[1];
-            const type = match[2].toLowerCase() === 'valor' ? 'vtotal' : 'qtd'; 
+            const type = match[2].toLowerCase() === 'r$' ? 'vtotal' : 'qtd'; 
             const channelId = channelLabelToIdMap.get(label);
             return { header, channelId, type };
         }
@@ -110,7 +111,7 @@ function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId:
             const col = headerMap[i];
             const cellValue = row[i];
             
-            if (col.channelId && col.type && cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '') {
+            if (col.channelId && col.type && (cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '')) {
                 const numericValue = parseFlexibleNumber(cellValue);
                 if (isNaN(numericValue)) {
                     errors.push({ sheetName, rowIndex, rowData: row, headers, message: `Valor não numérico "${cellValue}" encontrado na coluna "${col.header}". Use apenas números.` });
@@ -121,7 +122,7 @@ function processSimplePeriod(sheet: XLSX.WorkSheet, sheetName: string, periodId:
                 if (!periodData.channels![col.channelId]) {
                     periodData.channels![col.channelId] = {};
                 }
-                periodData.channels![col.channelId]![col.type] = numericValue;
+                periodData.channels![col.channelId]![col.type as 'qtd' | 'vtotal'] = numericValue;
             }
         }
 
@@ -165,10 +166,10 @@ function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, entri
             }
 
             const headerMap = headers.map(header => {
-                const match = header.match(/^(.*) \((Qtd|Valor)\)$/);
+                const match = header.match(/^(.*) \((Qtd|R\$)\)$/);
                 if (match) {
                     const label = match[1];
-                    const type = match[2].toLowerCase() === 'valor' ? 'vtotal' : 'qtd';
+                    const type = match[2].toLowerCase() === 'r$' ? 'vtotal' : 'qtd';
                     const channelId = channelLabelToIdMap.get(label);
                     return { header, channelId, type };
                 }
@@ -194,7 +195,7 @@ function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, entri
                 const col = headerMap[i];
                 const cellValue = row[i];
                 
-                if (col.channelId && col.type && cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '') {
+                if (col.channelId && col.type && (cellValue !== undefined && cellValue !== null && String(cellValue).trim() !== '')) {
                     const numericValue = parseFlexibleNumber(cellValue);
                     if (isNaN(numericValue)) {
                         allErrors.push({ sheetName: cleanSheetName, rowIndex, rowData: row, headers, message: `Valor não numérico "${cellValue}" encontrado na coluna "${col.header}". Use apenas números.` });
@@ -204,7 +205,7 @@ function processComplexPeriod(workbook: XLSX.WorkBook, periodId: PeriodId, entri
                     if (!periodData.subTabs![subTabKey]!.channels![col.channelId]) {
                          periodData.subTabs![subTabKey]!.channels![col.channelId] = {};
                     }
-                    periodData.subTabs![subTabKey]!.channels![col.channelId]![col.type] = numericValue;
+                    periodData.subTabs![subTabKey]!.channels![col.channelId]![col.type as 'qtd' | 'vtotal'] = numericValue;
                 }
             }
 
@@ -317,7 +318,6 @@ export async function POST(request: NextRequest) {
         const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
         
         // --- PRE-FETCHING ---
-        // 1. First pass: Collect all dates from the spreadsheet
         const allDates = new Set<string>();
         for (const sheetName of workbook.SheetNames) {
             const sheet = workbook.Sheets[sheetName];
@@ -333,7 +333,6 @@ export async function POST(request: NextRequest) {
             });
         }
         
-        // 2. Fetch all existing entries in the date range at once
         const datesArray = Array.from(allDates);
         const minDate = datesArray.reduce((min, p) => p < min ? p : min, datesArray[0] || '');
         const maxDate = datesArray.reduce((max, p) => p > max ? p : max, datesArray[0] || '');
@@ -352,7 +351,10 @@ export async function POST(request: NextRequest) {
         const periodConfig = PERIOD_FORM_CONFIG[periodId];
 
         if (periodId === 'eventos') {
-            const sheetName = workbook.SheetNames[0];
+            const sheetName = workbook.SheetNames.find(name => name.toLowerCase() === 'eventos');
+            if (!sheetName) {
+                return NextResponse.json({ success: false, message: `A planilha de importação de eventos deve conter uma aba chamada "Eventos".` }, { status: 400 });
+            }
             result = processEventosPeriod(workbook.Sheets[sheetName], sheetName, entriesMap);
         } else if (periodConfig?.subTabs) {
             result = processComplexPeriod(workbook, periodId, entriesMap);
@@ -379,3 +381,5 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, message: `Erro no servidor: ${error.message}` }, { status: 500 });
     }
 }
+
+    

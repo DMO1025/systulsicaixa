@@ -228,7 +228,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
     }
 
     const credits = sortedEstornos.filter(i => i.reason === 'relancamento' && i.uh && i.nf);
-    const debits = sortedEstornos.filter(i => (i.reason === 'erro de lancamento' || i.reason === 'nao consumido') && i.uh && i.nf);
+    const debits = sortedEstornos.filter(i => (i.reason === 'assinatura divergente' || i.reason === 'nao consumido') && i.uh && i.nf);
 
     credits.forEach(credit => {
       const matchingDebitIndex = debits.findIndex(debit => 
@@ -263,7 +263,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
           acc.valorTotalNota += item.valorTotalNota || 0;
         }
         
-        const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+        const isDebit = item.reason === 'assinatura divergente' || item.reason === 'nao consumido';
         const isCredit = item.reason === 'relancamento';
 
         if (isCredit) {
@@ -404,7 +404,7 @@ export default function EstornoForm({ category }: EstornoFormProps) {
                         </TableHeader>
                         <TableBody>
                             {sortedEstornos.map((item) => {
-                                const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+                                const isDebit = item.reason === 'assinatura divergente' || item.reason === 'nao consumido';
                                 const isCredit = item.reason === 'relancamento';
                                 const hasBeenRelaunched = relaunchedDebitIds.has(item.id);
                                 const isNeutralizedCredit = neutralizingCreditIds.has(item.id);

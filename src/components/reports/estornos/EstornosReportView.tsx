@@ -56,7 +56,7 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
     const creditIds = new Set<string>();
     
     const credits = sortedEstornos.filter(i => i.reason === 'relancamento' && i.uh && i.nf);
-    const debits = sortedEstornos.filter(i => (i.reason === 'erro de lancamento' || i.reason === 'nao consumido') && i.uh && i.nf);
+    const debits = sortedEstornos.filter(i => (i.reason === 'assiatura divergente' || i.reason === 'nao consumido') && i.uh && i.nf);
 
     credits.forEach(credit => {
         const matchingDebitIndex = debits.findIndex(debit => 
@@ -88,7 +88,7 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
             byDate[item.date] = { credit: 0, debit: 0, qtd: 0, controle: 0 };
         }
         const hasBeenRelaunched = relaunchedDebitIds.has(item.id);
-        const isDebit = (item.reason === 'erro de lancamento' || item.reason === 'nao consumido');
+        const isDebit = (item.reason === 'assinatura divergente' || item.reason === 'nao consumido');
         const isCredit = item.reason === 'relancamento';
 
         if (isCredit) {
@@ -136,7 +136,7 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
           acc.valorTotalNota += item.valorTotalNota || 0;
         }
         
-        const isDebit = (item.reason === 'erro de lancamento' || item.reason === 'nao consumido');
+        const isDebit = (item.reason === 'assinatura divergente' || item.reason === 'nao consumido');
         if (isDebit) {
             acc.debitadoValor += item.valorEstorno || 0;
         } else {
@@ -173,7 +173,7 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
       </TableHeader>
       <TableBody>
         {sortedEstornos.length > 0 ? sortedEstornos.map((item) => {
-            const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+            const isDebit = item.reason === 'assinatura divergente' || item.reason === 'nao consumido';
             const isCredit = item.reason === 'relancamento';
             const hasBeenRelaunched = relaunchedDebitIds.has(item.id);
             const isNeutralizedCredit = neutralizedCreditIds.has(item.id);
@@ -302,7 +302,7 @@ const EstornosReportView: React.FC<EstornosReportViewProps> = ({ estornos, categ
     };
 
     sortedEstornos.forEach(item => {
-        const isDebit = item.reason === 'erro de lancamento' || item.reason === 'nao consumido';
+        const isDebit = item.reason === 'assinatura divergente' || item.reason === 'nao consumido';
         const isCredit = item.reason === 'relancamento';
         const hasBeenRelaunched = relaunchedDebitIds.has(item.id);
         const isNeutralizedCredit = neutralizedCreditIds.has(item.id);
