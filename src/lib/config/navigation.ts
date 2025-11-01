@@ -1,4 +1,5 @@
 
+
 import type { PageId } from '@/lib/types';
 import {
   LayoutDashboard,
@@ -41,7 +42,7 @@ import {
 export const PATHS = {
   HOME: '/',
   DASHBOARD: '/dashboard',
-  ENTRIES_BASE: '/entries',
+  ENTRY_BASE: '/entries',
   CONTROLS_BASE: '/controls',
   REPORTS_BASE: '/reports',
   ESTORNOS_BASE: '/estornos',
@@ -87,7 +88,7 @@ export const REPORTS_PATHS = {
 export const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
   [PATHS.HOME]: 'dashboard',
   [PATHS.DASHBOARD]: 'dashboard',
-  [PATHS.ENTRIES_BASE]: 'entry',
+  [PATHS.ENTRY_BASE]: 'entry',
   [PATHS.CONTROLS_BASE]: 'controls',
   [PATHS.ESTORNOS_BASE]: 'estornos',
   [PATHS.REPORTS_BASE]: 'reports',
@@ -97,7 +98,7 @@ export const PATH_TO_PAGE_ID: Record<string, PageId | 'help' | 'admin'> = {
 
 export const PAGE_ID_TO_PATH: Record<PageId, string> = {
     dashboard: PATHS.DASHBOARD,
-    entry: PATHS.ENTRIES_BASE,
+    entry: PATHS.ENTRY_BASE,
     reports: PATHS.REPORTS_BASE,
     controls: PATHS.CONTROLS_BASE,
     estornos: PATHS.ESTORNOS_BASE,
@@ -105,7 +106,7 @@ export const PAGE_ID_TO_PATH: Record<PageId, string> = {
 
 export const BASE_NAV_ITEMS = [
   { id: 'dashboard', href: PATHS.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'entry', href: PATHS.ENTRIES_BASE, label: 'Lançamento Diário', icon: CalendarPlus },
+  { id: 'entry', href: PATHS.ENTRY_BASE, label: 'Lançamento Diário', icon: CalendarPlus },
   { id: 'controls', href: PATHS.CONTROLS_BASE, label: 'Controles Diários', icon: ClipboardCheck },
   { id: 'estornos', href: PATHS.ESTORNOS_BASE, label: 'Estornos', icon: Undo2 },
   { id: 'reports', href: PATHS.REPORTS_BASE, label: 'Relatórios', icon: FileText },
